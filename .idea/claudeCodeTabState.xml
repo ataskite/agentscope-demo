@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ClaudeCodeTabState">
+    <option name="tabSessions">
+      <map>
+        <entry key="0">
+          <value>
+            <TabSessionState>
+              <option name="provider" value="claude" />
+              <option name="sessionId" value="a7e6d5c9-f995-4380-9fcc-0da77425f3e5" />
+              <option name="cwd" value="$PROJECT_DIR$" />
+              <option name="model" value="claude-opus-4-6[1m]" />
+              <option name="permissionMode" value="bypassPermissions" />
+              <option name="reasoningEffort" value="medium" />
+            </TabSessionState>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>

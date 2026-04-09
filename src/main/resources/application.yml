@@ -1,0 +1,45 @@
+# AgentScope Demo Application Configuration
+
+spring:
+  application:
+    name: agentscope-demo
+
+# AgentScope Configuration
+agentscope:
+  # Model Configuration
+  model:
+    # Default model provider
+    provider: dashscope
+    # DashScope configuration
+    dashscope:
+      # API key (can be overridden by DASHSCOPE_API_KEY environment variable)
+      api-key: ${DASHSCOPE_API_KEY:}
+      # Model name
+      model-name: qwen-plus
+      # Enable streaming
+      stream: true
+      # Enable thinking mode
+      enable-thinking: true
+      # Thinking budget (tokens)
+      thinking-budget: 1024
+
+  # Memory Configuration
+  memory:
+    # Memory type: in-memory, mysql, redis
+    type: in-memory
+    # Max conversation history
+    max-history: 100
+
+  # Tool Configuration
+  tools:
+    # Enable built-in tools
+    enabled: true
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    io.agentscope: DEBUG
+    com.msxf.agentscope: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

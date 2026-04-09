@@ -1,0 +1,4 @@
+{"type":"server-started","port":53200,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:53200","screen_dir":"/Users/jiangkun/Documents/workspace/agentscope-demo/.superpowers/brainstorm/22984-1775729905/content","state_dir":"/Users/jiangkun/Documents/workspace/agentscope-demo/.superpowers/brainstorm/22984-1775729905/state"}
+{"type":"screen-added","file":"/Users/jiangkun/Documents/workspace/agentscope-demo/.superpowers/brainstorm/22984-1775729905/content/layout-options.html"}
+{"type":"screen-added","file":"/Users/jiangkun/Documents/workspace/agentscope-demo/.superpowers/brainstorm/22984-1775729905/content/layout-confirmed.html"}
+{"type":"screen-added","file":"/Users/jiangkun/Documents/workspace/agentscope-demo/.superpowers/brainstorm/22984-1775729905/content/waiting.html"}
