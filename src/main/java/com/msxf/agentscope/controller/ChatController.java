@@ -7,8 +7,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,6 +39,8 @@ public class ChatController {
     public Map<String, String> sendMessage(@RequestBody Map<String, String> request) {
         String agentType = request.getOrDefault("agentType", "basic");
         String message = request.get("message");
+        String filePath = request.get("filePath");
+        String fileName = request.get("fileName");
 
         if (message == null || message.isBlank()) {
             return Map.of("error", "Message cannot be empty");
@@ -57,7 +63,7 @@ public class ChatController {
 
         executor.submit(() -> {
             try {
-                agentService.streamToEmitter(agentType, message, emitter);
+                agentService.streamToEmitter(agentType, message, filePath, fileName, emitter);
             } catch (Exception e) {
                 log.error("Error during agent streaming", e);
                 emitter.completeWithError(e);
@@ -84,5 +90,44 @@ public class ChatController {
             return errorEmitter;
         }
         return emitter;
+    }
+
+    @PostMapping("/chat/upload")
+    @ResponseBody
+    public Map<String, String> uploadFile(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return Map.of("error", "File is empty");
+        }
+
+        String originalName = file.getOriginalFilename();
+        if (originalName == null) {
+            return Map.of("error", "File name is missing");
+        }
+
+        String lowerName = originalName.toLowerCase();
+        if (!lowerName.endsWith(".docx") && !lowerName.endsWith(".pdf")) {
+            return Map.of("error", "Only .docx and .pdf files are supported");
+        }
+
+        try {
+            String fileId = UUID.randomUUID().toString();
+            String ext = lowerName.substring(lowerName.lastIndexOf('.'));
+            String savedName = fileId + ext;
+            Path uploadDir = Paths.get(System.getProperty("java.io.tmpdir"), "agentscope-uploads");
+            Files.createDirectories(uploadDir);
+            Path filePath = uploadDir.resolve(savedName);
+            file.transferTo(filePath.toFile());
+
+            log.info("File uploaded: {} -> {}", originalName, filePath);
+
+            return Map.of(
+                    "fileId", fileId,
+                    "fileName", originalName,
+                    "filePath", filePath.toAbsolutePath().toString()
+            );
+        } catch (Exception e) {
+            log.error("Failed to upload file", e);
+            return Map.of("error", "Failed to save file: " + e.getMessage());
+        }
     }
 }
