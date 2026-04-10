@@ -3,6 +3,7 @@ package com.msxf.agentscope.service;
 import com.msxf.agentscope.model.SimpleTools;
 import com.msxf.agentscope.tool.DocxParserTool;
 import com.msxf.agentscope.tool.PdfParserTool;
+import com.msxf.agentscope.tool.XlsxParserTool;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.EventType;
 import io.agentscope.core.agent.StreamOptions;
@@ -61,7 +62,7 @@ public class AgentService {
                     case "task" -> "You are a document analysis assistant. " +
                             "When the user uploads a document, use the appropriate skill to parse it " +
                             "and then fulfill the user's request based on the extracted content. " +
-                            "Support .docx and .pdf file analysis.";
+                            "Support .docx, .pdf, and .xlsx file analysis.";
                     default -> "You are a helpful AI assistant. Be friendly and concise.";
                 })
                 .model(model)
@@ -84,6 +85,10 @@ public class AgentService {
                     skillBox.registration()
                             .skill(repo.getSkill("pdf"))
                             .tool(new PdfParserTool())
+                            .apply();
+                    skillBox.registration()
+                            .skill(repo.getSkill("xlsx"))
+                            .tool(new XlsxParserTool())
                             .apply();
                 } catch (Exception e) {
                     log.error("Failed to load skills from classpath", e);

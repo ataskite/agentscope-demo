@@ -105,8 +105,8 @@ public class ChatController {
         }
 
         String lowerName = originalName.toLowerCase();
-        if (!lowerName.endsWith(".docx") && !lowerName.endsWith(".pdf")) {
-            return Map.of("error", "Only .docx and .pdf files are supported");
+        if (!lowerName.endsWith(".docx") && !lowerName.endsWith(".pdf") && !lowerName.endsWith(".xlsx")) {
+            return Map.of("error", "Only .docx, .pdf, and .xlsx files are supported");
         }
 
         try {

@@ -749,7 +749,7 @@
                     <div id="fileTagArea"></div>
                     <div class="chat-input-row">
                         <button class="upload-btn" id="uploadBtn" onclick="document.getElementById('fileInput').click()" title="Upload file">&#x1F4CE;</button>
-                        <input type="file" id="fileInput" accept=".docx,.pdf" style="display:none" onchange="handleFileSelect(this)">
+                        <input type="file" id="fileInput" accept=".docx,.pdf,.xlsx" style="display:none" onchange="handleFileSelect(this)">
                         <textarea class="chat-input" id="messageInput" placeholder="Type your message..." rows="1"></textarea>
                         <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
                     </div>
@@ -1068,8 +1068,8 @@
             if (!file) return;
 
             var lowerName = file.name.toLowerCase();
-            if (!lowerName.endsWith('.docx') && !lowerName.endsWith('.pdf')) {
-                addDebugEntry('error', 'Only .docx and .pdf files are supported');
+            if (!lowerName.endsWith('.docx') && !lowerName.endsWith('.pdf') && !lowerName.endsWith('.xlsx')) {
+                addDebugEntry('error', 'Only .docx, .pdf, and .xlsx files are supported');
                 input.value = '';
                 return;
             }
