@@ -642,6 +642,59 @@
             .chat-messages { padding: 12px; }
             .message { max-width: 90%; }
         }
+
+        /* ===== FILE UPLOAD ===== */
+        .upload-btn {
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            background: var(--bg-input);
+            border: 1.5px solid var(--border-light);
+            border-radius: var(--radius);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: var(--text-secondary);
+            transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+        }
+
+        .upload-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .file-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: var(--accent-subtle);
+            border: 1px solid var(--accent);
+            border-radius: 20px;
+            font-size: 12px;
+            color: var(--accent);
+            margin-bottom: 6px;
+            max-width: 280px;
+        }
+
+        .file-tag-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-tag-remove {
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+            opacity: 0.7;
+        }
+
+        .file-tag-remove:hover {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -669,6 +722,13 @@
                             <div class="agent-card-desc">AI assistant with time, calculator, and weather tools</div>
                         </div>
                     </div>
+                    <div class="agent-card" data-agent="task" onclick="selectAgent('task')">
+                        <div class="agent-card-icon">&#x1F4C4;</div>
+                        <div class="agent-card-info">
+                            <div class="agent-card-name">Task Agent</div>
+                            <div class="agent-card-desc">Document analysis with file parsing skills</div>
+                        </div>
+                    </div>
                 </div>
             </aside>
 
@@ -686,7 +746,10 @@
                     </div>
                 </div>
                 <div class="chat-input-area">
+                    <div id="fileTagArea"></div>
                     <div class="chat-input-row">
+                        <button class="upload-btn" id="uploadBtn" onclick="document.getElementById('fileInput').click()" title="Upload file">&#x1F4CE;</button>
+                        <input type="file" id="fileInput" accept=".docx,.pdf" style="display:none" onchange="handleFileSelect(this)">
                         <textarea class="chat-input" id="messageInput" placeholder="Type your message..." rows="1"></textarea>
                         <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
                     </div>
@@ -713,10 +776,12 @@
         let isStreaming = false;
         let currentEventSource = null;
         let messageCount = 0;
+        let uploadedFile = null; // { fileId, fileName, filePath }
 
         const agents = {
             basic: { name: 'Basic Chat', desc: 'Simple conversation with AI assistant' },
-            tool: { name: 'Tool Calling', desc: 'AI assistant with time, calculator, and weather tools' }
+            tool: { name: 'Tool Calling', desc: 'AI assistant with time, calculator, and weather tools' },
+            task: { name: 'Task Agent', desc: 'Document analysis with file parsing skills' }
         };
 
         /* ===== DOM REFERENCES ===== */
@@ -746,6 +811,7 @@
 
         /* ===== SELECT AGENT ===== */
         function selectAgent(type) {
+            removeFile();
             if (isStreaming) return;
             currentAgent = type;
 
@@ -785,6 +851,9 @@
             input.value = '';
             input.style.height = 'auto';
 
+            // Clear file after send
+            removeFile();
+
             // Disable input
             setStreamingState(true);
 
@@ -802,7 +871,12 @@
                 var response = await fetch('/chat/send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ agentType: currentAgent, message: message })
+                    body: JSON.stringify({
+                        agentType: currentAgent,
+                        message: message,
+                        filePath: uploadedFile ? uploadedFile.filePath : null,
+                        fileName: uploadedFile ? uploadedFile.fileName : null
+                    })
                 });
 
                 var data = await response.json();
@@ -986,6 +1060,60 @@
                 debugPanel.classList.add('collapsed');
                 debugToggle.innerHTML = '&#x25B6;';
             }
+        }
+
+        /* ===== FILE UPLOAD ===== */
+        function handleFileSelect(input) {
+            var file = input.files[0];
+            if (!file) return;
+
+            var lowerName = file.name.toLowerCase();
+            if (!lowerName.endsWith('.docx') && !lowerName.endsWith('.pdf')) {
+                addDebugEntry('error', 'Only .docx and .pdf files are supported');
+                input.value = '';
+                return;
+            }
+
+            addDebugEntry('tool_call', 'Uploading file: ' + file.name);
+
+            var formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/chat/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    addDebugEntry('error', 'Upload failed: ' + data.error);
+                    return;
+                }
+                uploadedFile = data;
+                showFileTag(data.fileName);
+                if (currentAgent !== 'task') {
+                    selectAgent('task');
+                }
+                addDebugEntry('tool_result', 'File uploaded: ' + data.fileName);
+            })
+            .catch(function(err) {
+                addDebugEntry('error', 'Upload error: ' + err.message);
+            });
+
+            input.value = '';
+        }
+
+        function showFileTag(fileName) {
+            var area = document.getElementById('fileTagArea');
+            area.innerHTML = '<div class="file-tag">' +
+                '<span class="file-tag-name">' + escapeHtml(fileName) + '</span>' +
+                '<span class="file-tag-remove" onclick="removeFile()">&times;</span>' +
+                '</div>';
+        }
+
+        function removeFile() {
+            uploadedFile = null;
+            document.getElementById('fileTagArea').innerHTML = '';
         }
 
         /* ===== INIT ===== */
