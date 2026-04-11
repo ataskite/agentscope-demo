@@ -1422,6 +1422,11 @@
             currentFileInfo = fileInfo;
             var agentBubble = null;
 
+            // Create initial thinking box with file info
+            if (fileInfo) {
+                createThinkingBox(fileInfo);
+            }
+
             try {
                 var response = await fetch('/chat/send', {
                     method: 'POST',
