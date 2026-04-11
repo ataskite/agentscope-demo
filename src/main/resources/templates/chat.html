@@ -1148,6 +1148,57 @@
             opacity: 1;
         }
 
+        /* ===== FILE LIST (per message) ===== */
+        .file-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-sm);
+            margin-bottom: var(--space-sm);
+        }
+
+        .file-list-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: rgba(57, 255, 20, 0.08);
+            border: 1px solid rgba(57, 255, 20, 0.3);
+            border-radius: 4px;
+            font-size: 10px;
+            color: var(--neon-green);
+        }
+
+        .file-list-item .file-icon {
+            width: 14px;
+            height: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-card);
+            border-radius: 2px;
+            font-size: 7px;
+            font-weight: 700;
+        }
+
+        .file-list-item .file-icon.docx {
+            color: #2B579A;
+        }
+
+        .file-list-item .file-icon.pdf {
+            color: #FF4757;
+        }
+
+        .file-list-item .file-icon.xlsx {
+            color: #217346;
+        }
+
+        .file-list-item .file-name {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
         /* ===== RESPONSIVE ===== */
         @media (max-width: 900px) {
             .debug-panel:not(.collapsed) {
