@@ -1802,7 +1802,10 @@
         function createFileList(fileInfo) {
             if (!fileInfo) return '';
 
-            var ext = fileInfo.fileName.substring(fileInfo.fileName.lastIndexOf('.')).toLowerCase();
+            var lastDotIndex = fileInfo.fileName.lastIndexOf('.');
+            var ext = lastDotIndex >= 0
+                ? fileInfo.fileName.substring(lastDotIndex).toLowerCase()
+                : '';
             var iconLabel = '';
             var iconClass = '';
 
