@@ -53,6 +53,7 @@ public class AgentService {
                 .name(switch (agentType) {
                     case "tool" -> "ToolAgent";
                     case "task" -> "TaskAgent";
+                    case "template" -> "TemplateEditor";
                     default -> "Assistant";
                 })
                 .sysPrompt(switch (agentType) {
@@ -63,6 +64,10 @@ public class AgentService {
                             "When the user uploads a document, use the appropriate skill to parse it " +
                             "and then fulfill the user's request based on the extracted content. " +
                             "Support .docx, .pdf, and .xlsx file analysis.";
+                    case "template" -> "You are a Word document template editor. " +
+                            "When users upload a .docx template, help them fill in variables. " +
+                            "First parse the document to identify placeholders, " +
+                            "then ask for values if needed, then replace them using edit_docx.";
                     default -> "You are a helpful AI assistant. Be friendly and concise.";
                 })
                 .model(model)
@@ -89,6 +94,18 @@ public class AgentService {
                     skillBox.registration()
                             .skill(repo.getSkill("xlsx"))
                             .tool(new XlsxParserTool())
+                            .apply();
+                } catch (Exception e) {
+                    log.error("Failed to load skills from classpath", e);
+                }
+                builder.toolkit(toolkit).skillBox(skillBox);
+            }
+            case "template" -> {
+                SkillBox skillBox = new SkillBox(toolkit);
+                try (ClasspathSkillRepository repo = new ClasspathSkillRepository("skills")) {
+                    skillBox.registration()
+                            .skill(repo.getSkill("docx-template"))
+                            .tool(new DocxParserTool())
                             .apply();
                 } catch (Exception e) {
                     log.error("Failed to load skills from classpath", e);
