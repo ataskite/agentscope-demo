@@ -1035,13 +1035,35 @@
         }
         .debug-entry.type-thinking .debug-tag { color: var(--status-thinking); }
 
-        .debug-entry.type-tool_call,
+        .debug-entry.type-tool_call {
+            color: #FFB800;
+            border-left-color: #FFB800;
+            background: rgba(255, 184, 0, 0.08);
+        }
+        .debug-entry.type-tool_call .debug-tag { color: #FFB800; }
+
         .debug-entry.type-tool_result {
             color: var(--status-tool);
             border-left-color: var(--status-tool);
+            background: rgba(57, 255, 20, 0.05);
         }
-        .debug-entry.type-tool_call .debug-tag,
         .debug-entry.type-tool_result .debug-tag { color: var(--status-tool); }
+
+        .debug-entry .tool-name {
+            color: #FFB800;
+            font-weight: 600;
+        }
+
+        .debug-entry .tool-separator {
+            color: var(--text-muted);
+            margin: 0 4px;
+        }
+
+        .debug-entry .tool-params,
+        .debug-entry .tool-result {
+            color: var(--text-secondary);
+            word-break: break-all;
+        }
 
         .debug-entry.type-response {
             color: var(--neon-purple);
@@ -1243,6 +1265,193 @@
         .header-title:hover {
             animation: glitch 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both infinite;
         }
+        /* ===== CONFIG VIEWER MODAL ===== */
+        .config-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .config-modal {
+            width: 520px;
+            max-width: 90vw;
+            max-height: 80vh;
+            background: var(--bg-card);
+            border: 1px solid var(--border-accent);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 40px rgba(0, 245, 255, 0.2), inset 0 0 40px rgba(0, 245, 255, 0.03);
+            clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+            animation: modalIn 0.3s ease;
+        }
+
+        @keyframes modalIn {
+            from { opacity: 0; transform: translateY(-20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .config-modal-header {
+            padding: var(--space-lg) var(--space-xl);
+            border-bottom: 1px solid var(--border-dim);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .config-modal-title {
+            font-family: var(--font-heading);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 10px rgba(0, 245, 255, 0.4);
+        }
+
+        .config-modal-close {
+            width: 28px;
+            height: 28px;
+            background: none;
+            border: 1px solid var(--border-dim);
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
+        }
+
+        .config-modal-close:hover {
+            border-color: var(--status-error);
+            color: var(--status-error);
+            box-shadow: 0 0 10px rgba(255, 71, 87, 0.3);
+        }
+
+        .config-modal-body {
+            padding: var(--space-lg) var(--space-xl);
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .config-modal-body::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .config-modal-body::-webkit-scrollbar-thumb {
+            background: var(--border-dim);
+            border-radius: 2px;
+        }
+
+        .config-field {
+            margin-bottom: var(--space-md);
+        }
+
+        .config-field-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .config-field-value {
+            font-size: 12px;
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+
+        .config-field-value.mono {
+            font-family: var(--font-body);
+            background: var(--bg-void);
+            padding: var(--space-sm) var(--space-md);
+            border: 1px solid var(--border-dim);
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .config-field-value.tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-xs);
+        }
+
+        .config-tag {
+            display: inline-block;
+            padding: 2px var(--space-sm);
+            background: rgba(0, 245, 255, 0.1);
+            border: 1px solid var(--border-accent);
+            font-size: 10px;
+            color: var(--neon-cyan);
+            clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
+        }
+
+        .config-tag.tool {
+            background: rgba(255, 184, 0, 0.1);
+            border-color: rgba(255, 184, 0, 0.3);
+            color: #FFB800;
+        }
+
+        .config-tag.none {
+            background: rgba(88, 86, 112, 0.1);
+            border-color: var(--border-dim);
+            color: var(--text-muted);
+        }
+
+        .config-divider {
+            border: none;
+            border-top: 1px solid var(--border-dim);
+            margin: var(--space-lg) 0;
+        }
+
+        /* Agent card info button */
+        .agent-card-info-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 18px;
+            height: 18px;
+            background: none;
+            border: 1px solid transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            opacity: 0;
+            transition: all 0.2s ease;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .agent-card:hover .agent-card-info-btn {
+            opacity: 0.6;
+        }
+
+        .agent-card-info-btn:hover {
+            opacity: 1 !important;
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+        }
     </style>
 </head>
 <body>
@@ -1257,35 +1466,8 @@
             <!-- Left Sidebar: Agent Selector -->
             <aside class="sidebar">
                 <div class="sidebar-header">Select Agent</div>
-                <div class="agent-list">
-                    <div class="agent-card active" data-agent="basic" onclick="selectAgent('basic')">
-                        <div class="agent-card-icon">AI</div>
-                        <div class="agent-card-info">
-                            <div class="agent-card-name">Basic Chat</div>
-                            <div class="agent-card-desc">Simple conversation with AI assistant</div>
-                        </div>
-                    </div>
-                    <div class="agent-card" data-agent="tool" onclick="selectAgent('tool')">
-                        <div class="agent-card-icon">TL</div>
-                        <div class="agent-card-info">
-                            <div class="agent-card-name">Tool Calling</div>
-                            <div class="agent-card-desc">AI with time, calculator, weather tools</div>
-                        </div>
-                    </div>
-                    <div class="agent-card" data-agent="task" onclick="selectAgent('task')">
-                        <div class="agent-card-icon">TK</div>
-                        <div class="agent-card-info">
-                            <div class="agent-card-name">Task Agent</div>
-                            <div class="agent-card-desc">Document analysis with file parsing</div>
-                        </div>
-                    </div>
-                    <div class="agent-card" data-agent="template" onclick="selectAgent('template')">
-                        <div class="agent-card-icon">TE</div>
-                        <div class="agent-card-info">
-                            <div class="agent-card-name">Template Editor</div>
-                            <div class="agent-card-desc">Word template variable replacement</div>
-                        </div>
-                    </div>
+                <div class="agent-list" id="agentList">
+                    <!-- Agent cards rendered dynamically by loadAgents() -->
                 </div>
             </aside>
 
@@ -1329,18 +1511,13 @@
 
     <script>
         /* ===== STATE ===== */
-        let currentAgent = 'basic';
+        let currentAgent = null;
         let isStreaming = false;
         let currentEventSource = null;
         let messageCount = 0;
         let uploadedFile = null;
 
-        const agents = {
-            basic: { name: 'Basic Chat', desc: 'Simple conversation with AI assistant' },
-            tool: { name: 'Tool Calling', desc: 'AI with time, calculator, weather tools' },
-            task: { name: 'Task Agent', desc: 'Document analysis with file parsing' },
-            template: { name: 'Template Editor', desc: 'Word template variable replacement' }
-        };
+        const agents = {};
 
         /* ===== DOM REFERENCES ===== */
         const chatMessages = document.getElementById('chatMessages');
@@ -1352,6 +1529,137 @@
         const debugPanel = document.getElementById('debugPanel');
         const debugLog = document.getElementById('debugLog');
         const debugToggle = document.getElementById('debugToggle');
+
+        /* ===== LOAD AGENTS ===== */
+        async function loadAgents() {
+            try {
+                const response = await fetch('/api/agents');
+                const agentList = await response.json();
+
+                const agentListEl = document.getElementById('agentList');
+                agentListEl.innerHTML = '';
+
+                agentList.forEach(function(agent) {
+                    agents[agent.agentId] = {
+                        name: agent.name,
+                        desc: agent.description,
+                        config: agent
+                    };
+
+                    var card = document.createElement('div');
+                    card.className = 'agent-card';
+                    card.dataset.agentId = agent.agentId;
+                    card.onclick = function() { selectAgent(agent.agentId); };
+
+                    var namespace = agent.agentId.split('.')[0].toUpperCase();
+                    card.innerHTML =
+                        '<button class="agent-card-info-btn" onclick="event.stopPropagation(); showAgentConfig(\'' + agent.agentId + '\')" title="View config">i</button>' +
+                        '<div class="agent-card-icon">' + namespace.substring(0, 2) + '</div>' +
+                        '<div class="agent-card-info">' +
+                            '<div class="agent-card-name">' + escapeHtml(agent.name) + '</div>' +
+                            '<div class="agent-card-desc">' + escapeHtml(agent.description) + '</div>' +
+                        '</div>';
+
+                    agentListEl.appendChild(card);
+                });
+
+                // Select first agent by default
+                if (agentList.length > 0) {
+                    selectAgent(agentList[0].agentId);
+                }
+            } catch (err) {
+                addDebugEntry('error', '[INIT] Failed to load agents: ' + err.message);
+            }
+        }
+
+        /* ===== CONFIG VIEWER ===== */
+        function showAgentConfig(agentId) {
+            var agent = agents[agentId];
+            if (!agent || !agent.config) return;
+
+            var config = agent.config;
+
+            var skillsHtml;
+            if (config.skills && config.skills.length > 0) {
+                skillsHtml = '<div class="config-field-value tags">' +
+                    config.skills.map(function(s) { return '<span class="config-tag">' + escapeHtml(s) + '</span>'; }).join('') +
+                    '</div>';
+            } else {
+                skillsHtml = '<div class="config-field-value tags"><span class="config-tag none">None</span></div>';
+            }
+
+            var toolsHtml;
+            if (config.tools && config.tools.length > 0) {
+                toolsHtml = '<div class="config-field-value tags">' +
+                    config.tools.map(function(t) { return '<span class="config-tag tool">' + escapeHtml(t) + '</span>'; }).join('') +
+                    '</div>';
+            } else {
+                toolsHtml = '<div class="config-field-value tags"><span class="config-tag none">None</span></div>';
+            }
+
+            var overlay = document.createElement('div');
+            overlay.className = 'config-modal-overlay';
+            overlay.id = 'configModal';
+            overlay.onclick = function(e) {
+                if (e.target === overlay) closeConfigModal();
+            };
+
+            overlay.innerHTML =
+                '<div class="config-modal">' +
+                    '<div class="config-modal-header">' +
+                        '<div class="config-modal-title">Agent Configuration</div>' +
+                        '<button class="config-modal-close" onclick="closeConfigModal()">&#x2715;</button>' +
+                    '</div>' +
+                    '<div class="config-modal-body">' +
+                        '<div class="config-field">' +
+                            '<div class="config-field-label">Agent ID</div>' +
+                            '<div class="config-field-value">' + escapeHtml(config.agentId) + '</div>' +
+                        '</div>' +
+                        '<div class="config-field">' +
+                            '<div class="config-field-label">Name</div>' +
+                            '<div class="config-field-value">' + escapeHtml(config.name) + '</div>' +
+                        '</div>' +
+                        '<div class="config-field">' +
+                            '<div class="config-field-label">Description</div>' +
+                            '<div class="config-field-value">' + escapeHtml(config.description) + '</div>' +
+                        '</div>' +
+                        '<hr class="config-divider">' +
+                        '<div class="config-field">' +
+                            '<div class="config-field-label">Model</div>' +
+                            '<div class="config-field-value">' + escapeHtml(config.modelName) + '</div>' +
+                        '</div>' +
+                        '<div class="config-field">' +
+                            '<div class="config-field-label">Streaming</div>' +
+                            '<div class="config-field-value">' + (config.streaming ? 'Enabled' : 'Disabled') + '</div>' +
+                        '</div>' +
+                        '<div class="config-field">' +
+                            '<div class="config-field-label">Thinking Mode</div>' +
+                            '<div class="config-field-value">' + (config.enableThinking ? 'Enabled' : 'Disabled') + '</div>' +
+                        '</div>' +
+                        '<hr class="config-divider">' +
+                        '<div class="config-field">' +
+                            '<div class="config-field-label">System Prompt</div>' +
+                            '<div class="config-field-value mono">' + escapeHtml(config.systemPrompt || '') + '</div>' +
+                        '</div>' +
+                        '<hr class="config-divider">' +
+                        '<div class="config-field">' +
+                            '<div class="config-field-label">Skills</div>' +
+                            skillsHtml +
+                        '</div>' +
+                        '<div class="config-field">' +
+                            '<div class="config-field-label">Tools</div>' +
+                            toolsHtml +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+
+            document.body.appendChild(overlay);
+        }
+
+        function closeConfigModal() {
+            var modal = document.getElementById('configModal');
+            if (modal) modal.remove();
+        }
 
         /* ===== INPUT HANDLING ===== */
         messageInput.addEventListener('keydown', function(e) {
@@ -1367,17 +1675,18 @@
         });
 
         /* ===== SELECT AGENT ===== */
-        function selectAgent(type) {
+        function selectAgent(agentId) {
             removeFile();
             if (isStreaming) return;
-            currentAgent = type;
+            if (!agents[agentId]) return;
+            currentAgent = agentId;
 
             document.querySelectorAll('.agent-card').forEach(function(card) {
-                card.classList.toggle('active', card.dataset.agent === type);
+                card.classList.toggle('active', card.dataset.agentId === agentId);
             });
 
-            chatHeaderName.textContent = agents[type].name;
-            chatHeaderDesc.textContent = agents[type].desc;
+            chatHeaderName.textContent = agents[agentId].name;
+            chatHeaderDesc.textContent = agents[agentId].desc;
 
             chatMessages.innerHTML = '';
             messageCount = 0;
@@ -1440,7 +1749,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        agentType: currentAgent,
+                        agentId: currentAgent,
                         message: message,
                         filePath: fileInfo ? fileInfo.filePath : null,
                         fileName: fileInfo ? fileInfo.fileName : null
@@ -1489,15 +1798,21 @@
                             break;
 
                         case 'tool_call':
-                            var toolText = payload.content || payload.message || 'Tool invoked';
+                            var toolName = payload.name || 'unknown';
+                            var toolParams = payload.params || '{}';
+                            var toolText = 'Calling ' + toolName + ' with params: ' + toolParams;
                             updateThinkingBox('🔧 ' + toolText, fileInfo);
-                            addDebugEntry('tool_call', toolText);
+                            addDebugEntry('tool_call', toolName + ' | ' + toolParams);
                             break;
 
                         case 'tool_result':
-                            var resultText = payload.content || payload.message || 'Tool output';
+                            var toolName = payload.name || 'unknown';
+                            var toolResult = payload.result || '';
+                            // Truncate result if too long for thinking box
+                            var displayResult = toolResult.length > 100 ? toolResult.substring(0, 100) + '...' : toolResult;
+                            var resultText = toolName + ' returned: ' + displayResult;
                             updateThinkingBox('✓ ' + resultText, fileInfo);
-                            addDebugEntry('tool_result', resultText);
+                            addDebugEntry('tool_result', toolName + ' | ' + toolResult);
                             break;
 
                         case 'done':
@@ -1732,16 +2047,37 @@
 
             var typeLabels = {
                 thinking: 'THINK',
-                tool_call: 'CALL',
+                tool_call: 'TOOL',
                 tool_result: 'RESULT',
                 response: 'RESP',
                 error: 'ERR'
             };
 
+            var formattedContent;
+            if (type === 'tool_call') {
+                // content format: "toolName | params"
+                var parts = content.split(' | ');
+                var toolName = parts[0] || '';
+                var params = parts.slice(1).join(' | ') || '';
+                formattedContent = '<span class="tool-name">' + escapeHtml(toolName) + '</span>' +
+                    '<span class="tool-separator">→</span>' +
+                    '<span class="tool-params">' + escapeHtml(params) + '</span>';
+            } else if (type === 'tool_result') {
+                // content format: "toolName | result"
+                var parts = content.split(' | ');
+                var toolName = parts[0] || '';
+                var result = parts.slice(1).join(' | ') || '';
+                formattedContent = '<span class="tool-name">' + escapeHtml(toolName) + '</span>' +
+                    '<span class="tool-separator">←</span>' +
+                    '<span class="tool-result">' + escapeHtml(result) + '</span>';
+            } else {
+                formattedContent = escapeHtml(content);
+            }
+
             entry.innerHTML =
                 '<span class="debug-time">' + getTimestamp() + '</span>' +
                 '<span class="debug-tag">[' + (typeLabels[type] || type) + ']</span>' +
-                escapeHtml(content);
+                formattedContent;
 
             debugLog.appendChild(entry);
             scrollToBottom(debugLog);
@@ -1811,8 +2147,8 @@
                 }
                 uploadedFile = data;
                 showFileTag(data.fileName);
-                if (currentAgent !== 'task') {
-                    selectAgent('task');
+                if (currentAgent !== 'task.document-analysis') {
+                    selectAgent('task.document-analysis');
                 }
                 addDebugEntry('tool_result', '[UPLOAD COMPLETE] ' + data.fileName);
             })
@@ -1874,6 +2210,10 @@
         }
 
         /* ===== INIT ===== */
+        loadAgents();
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeConfigModal();
+        });
         messageInput.focus();
     </script>
 </body>
