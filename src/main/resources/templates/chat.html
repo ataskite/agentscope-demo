@@ -1412,10 +1412,11 @@
 
             addDebugEntry('thinking', '>>> Sending to ' + currentAgent.toUpperCase() + ' agent...');
 
-            // Reset thinking state
+            // Reset thinking state and store fileInfo
             currentThinkingBox = null;
             currentAgentMessageWrapper = null;
             thinkingContent = '';
+            currentFileInfo = fileInfo;
             var agentBubble = null;
 
             try {
@@ -1578,8 +1579,9 @@
         var currentThinkingBox = null;
         var currentAgentMessageWrapper = null;
         var thinkingContent = '';
+        var currentFileInfo = null;
 
-        function createThinkingBox() {
+        function createThinkingBox(fileInfo) {
             // Create a wrapper for agent response (thinking + bubble)
             var wrapper = document.createElement('div');
             wrapper.className = 'message agent';
@@ -1593,6 +1595,13 @@
 
             var content = document.createElement('div');
             content.className = 'agent-response-wrapper';
+
+            // Add file list if fileInfo provided
+            if (fileInfo) {
+                var fileListNode = document.createElement('div');
+                fileListNode.innerHTML = createFileList(fileInfo);
+                content.appendChild(fileListNode.firstChild);
+            }
 
             // Create thinking box
             var box = document.createElement('div');
@@ -1616,7 +1625,7 @@
 
         function updateThinkingBox(content) {
             if (!currentThinkingBox) {
-                createThinkingBox();
+                createThinkingBox(currentFileInfo);
             }
             thinkingContent += content;
             // 去掉多余的空行，只保留有内容的内容
@@ -1642,6 +1651,7 @@
                 currentThinkingBox.classList.add('collapsed');
                 thinkingContent = '';
                 currentThinkingBox = null;
+                currentFileInfo = null;
             }
         }
 
@@ -1652,7 +1662,7 @@
 
         function addAgentBubble() {
             if (!currentAgentMessageWrapper) {
-                createThinkingBox();
+                createThinkingBox(currentFileInfo);
             }
             var content = currentAgentMessageWrapper.querySelector('.agent-response-wrapper');
 
