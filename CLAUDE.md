@@ -24,35 +24,19 @@ App runs on http://localhost:8080.
 
 ## Architecture
 
-### Agent Types (AgentService)
+### Agent Configuration (config/agents.json)
 
-| Type | Name | Tools/Skills | Use Case |
-|------|------|--------------|----------|
-| `basic` | Assistant | none | Simple conversation |
-| `tool` | ToolAgent | SimpleTools (get_current_time, calculate_sum, get_weather) | Tool calling demo |
-| `task` | TaskAgent | DocxParserTool, PdfParserTool (via SkillBox) | Document analysis |
+Agents are defined in `src/main/resources/config/agents.json` using namespace-format IDs (e.g., `chat.basic`, `task.document-analysis`).
 
-Agents are cached in `ConcurrentHashMap<String, ReActAgent>`, created lazily via `createAgent()`.
+**Configuration chain:** `agents.json` → `AgentConfigService` → `AgentFactory` → `AgentService` (caches instances)
 
-### SkillBox + ClasspathSkillRepository Pattern
+Each agent config includes: `agentId`, `name`, `description`, `systemPrompt`, `modelName`, `streaming`, `enableThinking`, `skills[]`, `tools[]`.
 
-The `task` agent uses **SkillBox** for progressive tool disclosure:
-
-1. Skills are markdown files at `src/main/resources/skills/<skill-name>/SKILL.md` with YAML frontmatter (`name`, `description`)
-2. `ClasspathSkillRepository("skills")` loads skills from classpath (AutoCloseable)
-3. `skillBox.registration().skill(repo.getSkill("x")).tool(new XTool()).apply()` binds a skill to a tool instance
-4. The agent's `Toolkit` is shared between SkillBox and direct tool registration
-
-```java
-SkillBox skillBox = new SkillBox(toolkit);
-try (ClasspathSkillRepository repo = new ClasspathSkillRepository("skills")) {
-    skillBox.registration()
-        .skill(repo.getSkill("docx"))
-        .tool(new DocxParserTool())
-        .apply();
-}
-builder.toolkit(toolkit).skillBox(skillBox);
-```
+**Adding a new agent:**
+1. Add entry to `config/agents.json`
+2. If it uses a new tool class, register it in `ToolRegistry` constructor
+3. If it uses a new skill, create `skills/<name>/SKILL.md` and add mapping in `ToolRegistry`
+4. Restart the application — the new agent appears automatically in the UI
 
 ### Tool Registration
 
@@ -94,36 +78,56 @@ Register directly via `toolkit.registerTool(new SimpleTools())` or bind via Skil
 ```
 src/main/java/com/msxf/agentscope/
 ├── AgentScopeDemoApplication.java    # Spring Boot entry point
+├── config/
+│   ├── AgentConfig.java              # Agent config entity
+│   ├── AgentsConfig.java             # Root config wrapper
+│   ├── AgentConfigService.java       # Config loading and query service
+│   └── AgentFactory.java             # Agent creation from config
 ├── controller/
-│   └── ChatController.java           # SSE chat + file upload endpoints
+│   └── ChatController.java           # SSE chat + agent listing APIs
 ├── service/
-│   └── AgentService.java             # Agent factory, streaming logic
+│   └── AgentService.java             # Agent routing with instance cache
 ├── model/
 │   └── SimpleTools.java              # Demo tools (@Tool annotated methods)
 └── tool/
+    ├── ToolRegistry.java             # Tool/skill name-to-instance mapping
     ├── DocxParserTool.java           # DOCX parsing via Apache POI
-    └── PdfParserTool.java            # PDF parsing via Apache PDFBox
+    ├── PdfParserTool.java            # PDF parsing via Apache PDFBox
+    └── XlsxParserTool.java           # XLSX parsing via Apache POI
 
 src/main/resources/
 ├── application.yml                   # Config (api-key, multipart limits, logging)
+├── config/
+│   └── agents.json                   # Agent definitions (all agents in one file)
 ├── skills/
-│   ├── docx/SKILL.md                 # DOCX skill definition (YAML + markdown)
-│   └── pdf/SKILL.md                  # PDF skill definition
+│   ├── docx/SKILL.md                 # DOCX skill definition
+│   ├── pdf/SKILL.md                  # PDF skill definition
+│   ├── xlsx/SKILL.md                 # XLSX skill definition
+│   └── docx-template/SKILL.md        # DOCX template skill definition
 └── templates/
     └── chat.html                     # Single-page chat UI (vanilla JS + SSE)
 ```
 
-## Adding a New Skill
+## Adding a New Agent
 
-1. Create tool class in `src/main/java/com/msxf/agentscope/tool/` with `@Tool` methods
-2. Create `src/main/resources/skills/<name>/SKILL.md` with YAML frontmatter
-3. Add skill registration in `AgentService.createAgent()`'s `task` case:
-   ```java
-   skillBox.registration()
-       .skill(repo.getSkill("name"))
-       .tool(new YourTool())
-       .apply();
-   ```
+1. Add entry to `src/main/resources/config/agents.json`
+2. If using a new tool class, create it in `tool/` with `@Tool` methods
+3. Register the tool in `ToolRegistry` constructor: `registry.put("toolName", ToolClass::new)`
+4. If using skills, create `skills/<name>/SKILL.md` with YAML frontmatter
+5. Register the skill-to-tool mapping in `ToolRegistry` constructor
+6. Restart — agent appears in the UI automatically
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Chat UI page |
+| GET | `/api/agents` | List all agent configurations |
+| GET | `/api/agents/{agentId}` | Get specific agent configuration |
+| POST | `/chat/send` | Send message (body: `{agentId, message, filePath?, fileName?}`) |
+| GET | `/chat/stream?sessionId=` | SSE stream for responses |
+| POST | `/chat/upload` | Upload file (multipart) |
+| GET | `/chat/download?fileId=` | Download file |
 
 ## Dependencies
 
