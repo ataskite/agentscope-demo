@@ -1,11 +1,12 @@
 package com.msxf.agentscope.service;
 
-import com.msxf.agentscope.config.AgentFactory;
+import com.msxf.agentscope.agent.AgentFactory;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.EventType;
 import io.agentscope.core.agent.StreamOptions;
 import io.agentscope.core.agent.Event;
 import io.agentscope.core.message.*;
+import io.agentscope.core.model.ChatUsage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +24,7 @@ public class AgentService {
 
     private final AgentFactory agentFactory;
     private final ConcurrentHashMap<String, ReActAgent> agents = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> toolCallStartTimes = new ConcurrentHashMap<>();
 
     public AgentService(AgentFactory agentFactory) {
         this.agentFactory = agentFactory;
@@ -59,6 +61,7 @@ public class AgentService {
                                 handleEvent(event, emitter);
                             } catch (Exception e) {
                                 log.error("Error handling stream event", e);
+                                emitter.completeWithError(e);
                             }
                         },
                         error -> {
@@ -68,18 +71,29 @@ public class AgentService {
                             } catch (Exception e) {
                                 log.error("Error sending error event", e);
                             }
-                            emitter.complete();
+                            emitter.completeWithError(error);
                         },
                         () -> {
                             try {
-                                sendEvent(emitter, "done", Map.of());
+                                Map<String, Object> doneData = new java.util.LinkedHashMap<>();
+                                doneData.put("type", "done");
+                                doneData.put("totalLlmCalls", llmCallCount);
+                                doneData.put("toolCallsRemaining", toolCallStartTimes.size());
+                                String json = objectMapper.writeValueAsString(doneData);
+                                emitter.send(SseEmitter.event().name("message").data(json));
                             } catch (Exception e) {
                                 log.error("Error sending done event", e);
+                                emitter.completeWithError(e);
+                                return;
                             }
                             emitter.complete();
+                            llmCallCount = 0;
+                            toolCallStartTimes.clear();
                         }
                 );
     }
+
+    private int llmCallCount = 0;
 
     private void handleEvent(Event event, SseEmitter emitter) throws Exception {
         Msg msg = event.getMessage();
@@ -88,38 +102,62 @@ public class AgentService {
         }
 
         for (ContentBlock block : msg.getContent()) {
-            switch (block) {
-                case ThinkingBlock tb -> {
-                    String thinking = tb.getThinking();
-                    if (thinking != null && !thinking.isEmpty()) {
-                        sendEvent(emitter, "thinking", Map.of("content", thinking));
-                    }
+            if (block instanceof ThinkingBlock tb) {
+                String thinking = tb.getThinking();
+                if (thinking != null && !thinking.isEmpty()) {
+                    sendEvent(emitter, "thinking", Map.of("content", thinking));
                 }
-                case TextBlock tb -> {
-                    String text = tb.getText();
-                    if (text != null && !text.isEmpty()) {
-                        sendEvent(emitter, "text", Map.of("content", text));
-                    }
+            } else if (block instanceof TextBlock tb) {
+                String text = tb.getText();
+                if (text != null && !text.isEmpty()) {
+                    sendEvent(emitter, "text", Map.of("content", text));
                 }
-                case ToolUseBlock tub -> {
-                    sendEvent(emitter, "tool_call", Map.of(
-                            "name", tub.getName() != null ? tub.getName() : "",
-                            "params", tub.getInput() != null ? tub.getInput().toString() : "{}"
-                    ));
-                }
-                case ToolResultBlock trb -> {
-                    String resultText = trb.getOutput() != null
-                            ? trb.getOutput().stream()
-                            .filter(o -> o instanceof TextBlock)
-                            .map(o -> ((TextBlock) o).getText())
-                            .reduce("", (a, b) -> a + b)
-                            : "";
-                    sendEvent(emitter, "tool_result", Map.of(
-                            "name", trb.getName() != null ? trb.getName() : "",
-                            "result", resultText
-                    ));
-                }
-                default -> {}
+            } else if (block instanceof ToolUseBlock tub) {
+                String toolId = tub.getId();
+                toolCallStartTimes.put(toolId, System.currentTimeMillis());
+                sendEvent(emitter, "tool_call", Map.of(
+                        "id", toolId != null ? toolId : "",
+                        "name", tub.getName() != null ? tub.getName() : "",
+                        "params", tub.getInput() != null ? tub.getInput().toString() : "{}",
+                        "timestamp", System.currentTimeMillis()
+                ));
+            } else if (block instanceof ToolResultBlock trb) {
+                String resultText = trb.getOutput() != null
+                        ? trb.getOutput().stream()
+                        .filter(o -> o instanceof TextBlock)
+                        .map(o -> ((TextBlock) o).getText())
+                        .reduce("", (a, b) -> a + b)
+                        : "";
+                String toolId = trb.getId();
+                Long startTime = toolId != null ? toolCallStartTimes.remove(toolId) : null;
+                long durationMs = startTime != null ? System.currentTimeMillis() - startTime : -1;
+
+                String resultPreview = resultText.length() > 200
+                        ? resultText.substring(0, 200) + "..."
+                        : resultText;
+
+                sendEvent(emitter, "tool_result", Map.of(
+                        "id", toolId != null ? toolId : "",
+                        "name", trb.getName() != null ? trb.getName() : "",
+                        "result", resultText,
+                        "result_preview", resultPreview,
+                        "duration_ms", durationMs,
+                        "timestamp", System.currentTimeMillis()
+                ));
+            }
+        }
+
+        if (event.isLast()) {
+            ChatUsage usage = msg.getChatUsage();
+            if (usage != null) {
+                llmCallCount++;
+                sendEvent(emitter, "usage", Map.of(
+                        "inputTokens", usage.getInputTokens(),
+                        "outputTokens", usage.getOutputTokens(),
+                        "totalTokens", usage.getTotalTokens(),
+                        "time", usage.getTime(),
+                        "callNumber", llmCallCount
+                ));
             }
         }
     }
