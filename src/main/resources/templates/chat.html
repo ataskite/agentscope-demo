@@ -1798,6 +1798,40 @@
             document.getElementById('fileTagArea').innerHTML = '';
         }
 
+        /* ===== FILE LIST HELPER ===== */
+        function createFileList(fileInfo) {
+            if (!fileInfo) return '';
+
+            var ext = fileInfo.fileName.substring(fileInfo.fileName.lastIndexOf('.')).toLowerCase();
+            var iconLabel = '';
+            var iconClass = '';
+
+            switch (ext) {
+                case '.docx':
+                    iconLabel = 'W';
+                    iconClass = 'docx';
+                    break;
+                case '.pdf':
+                    iconLabel = 'P';
+                    iconClass = 'pdf';
+                    break;
+                case '.xlsx':
+                    iconLabel = 'X';
+                    iconClass = 'xlsx';
+                    break;
+                default:
+                    iconLabel = '?';
+                    iconClass = '';
+            }
+
+            return '<div class="file-list">' +
+                '<div class="file-list-item">' +
+                '<span class="file-icon ' + iconClass + '">' + iconLabel + '</span>' +
+                '<span class="file-name">' + escapeHtml(fileInfo.fileName) + '</span>' +
+                '</div>' +
+                '</div>';
+        }
+
         /* ===== INIT ===== */
         messageInput.focus();
     </script>
