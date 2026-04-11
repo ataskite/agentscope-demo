@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         /* ===== CYBERPUNK TERMINAL UI ===== */
         *, *::before, *::after {
@@ -180,7 +181,13 @@
             text-shadow: 0 0 10px rgba(0, 245, 255, 0.5);
         }
 
-        .header-title span {
+        .header-title .header-scope {
+            color: var(--neon-cyan);
+            font-weight: 700;
+            text-shadow: 0 0 10px rgba(0, 245, 255, 0.5);
+        }
+
+        .header-title .header-subtitle {
             color: var(--text-muted);
             font-weight: 500;
             margin-left: var(--space-md);
@@ -209,7 +216,11 @@
         }
 
         .sidebar-header {
-            padding: var(--space-lg) var(--space-lg) var(--space-md);
+            height: 40px;
+            min-height: 40px;
+            padding: 0 var(--space-lg);
+            display: flex;
+            align-items: center;
             font-family: var(--font-heading);
             font-size: 10px;
             font-weight: 700;
@@ -364,8 +375,8 @@
         }
 
         .chat-header {
-            height: 48px;
-            min-height: 48px;
+            height: 40px;
+            min-height: 40px;
             background: rgba(15, 15, 26, 0.5);
             border-bottom: 1px solid var(--border-dim);
             display: flex;
@@ -393,6 +404,30 @@
         .chat-header-desc {
             font-size: 11px;
             color: var(--text-secondary);
+        }
+
+        .chat-header-spacer {
+            flex: 1;
+        }
+
+        .chat-header-clear {
+            padding: 4px 12px;
+            background: none;
+            border: 1px solid var(--border-dim);
+            color: var(--text-muted);
+            font-size: 10px;
+            font-family: var(--font-heading);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
+        }
+
+        .chat-header-clear:hover {
+            border-color: var(--status-error);
+            color: var(--status-error);
+            box-shadow: 0 0 10px rgba(255, 71, 87, 0.3);
         }
 
         .chat-messages {
@@ -500,8 +535,134 @@
             line-height: 1.6;
             word-wrap: break-word;
             overflow-wrap: break-word;
-            white-space: pre-wrap;
             position: relative;
+        }
+
+        /* User bubbles keep pre-wrap for plain text */
+        .message.user .message-bubble {
+            white-space: pre-wrap;
+        }
+
+        /* ===== MARKDOWN STYLES (agent bubbles) ===== */
+        .message.agent .message-bubble {
+            white-space: normal;
+        }
+
+        .message-bubble.md-render p {
+            margin: 0 0 8px 0;
+        }
+
+        .message-bubble.md-render p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message-bubble.md-render ul,
+        .message-bubble.md-render ol {
+            margin: 6px 0;
+            padding-left: 20px;
+        }
+
+        .message-bubble.md-render li {
+            margin: 3px 0;
+            line-height: 1.6;
+        }
+
+        .message-bubble.md-render li::marker {
+            color: var(--neon-cyan);
+        }
+
+        .message-bubble.md-render strong {
+            color: var(--neon-cyan);
+            font-weight: 600;
+        }
+
+        .message-bubble.md-render em {
+            color: var(--neon-purple);
+            font-style: italic;
+        }
+
+        .message-bubble.md-render code {
+            background: rgba(0, 245, 255, 0.08);
+            border: 1px solid rgba(0, 245, 255, 0.15);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-family: var(--font-body);
+            font-size: 12px;
+            color: var(--neon-green);
+        }
+
+        .message-bubble.md-render pre {
+            background: var(--bg-void);
+            border: 1px solid var(--border-dim);
+            border-radius: 6px;
+            padding: var(--space-md);
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+
+        .message-bubble.md-render pre code {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 12px;
+            color: var(--text-primary);
+            white-space: pre;
+        }
+
+        .message-bubble.md-render blockquote {
+            border-left: 3px solid var(--neon-purple);
+            margin: 8px 0;
+            padding: 4px var(--space-md);
+            color: var(--text-secondary);
+            background: rgba(183, 148, 246, 0.05);
+        }
+
+        .message-bubble.md-render h1,
+        .message-bubble.md-render h2,
+        .message-bubble.md-render h3,
+        .message-bubble.md-render h4 {
+            color: var(--text-primary);
+            margin: 12px 0 6px 0;
+            font-weight: 600;
+        }
+
+        .message-bubble.md-render h1 { font-size: 16px; }
+        .message-bubble.md-render h2 { font-size: 15px; }
+        .message-bubble.md-render h3 { font-size: 14px; }
+
+        .message-bubble.md-render hr {
+            border: none;
+            border-top: 1px solid var(--border-dim);
+            margin: var(--space-md) 0;
+        }
+
+        .message-bubble.md-render a {
+            color: var(--neon-cyan);
+            text-decoration: none;
+            border-bottom: 1px solid rgba(0, 245, 255, 0.3);
+        }
+
+        .message-bubble.md-render a:hover {
+            border-bottom-color: var(--neon-cyan);
+        }
+
+        .message-bubble.md-render table {
+            border-collapse: collapse;
+            margin: 8px 0;
+            font-size: 12px;
+        }
+
+        .message-bubble.md-render th,
+        .message-bubble.md-render td {
+            border: 1px solid var(--border-dim);
+            padding: 6px 10px;
+            text-align: left;
+        }
+
+        .message-bubble.md-render th {
+            background: rgba(0, 245, 255, 0.05);
+            color: var(--neon-cyan);
+            font-weight: 600;
         }
 
         .message.user .message-bubble {
@@ -967,116 +1128,163 @@
             writing-mode: horizontal-tb;
         }
 
-        .debug-log {
-            flex: 1;
-            overflow-y: auto;
-            padding: var(--space-sm);
+        /* ===== SUMMARY CARD ===== */
+        .debug-summary {
+            flex-shrink: 0;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border-dim);
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        .debug-summary-row {
             display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .debug-panel.collapsed .debug-log {
-            display: none;
-        }
-
-        .debug-log::-webkit-scrollbar {
-            width: 4px;
-        }
-
-        .debug-log::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .debug-log::-webkit-scrollbar-thumb {
-            background: var(--border-dim);
-            border-radius: 2px;
-        }
-
-        .debug-entry {
-            font-family: var(--font-body);
+            justify-content: space-between;
+            align-items: center;
+            padding: 2px 0;
             font-size: 10px;
-            line-height: 1.5;
-            padding: var(--space-sm) var(--space-md);
-            background: rgba(0, 0, 0, 0.3);
-            border-left: 2px solid transparent;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            white-space: pre-wrap;
-            animation: debugIn 0.2s ease-out;
-            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%);
         }
 
-        @keyframes debugIn {
-            from {
-                opacity: 0;
-                transform: translateX(5px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        .debug-entry .debug-time {
+        .debug-summary-label {
             color: var(--text-muted);
-            margin-right: var(--space-sm);
-            opacity: 0.7;
-        }
-
-        .debug-entry .debug-tag {
             font-weight: 600;
-            margin-right: var(--space-sm);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            min-width: 50px;
         }
 
-        .debug-entry.type-thinking {
-            color: var(--status-thinking);
-            border-left-color: var(--status-thinking);
-        }
-        .debug-entry.type-thinking .debug-tag { color: var(--status-thinking); }
-
-        .debug-entry.type-tool_call {
-            color: #FFB800;
-            border-left-color: #FFB800;
-            background: rgba(255, 184, 0, 0.08);
-        }
-        .debug-entry.type-tool_call .debug-tag { color: #FFB800; }
-
-        .debug-entry.type-tool_result {
-            color: var(--status-tool);
-            border-left-color: var(--status-tool);
-            background: rgba(57, 255, 20, 0.05);
-        }
-        .debug-entry.type-tool_result .debug-tag { color: var(--status-tool); }
-
-        .debug-entry .tool-name {
-            color: #FFB800;
-            font-weight: 600;
+        .debug-summary-value {
+            font-family: var(--font-body);
+            color: var(--text-primary);
         }
 
-        .debug-entry .tool-separator {
+        .debug-summary-value .token-in {
+            color: var(--neon-blue);
+        }
+
+        .debug-summary-value .token-out {
+            color: var(--neon-cyan);
+        }
+
+        .debug-summary-value .arrow {
             color: var(--text-muted);
             margin: 0 4px;
         }
 
-        .debug-entry .tool-params,
-        .debug-entry .tool-result {
-            color: var(--text-secondary);
-            word-break: break-all;
+        .debug-panel.collapsed .debug-summary {
+            display: none;
         }
 
-        .debug-entry.type-response {
+        /* ===== TIMELINE ===== */
+        .debug-timeline {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-xs);
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            overflow-anchor: none;
+            transform: translateZ(0);
+        }
+
+        .debug-panel.collapsed .debug-timeline {
+            display: none;
+        }
+
+        .debug-timeline::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .debug-timeline::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .debug-timeline::-webkit-scrollbar-thumb {
+            background: var(--border-dim);
+            border-radius: 2px;
+        }
+
+        .debug-tl-row {
+            display: flex;
+            align-items: center;
+            font-family: var(--font-body);
+            font-size: 10px;
+            line-height: 1.4;
+            padding: 3px 6px;
+            background: rgba(0, 0, 0, 0.2);
+            border-left: 2px solid transparent;
+            animation: debugIn 0.15s ease-out;
+            will-change: opacity;
+        }
+
+        @keyframes debugIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .debug-tl-row.type-llm {
             color: var(--neon-purple);
             border-left-color: var(--neon-purple);
         }
-        .debug-entry.type-response .debug-tag { color: var(--neon-purple); }
 
-        .debug-entry.type-error {
+        .debug-tl-row.type-tool {
+            color: #FFB800;
+            border-left-color: #FFB800;
+            background: rgba(255, 184, 0, 0.06);
+        }
+
+        .debug-tl-row.type-tool.status-ok {
+            border-left-color: var(--neon-green);
+        }
+
+        .debug-tl-row.type-error {
             color: var(--status-error);
             border-left-color: var(--status-error);
+            background: rgba(255, 71, 87, 0.08);
         }
-        .debug-entry.type-error .debug-tag { color: var(--status-error); }
 
+        .debug-tl-row.type-done {
+            color: var(--neon-green);
+            border-left-color: var(--neon-green);
+        }
+
+        .debug-tl-icon {
+            width: 14px;
+            flex-shrink: 0;
+            text-align: center;
+        }
+
+        .debug-tl-label {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            padding-right: 6px;
+        }
+
+        .debug-tl-metrics {
+            flex-shrink: 0;
+            text-align: right;
+            white-space: nowrap;
+            color: var(--text-secondary);
+        }
+
+        .debug-tl-row.type-llm .debug-tl-metrics {
+            color: var(--neon-purple);
+            opacity: 0.8;
+        }
+
+        .debug-tl-row.type-tool .debug-tl-metrics {
+            color: #FFB800;
+            opacity: 0.8;
+        }
+
+        .debug-tl-status {
+            flex-shrink: 0;
+            width: 14px;
+            text-align: center;
+        }
+
+        /* ===== CLEAR BUTTON ===== */
         .debug-clear {
             padding: var(--space-sm);
             border-top: 1px solid var(--border-dim);
@@ -1141,15 +1349,20 @@
             display: inline-flex;
             align-items: center;
             gap: var(--space-sm);
-            padding: 4px var(--space-md);
+            padding: 6px var(--space-md);
             background: rgba(57, 255, 20, 0.1);
             border: 1px solid rgba(57, 255, 20, 0.4);
             font-size: 11px;
             color: var(--neon-green);
-            margin-bottom: var(--space-sm);
-            max-width: 280px;
+            max-width: 320px;
             clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 8px);
             box-shadow: 0 0 10px rgba(57, 255, 20, 0.2);
+            animation: fileTagIn 0.3s ease-out;
+        }
+
+        @keyframes fileTagIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .file-tag-name {
@@ -1287,9 +1500,9 @@
         }
 
         .config-modal {
-            width: 520px;
+            width: 560px;
             max-width: 90vw;
-            max-height: 80vh;
+            max-height: 92vh;
             background: var(--bg-card);
             border: 1px solid var(--border-accent);
             display: flex;
@@ -1305,7 +1518,7 @@
         }
 
         .config-modal-header {
-            padding: var(--space-lg) var(--space-xl);
+            padding: var(--space-md) var(--space-lg);
             border-bottom: 1px solid var(--border-dim);
             display: flex;
             align-items: center;
@@ -1344,7 +1557,7 @@
         }
 
         .config-modal-body {
-            padding: var(--space-lg) var(--space-xl);
+            padding: var(--space-md) var(--space-lg);
             overflow-y: auto;
             flex: 1;
         }
@@ -1359,7 +1572,7 @@
         }
 
         .config-field {
-            margin-bottom: var(--space-md);
+            margin-bottom: var(--space-sm);
         }
 
         .config-field-label {
@@ -1402,12 +1615,42 @@
             font-size: 10px;
             color: var(--neon-cyan);
             clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .config-tag:hover {
+            background: rgba(0, 245, 255, 0.2);
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 8px rgba(0, 245, 255, 0.3);
         }
 
         .config-tag.tool {
             background: rgba(255, 184, 0, 0.1);
             border-color: rgba(255, 184, 0, 0.3);
             color: #FFB800;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .config-tag.tool:hover {
+            background: rgba(255, 184, 0, 0.2);
+            border-color: #FFB800;
+            box-shadow: 0 0 8px rgba(255, 184, 0, 0.3);
+        }
+
+        .config-tag.system-tool {
+            background: rgba(77, 159, 255, 0.1);
+            border-color: rgba(77, 159, 255, 0.3);
+            color: var(--neon-blue);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .config-tag.system-tool:hover {
+            background: rgba(77, 159, 255, 0.2);
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 8px rgba(77, 159, 255, 0.3);
         }
 
         .config-tag.none {
@@ -1419,7 +1662,7 @@
         .config-divider {
             border: none;
             border-top: 1px solid var(--border-dim);
-            margin: var(--space-lg) 0;
+            margin: var(--space-sm) 0;
         }
 
         /* Agent card info button */
@@ -1437,20 +1680,25 @@
             align-items: center;
             justify-content: center;
             font-size: 10px;
-            opacity: 0;
+            opacity: 0.5;
             transition: all 0.2s ease;
             padding: 0;
             line-height: 1;
         }
 
         .agent-card:hover .agent-card-info-btn {
-            opacity: 0.6;
+            opacity: 0.8;
         }
 
         .agent-card-info-btn:hover {
             opacity: 1 !important;
             border-color: var(--neon-cyan);
             color: var(--neon-cyan);
+        }
+
+        .agent-card-info-btn svg {
+            width: 12px;
+            height: 12px;
         }
     </style>
 </head>
@@ -1460,7 +1708,7 @@
     <div class="app">
         <header class="app-header">
             <div class="header-logo"></div>
-            <div class="header-title">AGENT<span>SCOPE</span> <span>// TERMINAL v1.0</span></div>
+            <div class="header-title">AGENT<span class="header-scope">SCOPE</span> <span class="header-subtitle">// TERMINAL v1.0</span></div>
         </header>
         <div class="app-body">
             <!-- Left Sidebar: Agent Selector -->
@@ -1477,6 +1725,8 @@
                     <div class="chat-header-name" id="chatHeaderName">Basic Chat</div>
                     <div class="chat-header-sep">//</div>
                     <div class="chat-header-desc" id="chatHeaderDesc">Simple conversation with AI assistant</div>
+                    <div class="chat-header-spacer"></div>
+                    <button class="chat-header-clear" onclick="clearSession()">CLEAR</button>
                 </div>
                 <div class="chat-messages" id="chatMessages">
                     <div class="chat-empty" id="chatEmpty">
@@ -1485,7 +1735,7 @@
                     </div>
                 </div>
                 <div class="chat-input-area">
-                    <div id="fileTagArea"></div>
+                    <div id="fileTagArea" style="padding: 0 0 8px 0; min-height: 0;"></div>
                     <div class="chat-input-row">
                         <button class="upload-btn" id="uploadBtn" onclick="document.getElementById('fileInput').click()" title="Upload file">+</button>
                         <input type="file" id="fileInput" accept=".docx,.pdf,.xlsx" style="display:none" onchange="handleFileSelect(this)">
@@ -1498,12 +1748,30 @@
             <!-- Right: Debug Panel -->
             <aside class="debug-panel" id="debugPanel">
                 <div class="debug-header">
-                    <div class="debug-title">System Log</div>
+                    <div class="debug-title">Runtime</div>
                     <button class="debug-toggle" id="debugToggle" onclick="toggleDebug()" title="Toggle debug panel">▶</button>
                 </div>
-                <div class="debug-log" id="debugLog"></div>
+                <div class="debug-summary" id="debugSummary">
+                    <div class="debug-summary-row">
+                        <span class="debug-summary-label">Tokens</span>
+                        <span class="debug-summary-value"><span class="token-in" id="sumInputTok">0</span><span class="arrow">→</span><span class="token-out" id="sumOutputTok">0</span></span>
+                    </div>
+                    <div class="debug-summary-row">
+                        <span class="debug-summary-label">Time</span>
+                        <span class="debug-summary-value" id="sumTotalTime">0.0s</span>
+                    </div>
+                    <div class="debug-summary-row">
+                        <span class="debug-summary-label">Tools</span>
+                        <span class="debug-summary-value" id="sumToolCalls">0 calls</span>
+                    </div>
+                    <div class="debug-summary-row">
+                        <span class="debug-summary-label">LLM</span>
+                        <span class="debug-summary-value" id="sumLlmCalls">0 calls</span>
+                    </div>
+                </div>
+                <div class="debug-timeline" id="debugTimeline"></div>
                 <div class="debug-clear">
-                    <button onclick="clearDebug()">CLEAR LOG</button>
+                    <button onclick="clearDebug()">CLEAR</button>
                 </div>
             </aside>
         </div>
@@ -1516,8 +1784,27 @@
         let currentEventSource = null;
         let messageCount = 0;
         let uploadedFile = null;
+        let agentRawMarkdown = '';  // Accumulated raw markdown for current agent response
 
         const agents = {};
+
+        /* ===== MARKED CONFIG ===== */
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                breaks: true,
+                gfm: true
+            });
+        }
+
+        function renderMarkdown(text) {
+            if (typeof marked !== 'undefined') {
+                return marked.parse(text);
+            }
+            // Fallback: escape HTML and preserve whitespace
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
 
         /* ===== DOM REFERENCES ===== */
         const chatMessages = document.getElementById('chatMessages');
@@ -1553,7 +1840,7 @@
 
                     var namespace = agent.agentId.split('.')[0].toUpperCase();
                     card.innerHTML =
-                        '<button class="agent-card-info-btn" onclick="event.stopPropagation(); showAgentConfig(\'' + agent.agentId + '\')" title="View config">i</button>' +
+                        '<button class="agent-card-info-btn" onclick="event.stopPropagation(); showAgentConfig(\'' + agent.agentId + '\')" title="View config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>' +
                         '<div class="agent-card-icon">' + namespace.substring(0, 2) + '</div>' +
                         '<div class="agent-card-info">' +
                             '<div class="agent-card-name">' + escapeHtml(agent.name) + '</div>' +
@@ -1582,19 +1869,28 @@
             var skillsHtml;
             if (config.skills && config.skills.length > 0) {
                 skillsHtml = '<div class="config-field-value tags">' +
-                    config.skills.map(function(s) { return '<span class="config-tag">' + escapeHtml(s) + '</span>'; }).join('') +
+                    config.skills.map(function(s) { return '<span class="config-tag" onclick="showSkillInfo(\'' + escapeHtml(s) + '\')">' + escapeHtml(s) + '</span>'; }).join('') +
                     '</div>';
             } else {
                 skillsHtml = '<div class="config-field-value tags"><span class="config-tag none">None</span></div>';
             }
 
-            var toolsHtml;
-            if (config.tools && config.tools.length > 0) {
-                toolsHtml = '<div class="config-field-value tags">' +
-                    config.tools.map(function(t) { return '<span class="config-tag tool">' + escapeHtml(t) + '</span>'; }).join('') +
+            var userToolsHtml;
+            if (config.userTools && config.userTools.length > 0) {
+                userToolsHtml = '<div class="config-field-value tags">' +
+                    config.userTools.map(function(t) { return '<span class="config-tag tool" onclick="showToolInfo(\'' + escapeHtml(t) + '\')">' + escapeHtml(t) + '</span>'; }).join('') +
                     '</div>';
             } else {
-                toolsHtml = '<div class="config-field-value tags"><span class="config-tag none">None</span></div>';
+                userToolsHtml = '<div class="config-field-value tags"><span class="config-tag none">None</span></div>';
+            }
+
+            var systemToolsHtml;
+            if (config.systemTools && config.systemTools.length > 0) {
+                systemToolsHtml = '<div class="config-field-value tags">' +
+                    config.systemTools.map(function(t) { return '<span class="config-tag system-tool" onclick="showToolInfo(\'' + escapeHtml(t) + '\')">' + escapeHtml(t) + '</span>'; }).join('') +
+                    '</div>';
+            } else {
+                systemToolsHtml = '<div class="config-field-value tags"><span class="config-tag none">None</span></div>';
             }
 
             var overlay = document.createElement('div');
@@ -1638,17 +1934,21 @@
                         '</div>' +
                         '<hr class="config-divider">' +
                         '<div class="config-field">' +
-                            '<div class="config-field-label">System Prompt</div>' +
-                            '<div class="config-field-value mono">' + escapeHtml(config.systemPrompt || '') + '</div>' +
-                        '</div>' +
-                        '<hr class="config-divider">' +
-                        '<div class="config-field">' +
                             '<div class="config-field-label">Skills</div>' +
                             skillsHtml +
                         '</div>' +
                         '<div class="config-field">' +
-                            '<div class="config-field-label">Tools</div>' +
-                            toolsHtml +
+                            '<div class="config-field-label">User Tools</div>' +
+                            userToolsHtml +
+                        '</div>' +
+                        '<div class="config-field">' +
+                            '<div class="config-field-label">System Tools</div>' +
+                            systemToolsHtml +
+                        '</div>' +
+                        '<hr class="config-divider">' +
+                        '<div class="config-field">' +
+                            '<div class="config-field-label">System Prompt</div>' +
+                            '<div class="config-field-value mono">' + escapeHtml(config.systemPrompt || '') + '</div>' +
                         '</div>' +
                     '</div>' +
                 '</div>';
@@ -1658,6 +1958,113 @@
 
         function closeConfigModal() {
             var modal = document.getElementById('configModal');
+            if (modal) modal.remove();
+        }
+
+        async function showSkillInfo(skillName) {
+            try {
+                var response = await fetch('/api/skills/' + skillName);
+                if (!response.ok) {
+                    var err = await response.json();
+                    showInfoModal('Error', err.error || 'Skill not found');
+                    return;
+                }
+                var info = await response.json();
+
+                var content = '<div class="config-field">' +
+                    '<div class="config-field-label">Name</div>' +
+                    '<div class="config-field-value">' + escapeHtml(info.name) + '</div>' +
+                    '</div>' +
+                    '<div class="config-field">' +
+                    '<div class="config-field-label">Type</div>' +
+                    '<div class="config-field-value">Skill</div>' +
+                    '</div>' +
+                    '<div class="config-field">' +
+                    '<div class="config-field-label">Description</div>' +
+                    '<div class="config-field-value">' + escapeHtml(info.description) + '</div>' +
+                    '</div>';
+
+                if (info.tools && info.tools.length > 0) {
+                    content += '<hr class="config-divider">' +
+                        '<div class="config-field">' +
+                        '<div class="config-field-label">Available Tools</div>' +
+                        '<div class="config-field-value tags">';
+                    info.tools.forEach(function(t) {
+                        content += '<span class="config-tag tool" onclick="showToolInfo(\'' + escapeHtml(t.name) + '\')">' + escapeHtml(t.name) + '</span>';
+                    });
+                    content += '</div></div>';
+                }
+
+                showInfoModal('Skill Details', content);
+            } catch (err) {
+                showInfoModal('Error', 'Failed to load skill info: ' + err.message);
+            }
+        }
+
+        async function showToolInfo(toolName) {
+            try {
+                var response = await fetch('/api/tools/' + toolName);
+                if (!response.ok) {
+                    var err = await response.json();
+                    showInfoModal('Error', err.error || 'Tool not found');
+                    return;
+                }
+                var info = await response.json();
+
+                var content = '<div class="config-field">' +
+                    '<div class="config-field-label">Name</div>' +
+                    '<div class="config-field-value">' + escapeHtml(info.name) + '</div>' +
+                    '</div>' +
+                    '<div class="config-field">' +
+                    '<div class="config-field-label">Type</div>' +
+                    '<div class="config-field-value">Tool</div>' +
+                    '</div>' +
+                    '<div class="config-field">' +
+                    '<div class="config-field-label">Description</div>' +
+                    '<div class="config-field-value">' + escapeHtml(info.description) + '</div>' +
+                    '</div>';
+
+                if (info.parameters && info.parameters.length > 0) {
+                    content += '<hr class="config-divider">' +
+                        '<div class="config-field">' +
+                        '<div class="config-field-label">Parameters</div>' +
+                        '</div>';
+                    info.parameters.forEach(function(p) {
+                        content += '<div class="config-field" style="margin-left: 12px;">' +
+                            '<div class="config-field-label">' + escapeHtml(p.name) + ' <span style="color: var(--neon-blue);">(' + escapeHtml(p.type) + ')</span></div>' +
+                            '<div class="config-field-value">' + escapeHtml(p.description) + '</div>' +
+                            '</div>';
+                    });
+                }
+
+                showInfoModal('Tool Details', content);
+            } catch (err) {
+                showInfoModal('Error', 'Failed to load tool info: ' + err.message);
+            }
+        }
+
+        function showInfoModal(title, contentHtml) {
+            var overlay = document.createElement('div');
+            overlay.className = 'config-modal-overlay';
+            overlay.id = 'infoModal';
+            overlay.onclick = function(e) {
+                if (e.target === overlay) closeInfoModal();
+            };
+
+            overlay.innerHTML =
+                '<div class="config-modal">' +
+                    '<div class="config-modal-header">' +
+                        '<div class="config-modal-title">' + escapeHtml(title) + '</div>' +
+                        '<button class="config-modal-close" onclick="closeInfoModal()">&#x2715;</button>' +
+                    '</div>' +
+                    '<div class="config-modal-body">' + contentHtml + '</div>' +
+                '</div>';
+
+            document.body.appendChild(overlay);
+        }
+
+        function closeInfoModal() {
+            var modal = document.getElementById('infoModal');
             if (modal) modal.remove();
         }
 
@@ -1694,9 +2101,8 @@
             chatEmpty.style.display = 'flex';
 
             debugLog.innerHTML = '';
+            messageInput.focus();
         }
-
-        /* ===== SEND MESSAGE ===== */
         async function sendMessage() {
             var input = messageInput;
             var message = input.value.trim();
@@ -1704,12 +2110,7 @@
 
             chatEmpty.style.display = 'none';
 
-            // 构建用户消息显示内容（包含文件信息）
-            var displayMessage = message;
-            if (uploadedFile) {
-                displayMessage = '[上传文件: ' + uploadedFile.fileName + ']\n' + message;
-            }
-            appendMessage('user', displayMessage, uploadedFile);  // Pass uploadedFile for display
+            appendMessage('user', message, uploadedFile);
             messageCount++;
 
             input.value = '';
@@ -1786,8 +2187,11 @@
                             collapseThinkingBox();
                             if (!agentBubble) {
                                 agentBubble = addAgentBubble();
+                                agentRawMarkdown = '';
                             }
-                            agentBubble.textContent += (payload.content || payload.text || '');
+                            agentRawMarkdown += (payload.content || payload.text || '');
+                            agentBubble.classList.add('md-render');
+                            agentBubble.innerHTML = renderMarkdown(agentRawMarkdown);
                             scrollToBottom(chatMessages);
                             break;
 
@@ -1830,6 +2234,8 @@
                             if (!agentBubble) {
                                 agentBubble = addAgentBubble();
                             }
+                            agentBubble.classList.remove('md-render');
+                            agentBubble.style.whiteSpace = 'pre-wrap';
                             agentBubble.textContent += '\n\n[ERROR] ' + (payload.message || payload.content || 'Unknown error');
                             agentBubble.closest('.message').classList.add('error');
                             addDebugEntry('error', payload.message || payload.content || 'Unknown error');
@@ -1852,6 +2258,8 @@
                         if (!agentBubble) {
                             agentBubble = addAgentBubble();
                         }
+                        agentBubble.classList.remove('md-render');
+                        agentBubble.style.whiteSpace = 'pre-wrap';
                         if (!agentBubble.textContent.trim()) {
                             agentBubble.textContent = '[CONNECTION LOST] Please retry.';
                             agentBubble.closest('.message').classList.add('error');
@@ -1897,7 +2305,12 @@
 
             var bubble = document.createElement('div');
             bubble.className = 'message-bubble';
-            bubble.textContent = text;
+            if (role === 'agent') {
+                bubble.classList.add('md-render');
+                bubble.innerHTML = renderMarkdown(text);
+            } else {
+                bubble.textContent = text;
+            }
 
             var time = document.createElement('div');
             time.className = 'message-time';
@@ -2087,8 +2500,25 @@
             debugLog.innerHTML = '';
         }
 
+        function clearSession() {
+            if (isStreaming) return;
+            chatMessages.innerHTML = '';
+            messageCount = 0;
+            agentRawMarkdown = '';
+            currentThinkingBox = null;
+            currentAgentMessageWrapper = null;
+            thinkingContent = '';
+            currentFileInfo = null;
+            chatMessages.appendChild(chatEmpty);
+            chatEmpty.style.display = 'flex';
+            removeFile();
+            debugLog.innerHTML = '';
+        }
+
         function scrollToBottom(element) {
-            element.scrollTop = element.scrollHeight;
+            requestAnimationFrame(function() {
+                element.scrollTop = element.scrollHeight;
+            });
         }
 
         function getTimestamp() {
@@ -2145,11 +2575,13 @@
                     addDebugEntry('error', '[UPLOAD FAILED] ' + data.error);
                     return;
                 }
-                uploadedFile = data;
-                showFileTag(data.fileName);
+                // Switch agent first (selectAgent calls removeFile internally),
+                // then set uploadedFile and show tag — otherwise removeFile clears them
                 if (currentAgent !== 'task.document-analysis') {
                     selectAgent('task.document-analysis');
                 }
+                uploadedFile = data;
+                showFileTag(data.fileName);
                 addDebugEntry('tool_result', '[UPLOAD COMPLETE] ' + data.fileName);
             })
             .catch(function(err) {
@@ -2212,7 +2644,10 @@
         /* ===== INIT ===== */
         loadAgents();
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') closeConfigModal();
+            if (e.key === 'Escape') {
+                closeConfigModal();
+                closeInfoModal();
+            }
         });
         messageInput.focus();
     </script>
