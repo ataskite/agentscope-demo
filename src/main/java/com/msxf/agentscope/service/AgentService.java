@@ -24,7 +24,6 @@ public class AgentService {
 
     private final AgentFactory agentFactory;
     private final ConcurrentHashMap<String, ReActAgent> agents = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Long> toolCallStartTimes = new ConcurrentHashMap<>();
 
     public AgentService(AgentFactory agentFactory) {
         this.agentFactory = agentFactory;
@@ -35,6 +34,9 @@ public class AgentService {
     }
 
     public void streamToEmitter(String agentId, String message, String filePath, String fileName, SseEmitter emitter) {
+        final ConcurrentHashMap<String, Long> toolCallStartTimes = new ConcurrentHashMap<>();
+        final int[] llmCallCount = {0};
+
         ReActAgent agent = getAgent(agentId);
 
         String actualMessage = message;
@@ -58,7 +60,7 @@ public class AgentService {
                 .subscribe(
                         event -> {
                             try {
-                                handleEvent(event, emitter);
+                                handleEvent(event, emitter, toolCallStartTimes, llmCallCount);
                             } catch (Exception e) {
                                 log.error("Error handling stream event", e);
                                 emitter.completeWithError(e);
@@ -77,7 +79,7 @@ public class AgentService {
                             try {
                                 Map<String, Object> doneData = new java.util.LinkedHashMap<>();
                                 doneData.put("type", "done");
-                                doneData.put("totalLlmCalls", llmCallCount);
+                                doneData.put("totalLlmCalls", llmCallCount[0]);
                                 doneData.put("toolCallsRemaining", toolCallStartTimes.size());
                                 String json = objectMapper.writeValueAsString(doneData);
                                 emitter.send(SseEmitter.event().name("message").data(json));
@@ -87,15 +89,11 @@ public class AgentService {
                                 return;
                             }
                             emitter.complete();
-                            llmCallCount = 0;
-                            toolCallStartTimes.clear();
                         }
                 );
     }
 
-    private int llmCallCount = 0;
-
-    private void handleEvent(Event event, SseEmitter emitter) throws Exception {
+    private void handleEvent(Event event, SseEmitter emitter, ConcurrentHashMap<String, Long> toolCallStartTimes, int[] llmCallCount) throws Exception {
         Msg msg = event.getMessage();
         if (msg == null || msg.getContent() == null) {
             return;
@@ -150,13 +148,13 @@ public class AgentService {
         if (event.isLast()) {
             ChatUsage usage = msg.getChatUsage();
             if (usage != null) {
-                llmCallCount++;
+                llmCallCount[0]++;
                 sendEvent(emitter, "usage", Map.of(
                         "inputTokens", usage.getInputTokens(),
                         "outputTokens", usage.getOutputTokens(),
                         "totalTokens", usage.getTotalTokens(),
                         "time", usage.getTime(),
-                        "callNumber", llmCallCount
+                        "callNumber", llmCallCount[0]
                 ));
             }
         }
