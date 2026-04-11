@@ -4,26 +4,42 @@ import com.msxf.agentscope.service.AgentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
+/**
+ * Chat Controller with Virtual Threads (Java 21+)
+ *
+ * Why Virtual Threads?
+ * - Lightweight: Can create millions of virtual threads vs thousands of platform threads
+ * - Low blocking cost: Blocking a virtual thread doesn't pin a platform thread
+ * - Simple programming model: Keep traditional blocking code style
+ *
+ * Spring Boot 3.2+ automatically uses virtual threads when:
+ * 1. spring.threads.virtual.enabled=true
+ * 2. Methods are annotated with @Async
+ * 3. Or explicitly run in Thread.ofVirtual().start()
+ */
 @Controller
 public class ChatController {
 
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
-    private final ExecutorService executor = Executors.newCachedThreadPool();
     private final ConcurrentHashMap<String, SseEmitter> emitters = new ConcurrentHashMap<>();
 
     @Autowired
@@ -34,6 +50,14 @@ public class ChatController {
         return "chat";
     }
 
+    /**
+     * Send message endpoint using virtual threads for async streaming.
+     *
+     * The @Async annotation with virtual threads enabled means:
+     * - The agentService.streamToEmitter() runs in a virtual thread
+     * - No platform thread is blocked during LLM API calls
+     * - Can handle thousands of concurrent SSE connections
+     */
     @PostMapping("/chat/send")
     @ResponseBody
     public Map<String, String> sendMessage(@RequestBody Map<String, String> request) {
@@ -51,6 +75,7 @@ public class ChatController {
 
         emitters.put(sessionId, emitter);
 
+        // Cleanup on completion/timeout/error
         emitter.onCompletion(() -> emitters.remove(sessionId));
         emitter.onTimeout(() -> {
             emitters.remove(sessionId);
@@ -61,37 +86,60 @@ public class ChatController {
             log.error("SSE emitter error for session: {}", sessionId, ex);
         });
 
-        executor.submit(() -> {
-            try {
-                agentService.streamToEmitter(agentType, message, filePath, fileName, emitter);
-            } catch (Exception e) {
-                log.error("Error during agent streaming", e);
-                emitter.completeWithError(e);
-            }
-        });
+        // Run in virtual thread via @Async method
+        streamAsync(agentType, message, filePath, fileName, emitter, sessionId);
 
         return Map.of("sessionId", sessionId);
     }
 
+    /**
+     * Async method that runs in a virtual thread when spring.threads.virtual.enabled=true.
+     * This blocks the virtual thread during LLM calls, but platform threads remain free.
+     */
+    @Async
+    public void streamAsync(String agentType, String message, String filePath,
+                           String fileName, SseEmitter emitter, String sessionId) {
+        try {
+            log.debug("[{}] Starting stream in virtual thread", sessionId);
+            agentService.streamToEmitter(agentType, message, filePath, fileName, emitter);
+        } catch (Exception e) {
+            log.error("[{}] Error during agent streaming", sessionId, e);
+            emitter.completeWithError(e);
+        }
+    }
+
+    /**
+     * SSE stream endpoint - returns the emitter created earlier.
+     * The client polls this endpoint after getting sessionId.
+     */
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @ResponseBody
     public SseEmitter stream(@RequestParam String sessionId) {
         SseEmitter emitter = emitters.get(sessionId);
         if (emitter == null) {
             SseEmitter errorEmitter = new SseEmitter();
-            executor.submit(() -> {
-                try {
-                    errorEmitter.send(SseEmitter.event().name("message").data("{\"type\":\"error\",\"message\":\"Session not found\"}"));
-                    errorEmitter.complete();
-                } catch (Exception e) {
-                    // ignore
-                }
-            });
+            streamErrorAsync(errorEmitter, sessionId);
             return errorEmitter;
         }
         return emitter;
     }
 
+    @Async
+    public void streamErrorAsync(SseEmitter errorEmitter, String sessionId) {
+        try {
+            errorEmitter.send(SseEmitter.event()
+                .name("message")
+                .data("{\"type\":\"error\",\"message\":\"Session not found\"}"));
+            errorEmitter.complete();
+        } catch (Exception e) {
+            log.debug("[{}] Failed to send error response", sessionId, e);
+        }
+    }
+
+    /**
+     * File upload endpoint - runs synchronously as file I/O is fast.
+     * Virtual threads help when many uploads happen concurrently.
+     */
     @PostMapping("/chat/upload")
     @ResponseBody
     public Map<String, String> uploadFile(@RequestParam("file") MultipartFile file) {
@@ -121,13 +169,68 @@ public class ChatController {
             log.info("File uploaded: {} -> {}", originalName, filePath);
 
             return Map.of(
-                    "fileId", fileId,
-                    "fileName", originalName,
-                    "filePath", filePath.toAbsolutePath().toString()
+                "fileId", fileId,
+                "fileName", originalName,
+                "filePath", filePath.toAbsolutePath().toString()
             );
         } catch (Exception e) {
             log.error("Failed to upload file", e);
             return Map.of("error", "Failed to save file: " + e.getMessage());
+        }
+    }
+
+    /**
+     * File download endpoint - serves uploaded and edited files.
+     */
+    @GetMapping("/chat/download")
+    @ResponseBody
+    public ResponseEntity<Resource> downloadFile(@RequestParam String fileId) {
+        if (fileId == null || fileId.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            // Construct file path - supports both original uploads and edited files
+            Path uploadDir = Paths.get(System.getProperty("java.io.tmpdir"), "agentscope-uploads");
+            Path filePath = uploadDir.resolve(fileId);
+
+            // If fileId is a UUID (no extension), try to find the file
+            if (!filePath.toFile().exists() && !fileId.contains(".")) {
+                // Try common extensions
+                File[] matchingFiles = uploadDir.toFile().listFiles((dir, name) ->
+                    name.startsWith(fileId) && (name.endsWith(".docx") || name.endsWith(".pdf") || name.endsWith(".xlsx"))
+                );
+                if (matchingFiles != null && matchingFiles.length > 0) {
+                    filePath = matchingFiles[0].toPath();
+                }
+            }
+
+            File file = filePath.toFile();
+            if (!file.exists() || !file.isFile()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // Determine content type
+            String fileName = file.getName();
+            String contentType = "application/octet-stream";
+            if (fileName.endsWith(".docx")) {
+                contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            } else if (fileName.endsWith(".pdf")) {
+                contentType = "application/pdf";
+            } else if (fileName.endsWith(".xlsx")) {
+                contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            }
+
+            Resource resource = new FileSystemResource(file);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .body(resource);
+
+        } catch (Exception e) {
+            log.error("Failed to download file: {}", fileId, e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 }
