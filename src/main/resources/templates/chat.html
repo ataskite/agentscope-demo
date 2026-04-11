@@ -1549,7 +1549,7 @@
         }
 
         /* ===== HELPERS ===== */
-        function appendMessage(role, text) {
+        function appendMessage(role, text, fileInfo) {
             var wrapper = document.createElement('div');
             wrapper.className = 'message ' + role;
 
@@ -1564,6 +1564,13 @@
 
             var content = document.createElement('div');
             content.className = 'message-content';
+
+            // Add file list for user messages if fileInfo provided
+            if (fileInfo && role === 'user') {
+                var fileListNode = document.createElement('div');
+                fileListNode.innerHTML = createFileList(fileInfo);
+                content.appendChild(fileListNode.firstChild);
+            }
 
             var bubble = document.createElement('div');
             bubble.className = 'message-bubble';
