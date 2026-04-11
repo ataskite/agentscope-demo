@@ -216,11 +216,12 @@
         }
 
         .sidebar-header {
-            height: 40px;
-            min-height: 40px;
+            height: 44px;
+            min-height: 44px;
             padding: 0 var(--space-lg);
             display: flex;
             align-items: center;
+            gap: 8px;
             font-family: var(--font-heading);
             font-size: 10px;
             font-weight: 700;
@@ -228,7 +229,9 @@
             letter-spacing: 2px;
             color: var(--text-muted);
             border-bottom: 1px solid var(--border-dim);
+            border-left: 2px solid var(--neon-cyan);
             position: relative;
+            background: linear-gradient(180deg, rgba(0, 245, 255, 0.04) 0%, transparent 100%);
         }
 
         .sidebar-header::after {
@@ -236,10 +239,18 @@
             position: absolute;
             bottom: -1px;
             left: 0;
-            width: 40px;
+            width: 60px;
             height: 1px;
             background: linear-gradient(90deg, var(--neon-cyan), transparent);
             box-shadow: 0 0 8px var(--neon-cyan);
+        }
+
+        .sidebar-header-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--neon-cyan);
+            box-shadow: 0 0 6px var(--neon-cyan), 0 0 12px rgba(0, 245, 255, 0.4);
+            animation: pulse-glow 2s ease-in-out infinite;
         }
 
         .agent-list {
@@ -375,15 +386,27 @@
         }
 
         .chat-header {
-            height: 40px;
-            min-height: 40px;
-            background: rgba(15, 15, 26, 0.5);
+            height: 48px;
+            min-height: 48px;
+            background: linear-gradient(180deg, rgba(0, 245, 255, 0.03) 0%, rgba(15, 15, 26, 0.5) 100%);
             border-bottom: 1px solid var(--border-dim);
             display: flex;
             align-items: center;
             padding: 0 var(--space-lg);
             gap: var(--space-sm);
             backdrop-filter: blur(5px);
+            position: relative;
+        }
+
+        .chat-header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, var(--neon-cyan), var(--neon-blue) 50%, transparent);
+            box-shadow: 0 0 6px rgba(0, 245, 255, 0.3);
         }
 
         .chat-header-name {
@@ -393,6 +416,8 @@
             color: var(--neon-cyan);
             letter-spacing: 1px;
             text-shadow: 0 0 10px rgba(0, 245, 255, 0.4);
+            padding-left: 10px;
+            border-left: 2px solid var(--neon-cyan);
         }
 
         .chat-header-sep {
@@ -1065,20 +1090,33 @@
         }
 
         .debug-header {
-            height: 40px;
-            min-height: 40px;
+            height: 36px;
+            min-height: 36px;
             display: flex;
             align-items: center;
             padding: 0 var(--space-sm);
             gap: var(--space-sm);
             border-bottom: 1px solid var(--border-dim);
+            border-left: 2px solid var(--neon-magenta);
             flex-shrink: 0;
-            background: rgba(0, 0, 0, 0.3);
+            background: linear-gradient(180deg, rgba(255, 16, 240, 0.04) 0%, rgba(0, 0, 0, 0.3) 100%);
+            position: relative;
+        }
+
+        .debug-header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            right: 0;
+            width: 50px;
+            height: 1px;
+            background: linear-gradient(270deg, var(--neon-magenta), transparent);
+            box-shadow: 0 0 6px rgba(255, 16, 240, 0.3);
         }
 
         .debug-title {
             font-family: var(--font-heading);
-            font-size: 10px;
+            font-size: 9px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 2px;
@@ -1713,7 +1751,7 @@
         <div class="app-body">
             <!-- Left Sidebar: Agent Selector -->
             <aside class="sidebar">
-                <div class="sidebar-header">Select Agent</div>
+                <div class="sidebar-header"><div class="sidebar-header-dot"></div>Select Agent</div>
                 <div class="agent-list" id="agentList">
                     <!-- Agent cards rendered dynamically by loadAgents() -->
                 </div>
@@ -1814,8 +1852,17 @@
         const chatHeaderName = document.getElementById('chatHeaderName');
         const chatHeaderDesc = document.getElementById('chatHeaderDesc');
         const debugPanel = document.getElementById('debugPanel');
-        const debugLog = document.getElementById('debugLog');
+        const debugTimeline = document.getElementById('debugTimeline');
         const debugToggle = document.getElementById('debugToggle');
+
+        /* ===== OBSERVABILITY STATE ===== */
+        var sessionSummary = {
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTime: 0,
+            toolCallCount: 0,
+            llmCallCount: 0
+        };
 
         /* ===== LOAD AGENTS ===== */
         async function loadAgents() {
@@ -1855,7 +1902,7 @@
                     selectAgent(agentList[0].agentId);
                 }
             } catch (err) {
-                addDebugEntry('error', '[INIT] Failed to load agents: ' + err.message);
+                addTimelineRow('error', 'Failed to load agents: ' + err.message, '', 'fail');
             }
         }
 
@@ -2100,7 +2147,8 @@
             chatMessages.appendChild(chatEmpty);
             chatEmpty.style.display = 'flex';
 
-            debugLog.innerHTML = '';
+            debugTimeline.innerHTML = '';
+            resetSessionSummary();
             messageInput.focus();
         }
         async function sendMessage() {
@@ -2127,8 +2175,6 @@
             typingEl.innerHTML = '<div class="message-avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg></div><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
             chatMessages.appendChild(typingEl);
             scrollToBottom(chatMessages);
-
-            addDebugEntry('thinking', '>>> Sending to ' + currentAgent.toUpperCase() + ' agent...');
 
             // Reset thinking state
             currentThinkingBox = null;
@@ -2162,7 +2208,7 @@
                 if (data.error) {
                     removeTypingIndicator();
                     appendMessage('error', data.error);
-                    addDebugEntry('error', '[ERROR] ' + data.error);
+                    addTimelineRow('error', data.error, '', 'fail');
                     setStreamingState(false);
                     return;
                 }
@@ -2177,7 +2223,7 @@
                     try {
                         payload = JSON.parse(event.data);
                     } catch (e) {
-                        addDebugEntry('error', '[PARSE ERROR] ' + event.data);
+                        addTimelineRow('error', 'Parse error', '', 'fail');
                         return;
                     }
 
@@ -2198,7 +2244,6 @@
                         case 'thinking':
                             var thinkingText = payload.content || payload.message || 'Processing...';
                             updateThinkingBox(thinkingText, fileInfo);
-                            addDebugEntry('thinking', thinkingText);
                             break;
 
                         case 'tool_call':
@@ -2206,17 +2251,36 @@
                             var toolParams = payload.params || '{}';
                             var toolText = 'Calling ' + toolName + ' with params: ' + toolParams;
                             updateThinkingBox('🔧 ' + toolText, fileInfo);
-                            addDebugEntry('tool_call', toolName + ' | ' + toolParams);
+                            addTimelineRow('tool', toolName, '...', '');
                             break;
 
                         case 'tool_result':
                             var toolName = payload.name || 'unknown';
                             var toolResult = payload.result || '';
-                            // Truncate result if too long for thinking box
+                            var durationMs = payload.duration_ms || -1;
                             var displayResult = toolResult.length > 100 ? toolResult.substring(0, 100) + '...' : toolResult;
                             var resultText = toolName + ' returned: ' + displayResult;
                             updateThinkingBox('✓ ' + resultText, fileInfo);
-                            addDebugEntry('tool_result', toolName + ' | ' + toolResult);
+                            var lastToolRow = debugTimeline.querySelector('.debug-tl-row.type-tool:last-child');
+                            if (lastToolRow) {
+                                var durationStr = durationMs >= 0 ? (durationMs >= 1000 ? (durationMs / 1000).toFixed(1) + 's' : durationMs + 'ms') : '';
+                                lastToolRow.querySelector('.debug-tl-metrics').textContent = durationStr;
+                                lastToolRow.classList.add(durationMs >= 0 ? 'status-ok' : 'status-fail');
+                            }
+                            sessionSummary.toolCallCount++;
+                            updateSummaryCard();
+                            break;
+
+                        case 'usage':
+                            sessionSummary.inputTokens += payload.inputTokens || 0;
+                            sessionSummary.outputTokens += payload.outputTokens || 0;
+                            sessionSummary.totalTime += payload.time || 0;
+                            sessionSummary.llmCallCount++;
+                            updateSummaryCard();
+                            var callNum = payload.callNumber || sessionSummary.llmCallCount;
+                            var tokStr = (payload.totalTokens || 0).toLocaleString() + ' tok';
+                            var timeStr = payload.time ? payload.time.toFixed(1) + 's' : '';
+                            addTimelineRow('llm', 'LLM call #' + callNum, tokStr + '  ' + timeStr, '');
                             break;
 
                         case 'done':
@@ -2225,7 +2289,7 @@
                             currentEventSource = null;
                             isStreaming = false;
                             setStreamingState(false);
-                            addDebugEntry('response', '[COMPLETE] Stream finished');
+                            addTimelineRow('done', 'Complete', sessionSummary.totalTime.toFixed(1) + 's', 'ok');
                             scrollToBottom(chatMessages);
                             break;
 
@@ -2238,7 +2302,7 @@
                             agentBubble.style.whiteSpace = 'pre-wrap';
                             agentBubble.textContent += '\n\n[ERROR] ' + (payload.message || payload.content || 'Unknown error');
                             agentBubble.closest('.message').classList.add('error');
-                            addDebugEntry('error', payload.message || payload.content || 'Unknown error');
+                            addTimelineRow('error', payload.message || payload.content || 'Unknown error', '', 'fail');
                             currentEventSource.close();
                             currentEventSource = null;
                             isStreaming = false;
@@ -2264,7 +2328,7 @@
                             agentBubble.textContent = '[CONNECTION LOST] Please retry.';
                             agentBubble.closest('.message').classList.add('error');
                         }
-                        addDebugEntry('error', '[NETWORK] SSE connection terminated');
+                            addTimelineRow('error', 'SSE connection terminated', '', 'fail');
                         isStreaming = false;
                         setStreamingState(false);
                     }
@@ -2274,7 +2338,7 @@
                 completeThinkingBox();
                 removeTypingIndicator();
                 appendMessage('error', '[NETWORK ERROR] ' + err.message);
-                addDebugEntry('error', '[NETWORK] ' + err.message);
+                addTimelineRow('error', err.message, '', 'fail');
                 setStreamingState(false);
             }
         }
@@ -2454,50 +2518,55 @@
             }
         }
 
-        function addDebugEntry(type, content) {
-            var entry = document.createElement('div');
-            entry.className = 'debug-entry type-' + type;
-
-            var typeLabels = {
-                thinking: 'THINK',
-                tool_call: 'TOOL',
-                tool_result: 'RESULT',
-                response: 'RESP',
-                error: 'ERR'
-            };
-
-            var formattedContent;
-            if (type === 'tool_call') {
-                // content format: "toolName | params"
-                var parts = content.split(' | ');
-                var toolName = parts[0] || '';
-                var params = parts.slice(1).join(' | ') || '';
-                formattedContent = '<span class="tool-name">' + escapeHtml(toolName) + '</span>' +
-                    '<span class="tool-separator">→</span>' +
-                    '<span class="tool-params">' + escapeHtml(params) + '</span>';
-            } else if (type === 'tool_result') {
-                // content format: "toolName | result"
-                var parts = content.split(' | ');
-                var toolName = parts[0] || '';
-                var result = parts.slice(1).join(' | ') || '';
-                formattedContent = '<span class="tool-name">' + escapeHtml(toolName) + '</span>' +
-                    '<span class="tool-separator">←</span>' +
-                    '<span class="tool-result">' + escapeHtml(result) + '</span>';
-            } else {
-                formattedContent = escapeHtml(content);
+        function addTimelineRow(type, label, metrics, status) {
+            var row = document.createElement('div');
+            row.className = 'debug-tl-row type-' + type;
+            if (status) {
+                row.classList.add('status-' + status);
             }
+            row.innerHTML =
+                '<span class="debug-tl-icon">' + getTimelineIcon(type) + '</span>' +
+                '<span class="debug-tl-label">' + escapeHtml(label) + '</span>' +
+                '<span class="debug-tl-metrics">' + (metrics || '') + '</span>' +
+                '<span class="debug-tl-status">' + (status === 'ok' ? '✓' : status === 'fail' ? '✗' : '') + '</span>';
+            debugTimeline.appendChild(row);
+            requestAnimationFrame(function() {
+                debugTimeline.scrollTop = debugTimeline.scrollHeight;
+            });
+        }
 
-            entry.innerHTML =
-                '<span class="debug-time">' + getTimestamp() + '</span>' +
-                '<span class="debug-tag">[' + (typeLabels[type] || type) + ']</span>' +
-                formattedContent;
+        function getTimelineIcon(type) {
+            switch (type) {
+                case 'llm': return '↻';
+                case 'tool': return '⚡';
+                case 'error': return '⚠';
+                case 'done': return '◉';
+                default: return '·';
+            }
+        }
 
-            debugLog.appendChild(entry);
-            scrollToBottom(debugLog);
+        function updateSummaryCard() {
+            document.getElementById('sumInputTok').textContent = sessionSummary.inputTokens.toLocaleString();
+            document.getElementById('sumOutputTok').textContent = sessionSummary.outputTokens.toLocaleString();
+            document.getElementById('sumTotalTime').textContent = sessionSummary.totalTime.toFixed(1) + 's';
+            document.getElementById('sumToolCalls').textContent = sessionSummary.toolCallCount + ' calls';
+            document.getElementById('sumLlmCalls').textContent = sessionSummary.llmCallCount + ' calls';
+        }
+
+        function resetSessionSummary() {
+            sessionSummary = {
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTime: 0,
+                toolCallCount: 0,
+                llmCallCount: 0
+            };
+            updateSummaryCard();
         }
 
         function clearDebug() {
-            debugLog.innerHTML = '';
+            debugTimeline.innerHTML = '';
+            resetSessionSummary();
         }
 
         function clearSession() {
@@ -2512,7 +2581,8 @@
             chatMessages.appendChild(chatEmpty);
             chatEmpty.style.display = 'flex';
             removeFile();
-            debugLog.innerHTML = '';
+            debugTimeline.innerHTML = '';
+            resetSessionSummary();
         }
 
         function scrollToBottom(element) {
@@ -2555,12 +2625,12 @@
 
             var lowerName = file.name.toLowerCase();
             if (!lowerName.endsWith('.docx') && !lowerName.endsWith('.pdf') && !lowerName.endsWith('.xlsx')) {
-                addDebugEntry('error', '[INVALID FILE] Only .docx, .pdf, .xlsx supported');
+                addTimelineRow('error', 'Invalid file type', '', 'fail');
                 input.value = '';
                 return;
             }
 
-            addDebugEntry('tool_call', '[UPLOAD] ' + file.name);
+            addTimelineRow('tool', 'Upload: ' + file.name, '', '');
 
             var formData = new FormData();
             formData.append('file', file);
@@ -2572,7 +2642,7 @@
             .then(function(response) { return response.json(); })
             .then(function(data) {
                 if (data.error) {
-                    addDebugEntry('error', '[UPLOAD FAILED] ' + data.error);
+                    addTimelineRow('error', 'Upload failed: ' + data.error, '', 'fail');
                     return;
                 }
                 // Switch agent first (selectAgent calls removeFile internally),
@@ -2582,10 +2652,10 @@
                 }
                 uploadedFile = data;
                 showFileTag(data.fileName);
-                addDebugEntry('tool_result', '[UPLOAD COMPLETE] ' + data.fileName);
+                addTimelineRow('tool', 'Upload complete: ' + data.fileName, '', 'ok');
             })
             .catch(function(err) {
-                addDebugEntry('error', '[UPLOAD ERROR] ' + err.message);
+                addTimelineRow('error', 'Upload error: ' + err.message, '', 'fail');
             });
 
             input.value = '';
