@@ -1412,10 +1412,13 @@
 
             addDebugEntry('thinking', '>>> Sending to ' + currentAgent.toUpperCase() + ' agent...');
 
-            // Reset thinking state and store fileInfo
+            // Reset thinking state
             currentThinkingBox = null;
             currentAgentMessageWrapper = null;
             thinkingContent = '';
+            currentFileInfo = null;
+
+            // Store file info for this message
             currentFileInfo = fileInfo;
             var agentBubble = null;
 
@@ -1598,9 +1601,14 @@
 
             // Add file list if fileInfo provided
             if (fileInfo) {
-                var fileListNode = document.createElement('div');
-                fileListNode.innerHTML = createFileList(fileInfo);
-                content.appendChild(fileListNode.firstChild);
+                var fileListHtml = createFileList(fileInfo);
+                if (fileListHtml) {
+                    var fileListNode = document.createElement('div');
+                    fileListNode.innerHTML = fileListHtml;
+                    if (fileListNode.firstChild) {
+                        content.appendChild(fileListNode.firstChild);
+                    }
+                }
             }
 
             // Create thinking box
