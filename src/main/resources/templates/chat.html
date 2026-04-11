@@ -1471,19 +1471,19 @@
 
                         case 'thinking':
                             var thinkingText = payload.content || payload.message || 'Processing...';
-                            updateThinkingBox(thinkingText);
+                            updateThinkingBox(thinkingText, fileInfo);
                             addDebugEntry('thinking', thinkingText);
                             break;
 
                         case 'tool_call':
                             var toolText = payload.content || payload.message || 'Tool invoked';
-                            updateThinkingBox('🔧 ' + toolText);
+                            updateThinkingBox('🔧 ' + toolText, fileInfo);
                             addDebugEntry('tool_call', toolText);
                             break;
 
                         case 'tool_result':
                             var resultText = payload.content || payload.message || 'Tool output';
-                            updateThinkingBox('✓ ' + resultText);
+                            updateThinkingBox('✓ ' + resultText, fileInfo);
                             addDebugEntry('tool_result', resultText);
                             break;
 
@@ -1631,9 +1631,9 @@
             return box;
         }
 
-        function updateThinkingBox(content) {
+        function updateThinkingBox(content, fileInfo) {
             if (!currentThinkingBox) {
-                createThinkingBox(currentFileInfo);
+                createThinkingBox(fileInfo || currentFileInfo);
             }
             thinkingContent += content;
             // 去掉多余的空行，只保留有内容的内容
