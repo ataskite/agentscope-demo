@@ -1279,6 +1279,13 @@
                             <div class="agent-card-desc">Document analysis with file parsing</div>
                         </div>
                     </div>
+                    <div class="agent-card" data-agent="template" onclick="selectAgent('template')">
+                        <div class="agent-card-icon">TE</div>
+                        <div class="agent-card-info">
+                            <div class="agent-card-name">Template Editor</div>
+                            <div class="agent-card-desc">Word template variable replacement</div>
+                        </div>
+                    </div>
                 </div>
             </aside>
 
@@ -1331,7 +1338,8 @@
         const agents = {
             basic: { name: 'Basic Chat', desc: 'Simple conversation with AI assistant' },
             tool: { name: 'Tool Calling', desc: 'AI with time, calculator, weather tools' },
-            task: { name: 'Task Agent', desc: 'Document analysis with file parsing' }
+            task: { name: 'Task Agent', desc: 'Document analysis with file parsing' },
+            template: { name: 'Template Editor', desc: 'Word template variable replacement' }
         };
 
         /* ===== DOM REFERENCES ===== */
