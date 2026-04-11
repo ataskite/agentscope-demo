@@ -1,5 +1,7 @@
 package com.msxf.agentscope.controller;
 
+import com.msxf.agentscope.config.AgentConfig;
+import com.msxf.agentscope.config.AgentConfigService;
 import com.msxf.agentscope.service.AgentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,7 +21,9 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -45,6 +49,9 @@ public class ChatController {
     @Autowired
     private AgentService agentService;
 
+    @Autowired
+    private AgentConfigService agentConfigService;
+
     @GetMapping("/")
     public String chat() {
         return "chat";
@@ -61,7 +68,7 @@ public class ChatController {
     @PostMapping("/chat/send")
     @ResponseBody
     public Map<String, String> sendMessage(@RequestBody Map<String, String> request) {
-        String agentType = request.getOrDefault("agentType", "basic");
+        String agentId = request.getOrDefault("agentId", "chat.basic");
         String message = request.get("message");
         String filePath = request.get("filePath");
         String fileName = request.get("fileName");
@@ -87,7 +94,7 @@ public class ChatController {
         });
 
         // Run in virtual thread via @Async method
-        streamAsync(agentType, message, filePath, fileName, emitter, sessionId);
+        streamAsync(agentId, message, filePath, fileName, emitter, sessionId);
 
         return Map.of("sessionId", sessionId);
     }
@@ -97,11 +104,11 @@ public class ChatController {
      * This blocks the virtual thread during LLM calls, but platform threads remain free.
      */
     @Async
-    public void streamAsync(String agentType, String message, String filePath,
+    public void streamAsync(String agentId, String message, String filePath,
                            String fileName, SseEmitter emitter, String sessionId) {
         try {
             log.debug("[{}] Starting stream in virtual thread", sessionId);
-            agentService.streamToEmitter(agentType, message, filePath, fileName, emitter);
+            agentService.streamToEmitter(agentId, message, filePath, fileName, emitter);
         } catch (Exception e) {
             log.error("[{}] Error during agent streaming", sessionId, e);
             emitter.completeWithError(e);
@@ -134,6 +141,28 @@ public class ChatController {
         } catch (Exception e) {
             log.debug("[{}] Failed to send error response", sessionId, e);
         }
+    }
+
+    /**
+     * List all available agent configurations.
+     */
+    @GetMapping("/api/agents")
+    @ResponseBody
+    public List<AgentConfig> listAgents() {
+        return agentConfigService.getAllAgents();
+    }
+
+    /**
+     * Get a specific agent configuration by agentId.
+     */
+    @GetMapping("/api/agents/{agentId}")
+    @ResponseBody
+    public ResponseEntity<?> getAgentConfig(@PathVariable String agentId) {
+        Optional<AgentConfig> config = agentConfigService.findAgentConfig(agentId);
+        if (config.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("error", "Agent not found: " + agentId));
+        }
+        return ResponseEntity.ok(config.get());
     }
 
     /**
