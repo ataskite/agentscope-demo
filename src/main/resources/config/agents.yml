@@ -1,0 +1,75 @@
+agents:
+  - agentId: chat-basic
+    name: Basic Chat
+    description: 简单对话，与AI助手交流
+    systemPrompt: |
+      你是一个友好的AI助手。
+      请保持简洁、清晰地回答用户的问题。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    skills: []
+    userTools: []
+    systemTools: []
+
+  - agentId: tool-test-simple
+    name: Tool Calling
+    description: 具备时间、计算器、天气等工具的AI
+    systemPrompt: |
+      你是一个拥有多种工具的AI助手。
+      当需要时，请使用合适的工具来准确回答问题。
+      使用工具时，请向用户说明你正在做什么。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    skills: []
+    userTools:
+      - get_current_time
+      - calculate_sum
+      - get_weather
+    systemTools:
+      - view_text_file
+      - write_text_file
+      - execute_shell_command
+
+  - agentId: task-document-analysis
+    name: Task Agent
+    description: 文档分析，支持文件解析
+    systemPrompt: |
+      你是一个文档分析助手。
+      当用户上传文档时，使用相应的技能解析文档内容，然后根据解析结果满足用户的需求。
+      支持 .docx、.pdf 和 .xlsx 文件的分析。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    skills:
+      - docx
+      - pdf
+      - xlsx
+    userTools:
+      - parse_docx
+      - parse_pdf
+      - parse_xlsx
+    systemTools:
+      - view_text_file
+
+  - agentId: task-template-docx-editor
+    name: Template Editor
+    description: Word模板变量替换
+    systemPrompt: |
+      你是一个Word文档模板编辑助手。
+      当用户上传.docx模板时，帮助用户填充模板中的变量。
+      首先解析文档，识别模板中的占位符，
+      然后询问用户需要填入的值，
+      最后使用 edit_docx 工具完成变量替换。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    skills:
+      - docx-template
+    userTools:
+      - parse_docx
+      - edit_docx
+    systemTools:
+      - view_text_file
+      - write_text_file

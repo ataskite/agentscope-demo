@@ -35,6 +35,8 @@ public class AgentService {
 
     public void streamToEmitter(String agentId, String message, String filePath, String fileName, SseEmitter emitter) {
         final ConcurrentHashMap<String, Long> toolCallStartTimes = new ConcurrentHashMap<>();
+        final ConcurrentHashMap<String, Boolean> sentToolCalls = new ConcurrentHashMap<>();
+        final ConcurrentHashMap<String, Boolean> sentToolResults = new ConcurrentHashMap<>();
         final int[] llmCallCount = {0};
 
         ReActAgent agent = getAgent(agentId);
@@ -53,14 +55,14 @@ public class AgentService {
         StreamOptions streamOptions = StreamOptions.builder()
                 .eventTypes(EventType.REASONING, EventType.TOOL_RESULT)
                 .incremental(true)
-                .includeReasoningResult(false)
+                .includeReasoningResult(true)
                 .build();
 
         agent.stream(userMsg, streamOptions)
                 .subscribe(
                         event -> {
                             try {
-                                handleEvent(event, emitter, toolCallStartTimes, llmCallCount);
+                                handleEvent(event, emitter, toolCallStartTimes, sentToolCalls, sentToolResults, llmCallCount);
                             } catch (Exception e) {
                                 log.error("Error handling stream event", e);
                                 emitter.completeWithError(e);
@@ -93,12 +95,16 @@ public class AgentService {
                 );
     }
 
-    private void handleEvent(Event event, SseEmitter emitter, ConcurrentHashMap<String, Long> toolCallStartTimes, int[] llmCallCount) throws Exception {
+    private void handleEvent(Event event, SseEmitter emitter, ConcurrentHashMap<String, Long> toolCallStartTimes, ConcurrentHashMap<String, Boolean> sentToolCalls, ConcurrentHashMap<String, Boolean> sentToolResults, int[] llmCallCount) throws Exception {
         Msg msg = event.getMessage();
         if (msg == null || msg.getContent() == null) {
             return;
         }
 
+        log.debug("[stream] Event received: isLast={}, type={}, contentBlocks={}", event.isLast(), event.getType(), msg.getContent().size());
+
+        // Process ALL events (including isLast) for tool-related blocks
+        // because ToolResultBlock may only appear in isLast events
         for (ContentBlock block : msg.getContent()) {
             if (block instanceof ThinkingBlock tb) {
                 String thinking = tb.getThinking();
@@ -106,19 +112,28 @@ public class AgentService {
                     sendEvent(emitter, "thinking", Map.of("content", thinking));
                 }
             } else if (block instanceof TextBlock tb) {
-                String text = tb.getText();
-                if (text != null && !text.isEmpty()) {
-                    sendEvent(emitter, "text", Map.of("content", text));
+                // Skip TextBlock in isLast events as they are duplicates
+                if (!event.isLast()) {
+                    String text = tb.getText();
+                    if (text != null && !text.isEmpty()) {
+                        sendEvent(emitter, "text", Map.of("content", text));
+                    }
                 }
             } else if (block instanceof ToolUseBlock tub) {
                 String toolId = tub.getId();
-                toolCallStartTimes.put(toolId, System.currentTimeMillis());
-                sendEvent(emitter, "tool_call", Map.of(
-                        "id", toolId != null ? toolId : "",
-                        "name", tub.getName() != null ? tub.getName() : "",
-                        "params", tub.getInput() != null ? tub.getInput().toString() : "{}",
-                        "timestamp", System.currentTimeMillis()
-                ));
+                // Deduplicate: only send tool_call event once per toolId
+                if (toolId != null && sentToolCalls.putIfAbsent(toolId, Boolean.TRUE) == null) {
+                    toolCallStartTimes.put(toolId, System.currentTimeMillis());
+                    sendEvent(emitter, "tool_call", Map.of(
+                            "id", toolId,
+                            "name", tub.getName() != null ? tub.getName() : "",
+                            "params", tub.getInput() != null ? tub.getInput().toString() : "{}",
+                            "timestamp", System.currentTimeMillis()
+                    ));
+                    log.debug("[tool_call] New tool call: id={}, name={}", toolId, tub.getName());
+                } else {
+                    log.debug("[tool_call] Duplicate tool call skipped: id={}", toolId);
+                }
             } else if (block instanceof ToolResultBlock trb) {
                 String resultText = trb.getOutput() != null
                         ? trb.getOutput().stream()
@@ -127,35 +142,55 @@ public class AgentService {
                         .reduce("", (a, b) -> a + b)
                         : "";
                 String toolId = trb.getId();
-                Long startTime = toolId != null ? toolCallStartTimes.remove(toolId) : null;
-                long durationMs = startTime != null ? System.currentTimeMillis() - startTime : -1;
+                // Deduplicate: only send tool_result event once per toolId
+                if (toolId != null && sentToolResults.putIfAbsent(toolId, Boolean.TRUE) == null) {
+                    Long startTime = toolCallStartTimes.remove(toolId);
+                    long durationMs = startTime != null ? System.currentTimeMillis() - startTime : -1;
 
-                String resultPreview = resultText.length() > 200
-                        ? resultText.substring(0, 200) + "..."
-                        : resultText;
+                    String resultPreview = resultText.length() > 200
+                            ? resultText.substring(0, 200) + "..."
+                            : resultText;
 
-                sendEvent(emitter, "tool_result", Map.of(
-                        "id", toolId != null ? toolId : "",
-                        "name", trb.getName() != null ? trb.getName() : "",
-                        "result", resultText,
-                        "result_preview", resultPreview,
-                        "duration_ms", durationMs,
-                        "timestamp", System.currentTimeMillis()
-                ));
+                    log.info("[tool_result] name={}, id={}, duration={}ms, resultLength={}, hasStartTime={}",
+                            trb.getName(), toolId, durationMs, resultText.length(), startTime != null);
+
+                    sendEvent(emitter, "tool_result", Map.of(
+                            "id", toolId,
+                            "name", trb.getName() != null ? trb.getName() : "",
+                            "result", resultText,
+                            "result_preview", resultPreview,
+                            "duration_ms", durationMs,
+                            "timestamp", System.currentTimeMillis()
+                    ));
+                } else {
+                    log.debug("[tool_result] Duplicate tool result skipped: id={}", toolId);
+                }
             }
         }
 
         if (event.isLast()) {
+            log.info("[stream] isLast event received: type={}, contentBlocks={}", event.getType(), msg.getContent().size());
             ChatUsage usage = msg.getChatUsage();
+            log.info("[stream] ChatUsage: {}", usage != null ? usage : "null");
+            if (usage != null) {
+                log.info("[stream] Usage detail: in={}, out={}, total={}, time={}",
+                        usage.getInputTokens(), usage.getOutputTokens(),
+                        usage.getTotalTokens(), usage.getTime());
+            }
             if (usage != null) {
                 llmCallCount[0]++;
+                Double timeValue = usage.getTime();
+                log.info("[usage] LLM call #{}: tokens={}/{} time={}s",
+                        llmCallCount[0], usage.getInputTokens(), usage.getOutputTokens(), timeValue);
                 sendEvent(emitter, "usage", Map.of(
                         "inputTokens", usage.getInputTokens(),
                         "outputTokens", usage.getOutputTokens(),
                         "totalTokens", usage.getTotalTokens(),
-                        "time", usage.getTime(),
+                        "time", timeValue != null ? timeValue : 0,
                         "callNumber", llmCallCount[0]
                 ));
+            } else {
+                log.warn("[stream] ChatUsage is null in isLast event - model may not support usage stats");
             }
         }
     }
