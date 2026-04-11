@@ -1,24 +1,14 @@
 package com.msxf.agentscope.service;
 
-import com.msxf.agentscope.model.SimpleTools;
-import com.msxf.agentscope.tool.DocxParserTool;
-import com.msxf.agentscope.tool.PdfParserTool;
-import com.msxf.agentscope.tool.XlsxParserTool;
+import com.msxf.agentscope.config.AgentFactory;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.EventType;
 import io.agentscope.core.agent.StreamOptions;
 import io.agentscope.core.agent.Event;
-import io.agentscope.core.formatter.dashscope.DashScopeChatFormatter;
-import io.agentscope.core.memory.InMemoryMemory;
 import io.agentscope.core.message.*;
-import io.agentscope.core.model.DashScopeChatModel;
-import io.agentscope.core.skill.SkillBox;
-import io.agentscope.core.skill.repository.ClasspathSkillRepository;
-import io.agentscope.core.tool.Toolkit;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -31,95 +21,19 @@ public class AgentService {
     private static final Logger log = LoggerFactory.getLogger(AgentService.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Value("${agentscope.model.dashscope.api-key:}")
-    private String apiKey;
-
+    private final AgentFactory agentFactory;
     private final ConcurrentHashMap<String, ReActAgent> agents = new ConcurrentHashMap<>();
 
-    public ReActAgent getAgent(String agentType) {
-        return agents.computeIfAbsent(agentType, this::createAgent);
+    public AgentService(AgentFactory agentFactory) {
+        this.agentFactory = agentFactory;
     }
 
-    private ReActAgent createAgent(String agentType) {
-        DashScopeChatModel model = DashScopeChatModel.builder()
-                .apiKey(apiKey)
-                .modelName("qwen-plus")
-                .stream(true)
-                .enableThinking(true)
-                .formatter(new DashScopeChatFormatter())
-                .build();
-
-        ReActAgent.Builder builder = ReActAgent.builder()
-                .name(switch (agentType) {
-                    case "tool" -> "ToolAgent";
-                    case "task" -> "TaskAgent";
-                    case "template" -> "TemplateEditor";
-                    default -> "Assistant";
-                })
-                .sysPrompt(switch (agentType) {
-                    case "tool" -> "You are a helpful AI assistant with access to various tools. " +
-                            "Use the appropriate tools when needed to answer questions accurately. " +
-                            "Always explain what you're doing when using tools.";
-                    case "task" -> "You are a document analysis assistant. " +
-                            "When the user uploads a document, use the appropriate skill to parse it " +
-                            "and then fulfill the user's request based on the extracted content. " +
-                            "Support .docx, .pdf, and .xlsx file analysis.";
-                    case "template" -> "You are a Word document template editor. " +
-                            "When users upload a .docx template, help them fill in variables. " +
-                            "First parse the document to identify placeholders, " +
-                            "then ask for values if needed, then replace them using edit_docx.";
-                    default -> "You are a helpful AI assistant. Be friendly and concise.";
-                })
-                .model(model)
-                .memory(new InMemoryMemory());
-
-        Toolkit toolkit = new Toolkit();
-
-        switch (agentType) {
-            case "tool" -> {
-                toolkit.registerTool(new SimpleTools());
-                builder.toolkit(toolkit);
-            }
-            case "task" -> {
-                SkillBox skillBox = new SkillBox(toolkit);
-                try (ClasspathSkillRepository repo = new ClasspathSkillRepository("skills")) {
-                    skillBox.registration()
-                            .skill(repo.getSkill("docx"))
-                            .tool(new DocxParserTool())
-                            .apply();
-                    skillBox.registration()
-                            .skill(repo.getSkill("pdf"))
-                            .tool(new PdfParserTool())
-                            .apply();
-                    skillBox.registration()
-                            .skill(repo.getSkill("xlsx"))
-                            .tool(new XlsxParserTool())
-                            .apply();
-                } catch (Exception e) {
-                    log.error("Failed to load skills from classpath", e);
-                }
-                builder.toolkit(toolkit).skillBox(skillBox);
-            }
-            case "template" -> {
-                SkillBox skillBox = new SkillBox(toolkit);
-                try (ClasspathSkillRepository repo = new ClasspathSkillRepository("skills")) {
-                    skillBox.registration()
-                            .skill(repo.getSkill("docx-template"))
-                            .tool(new DocxParserTool())
-                            .apply();
-                } catch (Exception e) {
-                    log.error("Failed to load skills from classpath", e);
-                }
-                builder.toolkit(toolkit).skillBox(skillBox);
-            }
-            default -> builder.toolkit(toolkit);
-        }
-
-        return builder.build();
+    public ReActAgent getAgent(String agentId) {
+        return agents.computeIfAbsent(agentId, agentFactory::createAgent);
     }
 
-    public void streamToEmitter(String agentType, String message, String filePath, String fileName, SseEmitter emitter) {
-        ReActAgent agent = getAgent(agentType);
+    public void streamToEmitter(String agentId, String message, String filePath, String fileName, SseEmitter emitter) {
+        ReActAgent agent = getAgent(agentId);
 
         String actualMessage = message;
         if (filePath != null && !filePath.isBlank()) {
