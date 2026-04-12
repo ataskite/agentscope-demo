@@ -193,7 +193,6 @@ ToolRegistry maps tool/skill names to `Supplier<Object>` instances. It pre-regis
 ```java
 package com.msxf.agentscope.tool;
 
-import com.msxf.agentscope.model.SimpleTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;

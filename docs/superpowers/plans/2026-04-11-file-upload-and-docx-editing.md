@@ -21,7 +21,7 @@
 **Files:**
 - Modify: `src/main/resources/templates/chat.html:1332-1350`
 
-- [ ] **Step 1: Fix sendMessage() to cache fileInfo before removeFile()**
+- [x] **Step 1: Fix sendMessage() to cache fileInfo before removeFile()**
 
 Locate the `sendMessage()` function around line 1332. Find the line with `removeFile();` (currently line 1349) and modify the code to cache fileInfo first:
 
@@ -52,7 +52,7 @@ async function sendMessage() {
     // ... rest of function continues ...
 ```
 
-- [ ] **Step 2: Update fetch body to use fileInfo instead of uploadedFile**
+- [x] **Step 2: Update fetch body to use fileInfo instead of uploadedFile**
 
 Further down in the same function (around line 1368), update the fetch body:
 
@@ -70,7 +70,7 @@ try {
     });
 ```
 
-- [ ] **Step 3: Commit bug fix**
+- [x] **Step 3: Commit bug fix**
 
 ```bash
 git add src/main/resources/templates/chat.html
@@ -84,7 +84,7 @@ git commit -m "fix: cache file info before removeFile to fix upload path bug"
 **Files:**
 - Modify: `src/main/resources/templates/chat.html` (CSS section)
 
-- [ ] **Step 1: Add file list CSS styles**
+- [x] **Step 1: Add file list CSS styles**
 
 Locate the CSS section (starts around line 10, ends around line 1195). Find the `/* ===== FILE UPLOAD ===== */` section (around line 1095). After the `.file-tag-remove` styles, add the new file list styles:
 
@@ -141,7 +141,7 @@ Locate the CSS section (starts around line 10, ends around line 1195). Find the 
         }
 ```
 
-- [ ] **Step 2: Commit CSS styles**
+- [x] **Step 2: Commit CSS styles**
 
 ```bash
 git add src/main/resources/templates/chat.html
@@ -155,7 +155,7 @@ git commit -m "feat: add file list CSS styles with file type icon colors"
 **Files:**
 - Modify: `src/main/resources/templates/chat.html` (JavaScript section)
 
-- [ ] **Step 1: Add createFileList() helper function**
+- [x] **Step 1: Add createFileList() helper function**
 
 Locate the JavaScript section (starts around line 1272). Find the file upload functions (around line 1693). Add the new helper function after `removeFile()` (around line 1745):
 
@@ -209,7 +209,7 @@ Locate the JavaScript section (starts around line 1272). Find the file upload fu
         }
 ```
 
-- [ ] **Step 2: Commit helper function**
+- [x] **Step 2: Commit helper function**
 
 ```bash
 git add src/main/resources/templates/chat.html
@@ -223,7 +223,7 @@ git commit -m "feat: add createFileList() helper with file type icons"
 **Files:**
 - Modify: `src/main/resources/templates/chat.html` (JavaScript section)
 
-- [ ] **Step 1: Modify createThinkingBox() to accept fileInfo parameter**
+- [x] **Step 1: Modify createThinkingBox() to accept fileInfo parameter**
 
 Locate the `createThinkingBox()` function (around line 1528). Update the function signature and add file list rendering:
 
@@ -271,7 +271,7 @@ Locate the `createThinkingBox()` function (around line 1528). Update the functio
         }
 ```
 
-- [ ] **Step 2: Update all createThinkingBox() calls to pass fileInfo**
+- [x] **Step 2: Update all createThinkingBox() calls to pass fileInfo**
 
 Find the `updateThinkingBox()` function (around line 1563) and update its call to `createThinkingBox()`:
 
@@ -284,7 +284,7 @@ Find the `updateThinkingBox()` function (around line 1563) and update its call t
         }
 ```
 
-- [ ] **Step 3: Commit thinking box changes**
+- [x] **Step 3: Commit thinking box changes**
 
 ```bash
 git add src/main/resources/templates/chat.html
@@ -298,7 +298,7 @@ git commit -m "feat: update createThinkingBox to accept and display fileInfo"
 **Files:**
 - Modify: `src/main/resources/templates/chat.html` (JavaScript section)
 
-- [ ] **Step 1: Update sendMessage() event handlers for 'thinking' and 'tool_call'**
+- [x] **Step 1: Update sendMessage() event handlers for 'thinking' and 'tool_call'**
 
 Locate the SSE event handler in `sendMessage()` (around line 1403). Update the 'thinking' and 'tool_call' cases to pass fileInfo:
 
@@ -346,7 +346,7 @@ Locate the SSE event handler in `sendMessage()` (around line 1403). Update the '
                 });
 ```
 
-- [ ] **Step 2: Update createThinkingBox() call in error handling paths**
+- [x] **Step 2: Update createThinkingBox() call in error handling paths**
 
 Find the error handling code (around line 1465 in `currentEventSource.onerror`) and update:
 
@@ -372,7 +372,7 @@ Find the error handling code (around line 1465 in `currentEventSource.onerror`) 
                 };
 ```
 
-- [ ] **Step 3: Update sendMessage() initialization to create thinking box with fileInfo**
+- [x] **Step 3: Update sendMessage() initialization to create thinking box with fileInfo**
 
 Locate the section before the fetch (around line 1362) and update:
 
@@ -389,7 +389,7 @@ Locate the section before the fetch (around line 1362) and update:
             }
 ```
 
-- [ ] **Step 4: Commit event handler updates**
+- [x] **Step 4: Commit event handler updates**
 
 ```bash
 git add src/main/resources/templates/chat.html
@@ -403,7 +403,7 @@ git commit -m "feat: pass fileInfo through event handlers to display in thinking
 **Files:**
 - Modify: `src/main/resources/templates/chat.html` (JavaScript section)
 
-- [ ] **Step 1: Update appendMessage() to accept and display fileInfo**
+- [x] **Step 1: Update appendMessage() to accept and display fileInfo**
 
 Locate the `appendMessage()` function (around line 1489). Update it to accept fileInfo parameter and display file list:
 
@@ -450,7 +450,7 @@ Locate the `appendMessage()` function (around line 1489). Update it to accept fi
         }
 ```
 
-- [ ] **Step 2: Verify the existing appendMessage() call in sendMessage()**
+- [x] **Step 2: Verify the existing appendMessage() call in sendMessage()**
 
 The call at line 1344 should already be passing fileInfo (from Task 1, Step 1):
 
@@ -458,7 +458,7 @@ The call at line 1344 should already be passing fileInfo (from Task 1, Step 1):
 appendMessage('user', displayMessage, uploadedFile);  // Should already be passing uploadedFile
 ```
 
-- [ ] **Step 3: Commit user message display update**
+- [x] **Step 3: Commit user message display update**
 
 ```bash
 git add src/main/resources/templates/chat.html
@@ -472,7 +472,7 @@ git commit -m "feat: update appendMessage to display file list for user messages
 **Files:**
 - Modify: `src/main/resources/templates/chat.html` (HTML and JavaScript)
 
-- [ ] **Step 1: Add template agent card HTML**
+- [x] **Step 1: Add template agent card HTML**
 
 Locate the agent list in the HTML (around line 1209). After the "Task Agent" card (around line 1230), add the new template agent card:
 
@@ -488,7 +488,7 @@ Locate the agent list in the HTML (around line 1209). After the "Task Agent" car
             </aside>
 ```
 
-- [ ] **Step 2: Add template agent metadata to agents object**
+- [x] **Step 2: Add template agent metadata to agents object**
 
 Locate the `agents` object definition in JavaScript (around line 1280). Add the template entry:
 
@@ -501,7 +501,7 @@ Locate the `agents` object definition in JavaScript (around line 1280). Add the 
         };
 ```
 
-- [ ] **Step 3: Commit template agent UI**
+- [x] **Step 3: Commit template agent UI**
 
 ```bash
 git add src/main/resources/templates/chat.html
@@ -515,13 +515,13 @@ git commit -m "feat: add template editor agent card to sidebar"
 **Files:**
 - Create: `src/main/resources/skills/docx-template/SKILL.md`
 
-- [ ] **Step 1: Create skills directory structure**
+- [x] **Step 1: Create skills directory structure**
 
 ```bash
 mkdir -p src/main/resources/skills/docx-template
 ```
 
-- [ ] **Step 2: Create SKILL.md file**
+- [x] **Step 2: Create SKILL.md file**
 
 ```bash
 cat > src/main/resources/skills/docx-template/SKILL.md << 'EOF'
@@ -570,7 +570,7 @@ User: "Fill in this contract template"
 EOF
 ```
 
-- [ ] **Step 3: Commit skill definition**
+- [x] **Step 3: Commit skill definition**
 
 ```bash
 git add src/main/resources/skills/docx-template/SKILL.md
@@ -584,7 +584,7 @@ git commit -m "feat: add docx-template skill for variable replacement workflow"
 **Files:**
 - Modify: `src/main/java/com/msxf/agentscope/tool/DocxParserTool.java`
 
-- [ ] **Step 1: Add JSON parsing imports**
+- [x] **Step 1: Add JSON parsing imports**
 
 Add these imports at the top of the file after the existing imports:
 
@@ -599,7 +599,7 @@ import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 ```
 
-- [ ] **Step 2: Add ObjectMapper and ReplacementRecord class**
+- [x] **Step 2: Add ObjectMapper and ReplacementRecord class**
 
 Add these after the logger declaration in the class:
 
@@ -610,7 +610,7 @@ Add these after the logger declaration in the class:
     private static record ReplacementRecord(String placeholder, String value) {}
 ```
 
-- [ ] **Step 3: Add edit_docx tool method**
+- [x] **Step 3: Add edit_docx tool method**
 
 Add this method after the `parseDocx()` method:
 
@@ -714,7 +714,7 @@ Add this method after the `parseDocx()` method:
     }
 ```
 
-- [ ] **Step 4: Compile to verify**
+- [x] **Step 4: Compile to verify**
 
 ```bash
 mvn clean compile
@@ -722,7 +722,7 @@ mvn clean compile
 
 Expected: BUILD SUCCESS
 
-- [ ] **Step 5: Commit edit_docx implementation**
+- [x] **Step 5: Commit edit_docx implementation**
 
 ```bash
 git add src/main/java/com/msxf/agentscope/tool/DocxParserTool.java
@@ -736,7 +736,7 @@ git commit -m "feat: add edit_docx tool method for variable replacement"
 **Files:**
 - Modify: `src/main/java/com/msxf/agentscope/controller/ChatController.java`
 
-- [ ] **Step 1: Add imports for file download**
+- [x] **Step 1: Add imports for file download**
 
 Add these imports after the existing imports:
 
@@ -749,7 +749,7 @@ import org.springframework.http.ResponseEntity;
 import java.io.File;
 ```
 
-- [ ] **Step 2: Add download endpoint**
+- [x] **Step 2: Add download endpoint**
 
 Add this method after the `uploadFile()` method (after line 175):
 
@@ -810,7 +810,7 @@ Add this method after the `uploadFile()` method (after line 175):
     }
 ```
 
-- [ ] **Step 3: Compile to verify**
+- [x] **Step 3: Compile to verify**
 
 ```bash
 mvn clean compile
@@ -818,7 +818,7 @@ mvn clean compile
 
 Expected: BUILD SUCCESS
 
-- [ ] **Step 4: Commit download endpoint**
+- [x] **Step 4: Commit download endpoint**
 
 ```bash
 git add src/main/java/com/msxf/agentscope/controller/ChatController.java
@@ -832,7 +832,7 @@ git commit -m "feat: add /chat/download endpoint for serving uploaded and edited
 **Files:**
 - Modify: `src/main/java/com/msxf/agentscope/service/AgentService.java`
 
-- [ ] **Step 1: Add template case to createAgent()**
+- [x] **Step 1: Add template case to createAgent()**
 
 Locate the switch statement in `createAgent()` (around line 73). Add the template case after the task case:
 
@@ -884,7 +884,7 @@ Locate the switch statement in `createAgent()` (around line 73). Add the templat
         }
 ```
 
-- [ ] **Step 2: Compile to verify**
+- [x] **Step 2: Compile to verify**
 
 ```bash
 mvn clean compile
@@ -892,7 +892,7 @@ mvn clean compile
 
 Expected: BUILD SUCCESS
 
-- [ ] **Step 3: Commit template agent**
+- [x] **Step 3: Commit template agent**
 
 ```bash
 git add src/main/java/com/msxf/agentscope/service/AgentService.java
@@ -903,7 +903,7 @@ git commit -m "feat: add template agent for Word document variable editing"
 
 ## Task 12: Final Integration Test
 
-- [ ] **Step 1: Build the project**
+- [x] **Step 1: Build the project**
 
 ```bash
 mvn clean package -DskipTests
@@ -911,7 +911,7 @@ mvn clean package -DskipTests
 
 Expected: BUILD SUCCESS with jar file created
 
-- [ ] **Step 2: Start the application**
+- [x] **Step 2: Start the application**
 
 ```bash
 export DASHSCOPE_API_KEY=your_key_here
@@ -920,7 +920,7 @@ mvn spring-boot:run
 
 Expected: Application starts on http://localhost:8080
 
-- [ ] **Step 3: Test bug fix - File upload path**
+- [x] **Step 3: Test bug fix - File upload path**
 
 1. Open http://localhost:8080
 2. Select "Task Agent"
@@ -930,13 +930,13 @@ Expected: Application starts on http://localhost:8080
 
 Expected: `parse_docx` is called with actual file path (not null)
 
-- [ ] **Step 4: Test file list UI**
+- [x] **Step 4: Test file list UI**
 
 1. After uploading a file, observe the message display
 
 Expected: File name and icon appear above the user message and above the thinking box
 
-- [ ] **Step 5: Test template agent - Variable replacement**
+- [x] **Step 5: Test template agent - Variable replacement**
 
 1. Select "Template Editor" agent from sidebar
 2. Upload a .docx file with placeholders like `{{name}}`, `{{date}}`
@@ -945,7 +945,7 @@ Expected: File name and icon appear above the user message and above the thinkin
 
 Expected: Agent calls `parse_docx`, then `edit_docx`, then reports new file location
 
-- [ ] **Step 6: Test download endpoint**
+- [x] **Step 6: Test download endpoint**
 
 1. After editing completes, note the output file path from the response
 2. Extract the fileId (filename without .docx extension if _edited)
@@ -953,7 +953,7 @@ Expected: Agent calls `parse_docx`, then `edit_docx`, then reports new file loca
 
 Expected: Browser downloads the edited .docx file
 
-- [ ] **Step 7: Commit final integration**
+- [x] **Step 7: Commit final integration**
 
 ```bash
 git add -A

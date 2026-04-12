@@ -27,7 +27,7 @@
 **Files:**
 - Modify: `pom.xml` (after line 47, inside `<dependencies>`)
 
-- [ ] **Step 1: Add spring-boot-starter-thymeleaf to pom.xml**
+- [x] **Step 1: Add spring-boot-starter-thymeleaf to pom.xml**
 
 Add this block after the `spring-boot-starter-web` dependency (after line 47):
 
@@ -39,12 +39,12 @@ Add this block after the `spring-boot-starter-web` dependency (after line 47):
         </dependency>
 ```
 
-- [ ] **Step 2: Verify dependency resolves**
+- [x] **Step 2: Verify dependency resolves**
 
 Run: `cd /Users/jiangkun/Documents/workspace/agentscope-demo && ./mvnw dependency:resolve -q`
 Expected: BUILD SUCCESS (no errors)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add pom.xml
@@ -58,7 +58,7 @@ git commit -m "build: add spring-boot-starter-thymeleaf dependency"
 **Files:**
 - Create: `src/main/java/com/msxf/agentscope/model/SimpleTools.java`
 
-- [ ] **Step 1: Create SimpleTools class**
+- [x] **Step 1: Create SimpleTools class**
 
 ```java
 package com.msxf.agentscope.model;
@@ -107,12 +107,12 @@ public class SimpleTools {
 }
 ```
 
-- [ ] **Step 2: Verify compilation**
+- [x] **Step 2: Verify compilation**
 
 Run: `cd /Users/jiangkun/Documents/workspace/agentscope-demo && ./mvnw compile -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/main/java/com/msxf/agentscope/model/SimpleTools.java
@@ -134,12 +134,12 @@ Key design decisions:
 - StreamOptions subscribes to `REASONING` and `TOOL_RESULT` events with incremental mode
 - ContentBlock pattern matching handles ThinkingBlock, TextBlock, ToolUseBlock, ToolResultBlock
 
-- [ ] **Step 1: Create AgentService class**
+- [x] **Step 1: Create AgentService class**
 
 ```java
 package com.msxf.agentscope.service;
 
-import com.msxf.agentscope.model.SimpleTools;
+import com.msxf.agentscope.tool.SimpleTools;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.EventType;
 import io.agentscope.core.agent.StreamOptions;
@@ -156,7 +156,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -281,16 +280,17 @@ public class AgentService {
                 case ToolResultBlock trb -> {
                     String resultText = trb.getOutput() != null
                             ? trb.getOutput().stream()
-                            .filter(o -> o instanceof TextBlock)
-                            .map(o -> ((TextBlock) o).getText())
-                            .reduce("", (a, b) -> a + b)
+                              .filter(o -> o instanceof TextBlock)
+                              .map(o -> ((TextBlock) o).getText())
+                              .reduce("", (a, b) -> a + b)
                             : "";
                     sendEvent(emitter, "tool_result", Map.of(
                             "name", trb.getName() != null ? trb.getName() : "",
                             "result", resultText
                     ));
                 }
-                default -> {}
+                default -> {
+                }
             }
         }
     }
@@ -304,12 +304,12 @@ public class AgentService {
 }
 ```
 
-- [ ] **Step 2: Verify compilation**
+- [x] **Step 2: Verify compilation**
 
 Run: `cd /Users/jiangkun/Documents/workspace/agentscope-demo && ./mvnw compile -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/main/java/com/msxf/agentscope/service/AgentService.java
@@ -330,7 +330,7 @@ The controller has three endpoints:
 
 Data flow: POST creates emitter → stores in map → returns sessionId → frontend opens EventSource with that ID → streaming begins.
 
-- [ ] **Step 1: Create ChatController class**
+- [x] **Step 1: Create ChatController class**
 
 ```java
 package com.msxf.agentscope.controller;
@@ -424,12 +424,12 @@ public class ChatController {
 }
 ```
 
-- [ ] **Step 2: Verify compilation**
+- [x] **Step 2: Verify compilation**
 
 Run: `cd /Users/jiangkun/Documents/workspace/agentscope-demo && ./mvnw compile -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/main/java/com/msxf/agentscope/controller/ChatController.java
@@ -490,7 +490,7 @@ This is the main UI page. Use the **frontend-design** skill to produce a high-qu
 - `toggleDebug()` — collapse/expand right panel
 - Auto-scroll chat and debug to bottom on new content
 
-- [ ] **Step 1: Use frontend-design skill to create the template**
+- [x] **Step 1: Use frontend-design skill to create the template**
 
 Invoke the `frontend-design` skill to produce a production-quality Thymeleaf template at `src/main/resources/templates/chat.html`. The template should be a complete HTML file with:
 - `xmlns:th="http://www.thymeleaf.org"` on the html tag
@@ -500,7 +500,7 @@ Invoke the `frontend-design` skill to produce a production-quality Thymeleaf tem
 - Modern, clean design with subtle shadows and rounded corners
 - The SSE logic described above fully implemented in JS
 
-- [ ] **Step 2: Verify the page loads**
+- [x] **Step 2: Verify the page loads**
 
 Run: `cd /Users/jiangkun/Documents/workspace/agentscope-demo && ./mvnw spring-boot:run`
 
@@ -508,7 +508,7 @@ Then open `http://localhost:8080` in a browser. Expected: The three-column chat 
 
 Stop the server after verifying.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/main/resources/templates/chat.html
@@ -519,11 +519,11 @@ git commit -m "feat: add chat.html Thymeleaf template with three-column SSE UI"
 
 ### Task 6: End-to-End Smoke Test
 
-- [ ] **Step 1: Start the application**
+- [x] **Step 1: Start the application**
 
 Run: `cd /Users/jiangkun/Documents/workspace/agentscope-demo && ./mvnw spring-boot:run`
 
-- [ ] **Step 2: Verify page renders**
+- [x] **Step 2: Verify page renders**
 
 Open `http://localhost:8080`. Check:
 - Three columns visible (left agent list, center chat area, right debug panel)
@@ -531,7 +531,7 @@ Open `http://localhost:8080`. Check:
 - Chat input area with text input and Send button
 - Debug panel shows "Debug" header with collapse button
 
-- [ ] **Step 3: Test Basic Chat agent**
+- [x] **Step 3: Test Basic Chat agent**
 
 1. Click "Basic Chat" in left sidebar
 2. Type "Hello, introduce yourself" in input
@@ -542,7 +542,7 @@ Open `http://localhost:8080`. Check:
    - Debug panel shows thinking (blue) and text (orange) events
    - Input re-enables after response completes
 
-- [ ] **Step 4: Test Tool Calling agent**
+- [x] **Step 4: Test Tool Calling agent**
 
 1. Click "Tool Calling" in left sidebar
 2. Type "What time is it in Shanghai?" in input
@@ -553,21 +553,21 @@ Open `http://localhost:8080`. Check:
    - Chat shows agent's response with the time
    - Input re-enables after response completes
 
-- [ ] **Step 5: Test debug panel collapse**
+- [x] **Step 5: Test debug panel collapse**
 
 1. Click collapse button on debug panel header
 2. Expected: Right panel collapses to narrow strip showing "Debug" vertically
 3. Click the strip to expand
 4. Expected: Panel expands back to full width
 
-- [ ] **Step 6: Test agent switching**
+- [x] **Step 6: Test agent switching**
 
 1. Switch between Basic Chat and Tool Calling
 2. Expected: Chat area clears, debug log retains history
 
 Stop the server.
 
-- [ ] **Step 7: Final commit (if any fixes were needed)**
+- [x] **Step 7: Final commit (if any fixes were needed)**
 
 ```bash
 git add -A

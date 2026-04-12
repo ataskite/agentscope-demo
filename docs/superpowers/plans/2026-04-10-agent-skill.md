@@ -31,7 +31,7 @@
 **Files:**
 - Modify: `pom.xml:28-68` (dependencies block)
 
-- [ ] **Step 1: Add POI and PDFBox dependencies to pom.xml**
+- [x] **Step 1: Add POI and PDFBox dependencies to pom.xml**
 
 在 `pom.xml` 的 `<dependencies>` 块中，在 `spring-boot-starter-test` 之前添加：
 
@@ -51,12 +51,12 @@
         </dependency>
 ```
 
-- [ ] **Step 2: Verify dependencies resolve**
+- [x] **Step 2: Verify dependencies resolve**
 
 Run: `cd /Users/jiangkun/Documents/workspace/agentscope-demo && mvn dependency:resolve -q`
 Expected: BUILD SUCCESS, no errors
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add pom.xml
@@ -71,7 +71,7 @@ git commit -m "build: add Apache POI and PDFBox dependencies for file parsing"
 - Create: `src/main/resources/skills/docx/SKILL.md`
 - Create: `src/main/resources/skills/pdf/SKILL.md`
 
-- [ ] **Step 1: Create skills directory and docx SKILL.md**
+- [x] **Step 1: Create skills directory and docx SKILL.md**
 
 Create directory `src/main/resources/skills/docx/` and file `src/main/resources/skills/docx/SKILL.md`:
 
@@ -114,7 +114,7 @@ Extracts all text content from a .docx file.
    - Compare with other documents
 ```
 
-- [ ] **Step 2: Create pdf SKILL.md**
+- [x] **Step 2: Create pdf SKILL.md**
 
 Create directory `src/main/resources/skills/pdf/` and file `src/main/resources/skills/pdf/SKILL.md`:
 
@@ -154,12 +154,12 @@ Extracts text content from a PDF file.
    - Compare multiple documents
 ```
 
-- [ ] **Step 3: Verify skill files are on classpath**
+- [x] **Step 3: Verify skill files are on classpath**
 
 Run: `mvn process-resources -q && ls -la target/classes/skills/docx/ target/classes/skills/pdf/`
 Expected: Both directories contain SKILL.md
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/main/resources/skills/
@@ -173,7 +173,7 @@ git commit -m "feat: add docx and pdf skill markdown files for Task Agent"
 **Files:**
 - Create: `src/main/java/com/msxf/agentscope/tool/DocxParserTool.java`
 
-- [ ] **Step 1: Create the tool class**
+- [x] **Step 1: Create the tool class**
 
 Create file `src/main/java/com/msxf/agentscope/tool/DocxParserTool.java`:
 
@@ -279,12 +279,12 @@ public class DocxParserTool {
 }
 ```
 
-- [ ] **Step 2: Verify compilation**
+- [x] **Step 2: Verify compilation**
 
 Run: `mvn compile -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/main/java/com/msxf/agentscope/tool/DocxParserTool.java
@@ -298,7 +298,7 @@ git commit -m "feat: add DocxParserTool using Apache POI"
 **Files:**
 - Create: `src/main/java/com/msxf/agentscope/tool/PdfParserTool.java`
 
-- [ ] **Step 1: Create the tool class**
+- [x] **Step 1: Create the tool class**
 
 Create file `src/main/java/com/msxf/agentscope/tool/PdfParserTool.java`:
 
@@ -377,12 +377,12 @@ public class PdfParserTool {
 }
 ```
 
-- [ ] **Step 2: Verify compilation**
+- [x] **Step 2: Verify compilation**
 
 Run: `mvn compile -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/main/java/com/msxf/agentscope/tool/PdfParserTool.java
@@ -396,7 +396,7 @@ git commit -m "feat: add PdfParserTool using Apache PDFBox"
 **Files:**
 - Modify: `src/main/resources/application.yml`
 
-- [ ] **Step 1: Add multipart configuration**
+- [x] **Step 1: Add multipart configuration**
 
 在 `application.yml` 中 `spring:` 节点下添加 `servlet.multipart` 配置：
 
@@ -422,7 +422,7 @@ spring:
       max-request-size: 50MB
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add src/main/resources/application.yml
@@ -436,7 +436,7 @@ git commit -m "config: add multipart file upload limits (50MB)"
 **Files:**
 - Modify: `src/main/java/com/msxf/agentscope/service/AgentService.java`
 
-- [ ] **Step 1: Add imports for skill classes**
+- [x] **Step 1: Add imports for skill classes**
 
 在 AgentService.java 顶部 import 区域添加：
 
@@ -447,7 +447,7 @@ import com.msxf.agentscope.tool.DocxParserTool;
 import com.msxf.agentscope.tool.PdfParserTool;
 ```
 
-- [ ] **Step 2: Add "task" case to createAgent method**
+- [x] **Step 2: Add "task" case to createAgent method**
 
 在 `createAgent` 方法的 `switch` 语句中，在 `case "tool"` 和 `default` 之间添加 `case "task"` 分支。
 
@@ -502,7 +502,7 @@ import com.msxf.agentscope.tool.PdfParserTool;
         return builder.build();
 ```
 
-- [ ] **Step 3: Modify streamToEmitter to support file path**
+- [x] **Step 3: Modify streamToEmitter to support file path**
 
 将 `streamToEmitter` 方法签名改为支持文件信息：
 
@@ -525,12 +525,12 @@ import com.msxf.agentscope.tool.PdfParserTool;
                 .build();
 ```
 
-- [ ] **Step 4: Verify compilation**
+- [x] **Step 4: Verify compilation**
 
 Run: `mvn compile -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/msxf/agentscope/service/AgentService.java
@@ -544,7 +544,7 @@ git commit -m "feat: add TaskAgent with SkillBox and skill-based file parsing"
 **Files:**
 - Modify: `src/main/java/com/msxf/agentscope/controller/ChatController.java`
 
-- [ ] **Step 1: Add multipart imports**
+- [x] **Step 1: Add multipart imports**
 
 在 import 区域添加：
 
@@ -555,7 +555,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 ```
 
-- [ ] **Step 2: Add upload endpoint**
+- [x] **Step 2: Add upload endpoint**
 
 在 `stream` 方法之后添加上传端点：
 
@@ -600,7 +600,7 @@ import java.nio.file.Paths;
     }
 ```
 
-- [ ] **Step 3: Modify sendMessage to support file params**
+- [x] **Step 3: Modify sendMessage to support file params**
 
 将 `sendMessage` 方法的请求解析部分更新，提取 `filePath` 和 `fileName`，并传递给 `agentService.streamToEmitter`：
 
@@ -645,12 +645,12 @@ import java.nio.file.Paths;
     }
 ```
 
-- [ ] **Step 4: Verify compilation**
+- [x] **Step 4: Verify compilation**
 
 Run: `mvn compile -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/msxf/agentscope/controller/ChatController.java
@@ -666,7 +666,7 @@ git commit -m "feat: add file upload endpoint and pass file info to AgentService
 
 这是最大的改动，涉及 CSS、HTML 和 JS 三部分。
 
-- [ ] **Step 1: Add upload button CSS**
+- [x] **Step 1: Add upload button CSS**
 
 在 `</style>` 标签之前添加上传相关样式：
 
@@ -725,7 +725,7 @@ git commit -m "feat: add file upload endpoint and pass file info to AgentService
         }
 ```
 
-- [ ] **Step 2: Add Task Agent card to sidebar**
+- [x] **Step 2: Add Task Agent card to sidebar**
 
 在 agent-list 的 Tool Calling 卡片之后添加 Task Agent 卡片：
 
@@ -739,7 +739,7 @@ git commit -m "feat: add file upload endpoint and pass file info to AgentService
                     </div>
 ```
 
-- [ ] **Step 3: Replace input area HTML with upload-capable version**
+- [x] **Step 3: Replace input area HTML with upload-capable version**
 
 将 `<div class="chat-input-area">` 整个块替换为：
 
@@ -755,7 +755,7 @@ git commit -m "feat: add file upload endpoint and pass file info to AgentService
                 </div>
 ```
 
-- [ ] **Step 4: Add file upload state and handlers to JS**
+- [x] **Step 4: Add file upload state and handlers to JS**
 
 在 `<script>` 的 `/* ===== STATE ===== */` 部分添加上传状态：
 
@@ -832,7 +832,7 @@ git commit -m "feat: add file upload endpoint and pass file info to AgentService
         }
 ```
 
-- [ ] **Step 5: Modify sendMessage to include file info**
+- [x] **Step 5: Modify sendMessage to include file info**
 
 在 `sendMessage` 函数中修改 fetch body，添加文件信息：
 
@@ -858,7 +858,7 @@ git commit -m "feat: add file upload endpoint and pass file info to AgentService
             removeFile();
 ```
 
-- [ ] **Step 6: Update selectAgent to clear file on agent switch**
+- [x] **Step 6: Update selectAgent to clear file on agent switch**
 
 在 `selectAgent` 函数开头添加：
 
@@ -866,14 +866,14 @@ git commit -m "feat: add file upload endpoint and pass file info to AgentService
             removeFile();
 ```
 
-- [ ] **Step 7: Verify full page renders**
+- [x] **Step 7: Verify full page renders**
 
 Run: `mvn spring-boot:run -q &`
 Then: `curl -s http://localhost:8080/ | head -20`
 Expected: HTML containing "Task Agent" and upload button HTML
 Kill: stop the background process
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/main/resources/templates/chat.html
@@ -886,23 +886,23 @@ git commit -m "feat: add file upload UI, Task Agent card, and upload JS logic"
 
 **Files:** None (verification only)
 
-- [ ] **Step 1: Clean build**
+- [x] **Step 1: Clean build**
 
 Run: `mvn clean compile -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 2: Start application**
+- [x] **Step 2: Start application**
 
 Run: `mvn spring-boot:run`
 
-- [ ] **Step 3: Verify frontend loads**
+- [x] **Step 3: Verify frontend loads**
 
 Open http://localhost:8080 in browser. Verify:
 - Left sidebar shows 3 agent cards: Basic Chat, Tool Calling, Task Agent
 - Input area has upload button (📎) next to textarea
 - Clicking Task Agent switches the chat header
 
-- [ ] **Step 4: Test file upload flow**
+- [x] **Step 4: Test file upload flow**
 
 1. Click Task Agent
 2. Click 📎 button, select a .docx or .pdf file
@@ -910,7 +910,7 @@ Open http://localhost:8080 in browser. Verify:
 4. Type "请摘要这个文件" and send
 5. Verify SSE stream shows tool_call and text response in debug panel
 
-- [ ] **Step 5: Verify other agents still work**
+- [x] **Step 5: Verify other agents still work**
 
 1. Switch to Basic Chat
 2. Send "hello"
@@ -919,6 +919,6 @@ Open http://localhost:8080 in browser. Verify:
 5. Send "what time is it in Shanghai?"
 6. Verify tool call and response work
 
-- [ ] **Step 6: Stop application and final commit (if any uncommitted fixes)**
+- [x] **Step 6: Stop application and final commit (if any uncommitted fixes)**
 
 Run: Stop the app (Ctrl+C)
