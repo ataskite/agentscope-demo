@@ -205,8 +205,8 @@ html, body {
 }
 
 .sidebar-header {
-    height: 44px;
-    min-height: 44px;
+    height: 40px;
+    min-height: 40px;
     padding: 0 var(--space-lg);
     display: flex;
     align-items: center;
@@ -375,8 +375,8 @@ html, body {
 }
 
 .chat-header {
-    height: 48px;
-    min-height: 48px;
+    height: 56px;
+    min-height: 56px;
     background: linear-gradient(180deg, rgba(0, 245, 255, 0.03) 0%, rgba(15, 15, 26, 0.5) 100%);
     border-bottom: 1px solid var(--border-dim);
     display: flex;
@@ -1079,8 +1079,8 @@ html, body {
 }
 
 .debug-header {
-    height: 36px;
-    min-height: 36px;
+    height: 40px;
+    min-height: 40px;
     display: flex;
     align-items: center;
     padding: 0 var(--space-sm);
@@ -1326,17 +1326,25 @@ html, body {
     color: var(--text-primary);
 }
 
-.rm-value .tok-in {
+.rm-value .tokens-in,
+.rm-value .tokens-out {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.rm-value .tokens-in {
     color: var(--neon-blue);
 }
 
-.rm-value .tok-out {
+.rm-value .tokens-out {
     color: var(--neon-cyan);
+    margin-left: 8px;
 }
 
-.rm-value .rm-arrow {
-    color: var(--text-muted);
-    margin: 0 4px;
+.rm-value .token-icon {
+    flex-shrink: 0;
+}
 }
 
 /* Round Timeline */
@@ -1344,7 +1352,7 @@ html, body {
     padding: 3px 4px;
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 0;
 }
 
 .rtl-row {
@@ -1369,20 +1377,83 @@ html, body {
     border-left-color: var(--neon-purple);
 }
 
+.rtl-row.type-phase {
+    color: var(--neon-cyan);
+    border-left-color: var(--neon-cyan);
+    background: rgba(0, 245, 255, 0.04);
+}
+
 .rtl-row.type-tool {
     color: #FFB800;
     border-left-color: #FFB800;
     background: rgba(255, 184, 0, 0.04);
 }
 
+/* Status variants */
+.rtl-row.status-running {
+    border-left-color: var(--neon-magenta);
+    background: rgba(255, 16, 240, 0.04);
+}
+
+.rtl-row.status-running .rtl-status {
+    color: var(--neon-magenta);
+    animation: pulse-status 1s ease-in-out infinite;
+}
+
+@keyframes pulse-status {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+.rtl-row.type-llm.status-ok {
+    border-left-color: var(--neon-purple);
+}
+
 .rtl-row.type-tool.status-ok {
     border-left-color: var(--neon-green);
+}
+
+.rtl-row.type-tool.status-ok .rtl-icon {
+    color: var(--neon-green);
+}
+
+.rtl-row.type-skill.status-ok {
+    border-left-color: var(--neon-blue);
+}
+
+.rtl-row.type-skill.status-ok .rtl-icon {
+    color: var(--neon-blue);
 }
 
 .rtl-row.type-error {
     color: var(--status-error);
     border-left-color: var(--status-error);
     background: rgba(255, 71, 87, 0.06);
+}
+
+.rtl-connector {
+    width: 14px;
+    flex-shrink: 0;
+    text-align: center;
+    color: var(--border-dim);
+    font-size: 10px;
+    line-height: 1.4;
+    font-family: var(--font-body);
+}
+
+.rtl-row.type-phase .rtl-connector {
+    color: var(--neon-cyan);
+    opacity: 0.5;
+}
+
+.rtl-row.type-llm .rtl-connector {
+    color: var(--neon-purple);
+    opacity: 0.4;
+}
+
+.rtl-row.type-tool .rtl-connector {
+    color: #FFB800;
+    opacity: 0.4;
 }
 
 .rtl-icon {
@@ -1408,6 +1479,11 @@ html, body {
 
 .rtl-row.type-llm .rtl-metrics {
     color: var(--neon-purple);
+    opacity: 0.8;
+}
+
+.rtl-row.type-phase .rtl-metrics {
+    color: var(--neon-cyan);
     opacity: 0.8;
 }
 

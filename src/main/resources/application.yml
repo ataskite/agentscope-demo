@@ -7,6 +7,15 @@ spring:
     multipart:
       max-file-size: 50MB
       max-request-size: 50MB
+  task:
+    execution:
+      pool:
+        core-size: 10
+        max-size: 50
+        queue-capacity: 100
+        keep-alive: 60s
+        allow-core-thread-timeout: true
+      thread-name-prefix: sse-
 
 # AgentScope Configuration
 agentscope:
@@ -43,7 +52,7 @@ agentscope:
 logging:
   level:
     root: INFO
-    io.agentscope: DEBUG
-    com.msxf.agentscope: DEBUG
+    io.agentscope: INFO
+    com.msxf.agentscope: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

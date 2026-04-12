@@ -20,7 +20,6 @@ function renderMarkdown(text) {
     if (typeof marked !== 'undefined') {
         return marked.parse(text);
     }
-    // Fallback: escape HTML and preserve whitespace
     var div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
@@ -75,12 +74,11 @@ async function loadAgents() {
             agentListEl.appendChild(card);
         });
 
-        // Select first agent by default
         if (agentList.length > 0) {
             selectAgent(agentList[0].agentId);
         }
     } catch (err) {
-        // Agent loading error - no round context
+        // Agent loading error
     }
 }
 
@@ -331,6 +329,7 @@ function selectAgent(agentId) {
     roundNumber = 0;
     messageInput.focus();
 }
+
 async function sendMessage() {
     var input = messageInput;
     var message = input.value.trim();
@@ -338,13 +337,17 @@ async function sendMessage() {
 
     chatEmpty.style.display = 'none';
 
+    // Collapse all previous runtime panels before starting new message
+    document.querySelectorAll('.round-body:not(.collapsed)').forEach(function(body) {
+        body.classList.add('collapsed');
+    });
+
     appendMessage('user', message, uploadedFile);
     messageCount++;
 
     input.value = '';
     input.style.height = 'auto';
 
-    // CACHE file info BEFORE clearing
     var fileInfo = uploadedFile;
     removeFile();
     setStreamingState(true);
@@ -357,17 +360,14 @@ async function sendMessage() {
     chatMessages.appendChild(typingEl);
     scrollToBottom(chatMessages);
 
-    // Reset thinking state
     currentThinkingBox = null;
     currentAgentMessageWrapper = null;
     thinkingContent = '';
     currentFileInfo = null;
-
-    // Store file info for this message
     currentFileInfo = fileInfo;
+
     var agentBubble = null;
 
-    // Create initial thinking box with file info
     if (fileInfo) {
         createThinkingBox(fileInfo);
     }
@@ -408,13 +408,163 @@ async function sendMessage() {
             }
 
             switch (payload.type) {
-                case 'text':
-                    // End thinking time tracking
+
+                // ===== HOOK LIFECYCLE EVENTS (from ObservabilityHook) =====
+
+                case 'agent_start':
+                    // Agent begins processing
+                    if (currentRound) {
+                        addTimelineRow('phase', 'Agent Start', payload.agentName || '', 'running');
+                    }
+                    break;
+
+                case 'agent_end':
+                    // Agent finishes - finalize metrics
+                    if (currentRound) {
+                        var totalDur = payload.duration_ms || 0;
+                        addTimelineRow('phase', 'Agent End', formatDuration(totalDur), 'ok');
+                        currentRound.totalLlmCalls = payload.totalLlmCalls || 0;
+                        currentRound.totalToolCalls = payload.totalToolCalls || 0;
+                    }
+                    break;
+
+                case 'llm_start':
+                    // LLM call begins (from Hook's PreReasoningEvent)
+                    if (currentRound) {
+                        var callNum = payload.callNumber || (currentRound.llmCallCount + 1);
+                        currentRound._currentLlmStart = Date.now();
+                        currentRound._currentLlmCallNum = callNum;
+                        // Create a "running" LLM row that will be updated on llm_end
+                        currentRound._currentLlmRow = addTimelineRow('llm', 'LLM #' + callNum, (payload.modelName || '') + ' ...', 'running');
+                    }
+                    break;
+
+                case 'llm_end':
+                    // LLM call ends (from Hook's PostReasoningEvent)
+                    if (currentRound) {
+                        currentRound.llmCallCount++;
+                        var tokens = payload.totalTokens ? payload.totalTokens.toLocaleString() + ' tokens' : '';
+                        var llmTimeSec = payload.llmTime ? payload.llmTime : 0;
+                        var llmDurMs = 0;
+                        if (currentRound._currentLlmStart) {
+                            llmDurMs = Date.now() - currentRound._currentLlmStart;
+                        }
+                        var timeStr = llmDurMs > 0 ? formatDuration(llmDurMs) : (llmTimeSec > 0 ? (llmTimeSec >= 1 ? llmTimeSec.toFixed(1) + 's' : (llmTimeSec * 1000).toFixed(0) + 'ms') : '');
+
+                        // Accumulate usage
+                        currentRound.inputTokens += (payload.inputTokens || 0);
+                        currentRound.outputTokens += (payload.outputTokens || 0);
+                        currentRound.totalTokens += (payload.totalTokens || 0);
+                        currentRound.llmTime += llmTimeSec;
+
+                        // Update the LLM row with final info
+                        if (currentRound._currentLlmRow) {
+                            var row = currentRound._currentLlmRow;
+                            var metricsEl = row.querySelector('.rtl-metrics');
+                            var statusEl = row.querySelector('.rtl-status');
+                            if (metricsEl) metricsEl.textContent = [tokens, timeStr].filter(Boolean).join(' ');
+                            if (statusEl) statusEl.textContent = '✓';
+                            row.classList.remove('status-running');
+                            row.classList.add('status-ok');
+                            currentRound._currentLlmRow = null;
+                        }
+
+                        updateRoundMetrics();
+                        currentRound._currentLlmStart = null;
+                    }
+                    break;
+
+                case 'thinking':
+                    // Thinking text chunk (from Hook's ReasoningChunkEvent)
+                    if (currentRound && !currentRound.thinkingCycleStart) {
+                        currentRound.thinkingCycleStart = Date.now();
+                    }
+                    var thinkingText = payload.content || 'Processing...';
+                    updateThinkingBox(thinkingText, fileInfo);
+                    break;
+
+                case 'reasoning_text':
+                    // Reasoning text from hook - show in thinking box
+                    var rText = payload.content || '';
+                    if (rText) {
+                        updateThinkingBox(rText, fileInfo);
+                    }
+                    break;
+
+                case 'tool_start':
+                    // Tool execution begins (from Hook's PreActingEvent)
                     if (currentRound && currentRound.thinkingCycleStart) {
                         currentRound.thinkingTime += Date.now() - currentRound.thinkingCycleStart;
                         currentRound.thinkingCycleStart = null;
                     }
-                    // Collapse thinking and create/add to agent bubble
+                    var tName = payload.name || 'unknown';
+                    var tParams = payload.params || '{}';
+                    var tParamsPreview = payload.paramsPreview || tParams.substring(0, 50);
+                    var isSkill = payload.isSkill === true;
+                    var tSkillName = payload.displayName || '';
+
+                    if (isSkill) {
+                        updateThinkingBox('📖 Loading skill: ' + (tSkillName || '...'), fileInfo);
+                    } else {
+                        updateThinkingBox('⚡ ' + tName + '(' + tParamsPreview + ')', fileInfo);
+                    }
+
+                    if (currentRound) {
+                        currentRound.toolCallCount++;
+                        currentRound._currentToolStart = Date.now();
+                        // Create running tool row — use 'skill' type for skill-loading calls
+                        var rowType = isSkill ? 'skill' : 'tool';
+                        var rowLabel = isSkill ? ('Skill → ' + (tSkillName || '')) : ('Tool → ' + tName);
+                        currentRound._currentToolRow = addTimelineRow(rowType, rowLabel, '...', 'running');
+                        currentRound._currentToolIsSkill = isSkill;
+                        updateRoundMetrics();
+                    }
+                    break;
+
+                case 'tool_end':
+                    // Tool execution ends (from Hook's PostActingEvent)
+                    var teName = payload.name || 'unknown';
+                    var teResult = payload.result || '';
+                    var teDurMs = payload.duration_ms || -1;
+                    var tePreview = payload.resultPreview || (teResult.length > 100 ? teResult.substring(0, 100) + '...' : teResult);
+                    var teIsSkill = payload.isSkill === true;
+                    updateThinkingBox('✓ ' + teName + ': ' + tePreview, fileInfo);
+
+                    var targetRound = currentRound || (rounds.length > 0 ? rounds[rounds.length - 1] : null);
+                    if (targetRound) {
+                        if (teDurMs > 0) {
+                            targetRound.toolTime += teDurMs;
+                        } else if (targetRound._currentToolStart) {
+                            targetRound.toolTime += Date.now() - targetRound._currentToolStart;
+                        }
+                        targetRound._currentToolStart = null;
+
+                        // Update the tool row with final info
+                        if (targetRound._currentToolRow) {
+                            var tRow = targetRound._currentToolRow;
+                            var tmEl = tRow.querySelector('.rtl-metrics');
+                            var tsEl = tRow.querySelector('.rtl-status');
+                            var durStr = teDurMs >= 0 ? formatDuration(teDurMs) : '';
+                            if (tmEl) tmEl.textContent = durStr;
+                            if (tsEl) tsEl.textContent = teDurMs >= 0 ? '✓' : '✗';
+                            tRow.classList.remove('status-running');
+                            tRow.classList.add(teDurMs >= 0 ? 'status-ok' : 'status-fail');
+                            targetRound._currentToolRow = null;
+                        }
+
+                        var metricsEl = document.getElementById('round-metrics-' + targetRound.number);
+                        if (metricsEl) updateRoundMetricsForRound(targetRound);
+                    }
+                    break;
+
+                // ===== STREAM CONTENT EVENTS =====
+
+                case 'text':
+                    // Response text from stream (for chat area display)
+                    if (currentRound && currentRound.thinkingCycleStart) {
+                        currentRound.thinkingTime += Date.now() - currentRound.thinkingCycleStart;
+                        currentRound.thinkingCycleStart = null;
+                    }
                     collapseThinkingBox();
                     if (!agentBubble) {
                         agentBubble = addAgentBubble();
@@ -426,98 +576,7 @@ async function sendMessage() {
                     scrollToBottom(chatMessages);
                     break;
 
-                case 'thinking':
-                    // Track thinking start time
-                    if (currentRound && !currentRound.thinkingCycleStart) {
-                        currentRound.thinkingCycleStart = Date.now();
-                    }
-                    var thinkingText = payload.content || payload.message || 'Processing...';
-                    updateThinkingBox(thinkingText, fileInfo);
-                    break;
-
-                case 'tool_call':
-                    // End thinking time tracking
-                    if (currentRound && currentRound.thinkingCycleStart) {
-                        currentRound.thinkingTime += Date.now() - currentRound.thinkingCycleStart;
-                        currentRound.thinkingCycleStart = null;
-                    }
-                    var toolName = payload.name || 'unknown';
-                    var toolParams = payload.params || '{}';
-                    var toolText = 'Calling ' + toolName + ' with params: ' + toolParams;
-                    updateThinkingBox('🔧 ' + toolText, fileInfo);
-                    if (currentRound) {
-                        currentRound.toolCallCount++;
-                        currentRound._toolCallStart = Date.now();
-                        updateRoundMetrics();
-                        console.log('[tool_call] toolCallCount=' + currentRound.toolCallCount + ', round=' + currentRound.number);
-                    }
-                    // 格式化参数用于timeline显示（截取过长的参数）
-                    var paramsPreview = toolParams.length > 50 ? toolParams.substring(0, 50) + '...' : toolParams;
-                    addRoundTimelineRow('tool', toolName, paramsPreview, '');
-                    break;
-
-                case 'tool_result':
-                    var toolName = payload.name || 'unknown';
-                    var toolResult = payload.result || '';
-                    var durationMs = payload.duration_ms || -1;
-                    var displayResult = toolResult.length > 100 ? toolResult.substring(0, 100) + '...' : toolResult;
-                    var resultText = toolName + ' returned: ' + displayResult;
-                    updateThinkingBox('✓ ' + resultText, fileInfo);
-                    // 找到对应的round（可能是currentRound或之前的round）
-                    var targetRound = currentRound;
-                    if (!targetRound && rounds.length > 0) {
-                        // 如果currentRound已清空，使用最后一个round
-                        targetRound = rounds[rounds.length - 1];
-                    }
-                    if (targetRound) {
-                        // 使用服务端时间或前端计时
-                        if (durationMs > 0) {
-                            targetRound.toolTime += durationMs;
-                        } else if (targetRound._toolCallStart) {
-                            targetRound.toolTime += Date.now() - targetRound._toolCallStart;
-                        }
-                        targetRound._toolCallStart = null;
-                        // 更新UI（使用currentRound的ID或targetRound的ID）
-                        var metricsEl = document.getElementById('round-metrics-' + targetRound.number);
-                        if (metricsEl) {
-                            updateRoundMetricsForRound(targetRound);
-                        }
-                        // Update the last tool row in this round's timeline
-                        var timeline = document.getElementById('round-timeline-' + targetRound.number);
-                        if (timeline) {
-                            var lastToolRow = timeline.querySelector('.rtl-row.type-tool:last-child');
-                            if (lastToolRow) {
-                                var actualDuration = durationMs > 0 ? durationMs : -1;
-                                var durationStr = actualDuration >= 0 ? (actualDuration >= 1000 ? (actualDuration / 1000).toFixed(1) + 's' : actualDuration + 'ms') : '';
-                                lastToolRow.querySelector('.rtl-metrics').textContent = durationStr;
-                                lastToolRow.classList.add(actualDuration >= 0 ? 'status-ok' : 'status-fail');
-                            }
-                        }
-                    }
-                    break;
-
-                case 'usage':
-                    if (currentRound) {
-                        currentRound.inputTokens += payload.inputTokens || 0;
-                        currentRound.outputTokens += payload.outputTokens || 0;
-                        currentRound.totalTokens += payload.totalTokens || 0;
-                        currentRound.llmTime += payload.time || 0;
-                        currentRound.llmCallCount++;
-                        currentRound.thinkingCycleStart = null;
-                        updateRoundMetrics();
-                        var callNum = currentRound.llmCallCount;
-                        var tokStr = (payload.totalTokens || 0).toLocaleString() + ' tok';
-                        var timeStr = payload.time ? payload.time.toFixed(1) + 's' : '';
-                        addRoundTimelineRow('llm', 'LLM #' + callNum, tokStr + '  ' + timeStr, '');
-                    }
-                    break;
-
                 case 'done':
-                    // Finalize thinking time
-                    if (currentRound && currentRound.thinkingCycleStart) {
-                        currentRound.thinkingTime += Date.now() - currentRound.thinkingCycleStart;
-                        currentRound.thinkingCycleStart = null;
-                    }
                     completeThinkingBox();
                     currentEventSource.close();
                     currentEventSource = null;
@@ -582,7 +641,6 @@ function appendMessage(role, text, fileInfo) {
     var wrapper = document.createElement('div');
     wrapper.className = 'message ' + role;
 
-    // Avatar
     var avatar = document.createElement('div');
     avatar.className = 'message-avatar';
     if (role === 'user') {
@@ -594,7 +652,6 @@ function appendMessage(role, text, fileInfo) {
     var content = document.createElement('div');
     content.className = 'message-content';
 
-    // Add file list for user messages if fileInfo provided
     if (fileInfo && role === 'user') {
         var fileListNode = document.createElement('div');
         fileListNode.innerHTML = createFileList(fileInfo);
@@ -631,13 +688,11 @@ var thinkingContent = '';
 var currentFileInfo = null;
 
 function createThinkingBox(fileInfo) {
-    // Create a wrapper for agent response (thinking + bubble)
     var wrapper = document.createElement('div');
     wrapper.className = 'message agent';
     wrapper.style.maxWidth = '100%';
     wrapper.style.width = '100%';
 
-    // Avatar
     var avatar = document.createElement('div');
     avatar.className = 'message-avatar';
     avatar.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>';
@@ -645,7 +700,6 @@ function createThinkingBox(fileInfo) {
     var content = document.createElement('div');
     content.className = 'agent-response-wrapper';
 
-    // Add file list if fileInfo provided
     if (fileInfo) {
         var fileListHtml = createFileList(fileInfo);
         if (fileListHtml) {
@@ -657,7 +711,6 @@ function createThinkingBox(fileInfo) {
         }
     }
 
-    // Create thinking box
     var box = document.createElement('div');
     box.className = 'thinking-box';
     box.innerHTML = '<div class="thinking-header" onclick="toggleThinking(this)">' +
@@ -681,7 +734,6 @@ function updateThinkingBox(content, fileInfo) {
     if (!currentThinkingBox) {
         createThinkingBox(fileInfo || currentFileInfo);
     }
-    // 过滤掉 __fragment__ 等系统标记
     thinkingContent += content;
     var lines = thinkingContent.split('\n');
     var filteredLines = lines.filter(function(line) {
@@ -690,6 +742,7 @@ function updateThinkingBox(content, fileInfo) {
     });
     var contentEl = currentThinkingBox.querySelector('.thinking-content');
     contentEl.textContent = filteredLines.join('\n\n');
+    contentEl.scrollTop = contentEl.scrollHeight;
     scrollToBottom(chatMessages);
 }
 
@@ -770,7 +823,15 @@ function startRound(userMessage) {
         thinkingCycleStart: null,
         llmCallCount: 0,
         toolCallCount: 0,
-        status: 'running'
+        totalLlmCalls: 0,
+        totalToolCalls: 0,
+        status: 'running',
+        timelineStep: 0,
+        _currentLlmRow: null,
+        _currentLlmStart: null,
+        _currentLlmCallNum: 0,
+        _currentToolRow: null,
+        _currentToolStart: null
     };
     rounds.push(round);
     currentRound = round;
@@ -807,6 +868,15 @@ function endRound(status) {
     currentRound.status = status;
     updateRoundMetrics();
 
+    // Stop all running timeline rows in this round
+    var roundCard = document.getElementById('round-' + currentRound.number);
+    if (roundCard) {
+        roundCard.querySelectorAll('.rtl-row.status-running').forEach(function(row) {
+            row.classList.remove('status-running');
+            row.classList.add('status-ok');
+        });
+    }
+
     var card = document.getElementById('round-' + currentRound.number);
     if (card) {
         card.classList.remove('running');
@@ -823,12 +893,6 @@ function endRound(status) {
             timeEl.textContent = formatDuration(wallMs);
         }
 
-        // Collapse after brief delay
-        var rn = currentRound.number;
-        setTimeout(function() {
-            var body = document.getElementById('round-body-' + rn);
-            if (body) body.classList.add('collapsed');
-        }, 800);
     }
 
     currentRound = null;
@@ -836,11 +900,14 @@ function endRound(status) {
 
 function updateRoundMetrics() {
     if (!currentRound) return;
-    var r = currentRound;
+    updateRoundMetricsForRound(currentRound);
+}
+
+function updateRoundMetricsForRound(r) {
     var metricsEl = document.getElementById('round-metrics-' + r.number);
     if (!metricsEl) return;
 
-    var wallMs = Date.now() - r.startTime;
+    var wallMs = (r.endTime || Date.now()) - r.startTime;
     var speed = r.llmTime > 0 ? Math.round(r.outputTokens / r.llmTime) : 0;
     var modelName = currentAgent && agents[currentAgent] ? agents[currentAgent].config.modelName : '';
 
@@ -848,41 +915,66 @@ function updateRoundMetrics() {
     if (modelName) {
         html += '<div class="rm-row"><span class="rm-label">Model</span><span class="rm-value">' + escapeHtml(modelName) + '</span></div>';
     }
-    html += '<div class="rm-row"><span class="rm-label">Tokens</span><span class="rm-value"><span class="tok-in">' + r.inputTokens.toLocaleString() + '</span><span class="rm-arrow">→</span><span class="tok-out">' + r.outputTokens.toLocaleString() + '</span></span></div>';
+    html += '<div class="rm-row"><span class="rm-label">Tokens</span><span class="rm-value"><span class="tokens-in"><svg class="token-icon" viewBox="0 0 16 16" width="12" height="12"><path d="M8 1v10M4 7l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' + r.inputTokens.toLocaleString() + '</span><span class="tokens-out"><svg class="token-icon" viewBox="0 0 16 16" width="12" height="12"><path d="M8 13V3M4 7l4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' + r.outputTokens.toLocaleString() + '</span></span></div>';
     html += '<div class="rm-row"><span class="rm-label">LLM</span><span class="rm-value">' + r.llmTime.toFixed(1) + 's (' + r.llmCallCount + ' calls)</span></div>';
     html += '<div class="rm-row"><span class="rm-label">Tools</span><span class="rm-value">' + formatDuration(r.toolTime) + ' (' + r.toolCallCount + ' calls)</span></div>';
-    html += '<div class="rm-row"><span class="rm-label">Think</span><span class="rm-value">' + formatDuration(r.thinkingTime) + '</span></div>';
-    html += '<div class="rm-row"><span class="rm-label">Wall</span><span class="rm-value">' + formatDuration(wallMs) + '</span></div>';
     if (speed > 0) {
-        html += '<div class="rm-row"><span class="rm-label">Speed</span><span class="rm-value">' + speed + ' tok/s</span></div>';
+        html += '<div class="rm-row"><span class="rm-label">Speed</span><span class="rm-value">' + speed + ' tokens/s</span></div>';
     }
 
     metricsEl.innerHTML = html;
 }
 
-function addRoundTimelineRow(type, label, metrics, status) {
-    if (!currentRound) return;
+function addTimelineRow(type, label, metrics, status) {
+    if (!currentRound) return null;
     var timeline = document.getElementById('round-timeline-' + currentRound.number);
-    if (!timeline) return;
+    if (!timeline) return null;
+
+    currentRound.timelineStep = (currentRound.timelineStep || 0) + 1;
+    var stepNum = currentRound.timelineStep;
 
     var row = document.createElement('div');
     row.className = 'rtl-row type-' + type;
     if (status) row.classList.add('status-' + status);
     row.innerHTML =
+        '<span class="rtl-connector">' + getTimelineConnector(type) + '</span>' +
         '<span class="rtl-icon">' + getTimelineIcon(type) + '</span>' +
         '<span class="rtl-label">' + escapeHtml(label) + '</span>' +
         '<span class="rtl-metrics">' + (metrics || '') + '</span>' +
-        '<span class="rtl-status">' + (status === 'ok' ? '✓' : status === 'fail' ? '✗' : '') + '</span>';
+        '<span class="rtl-status">' + getStatusText(status) + '</span>';
     timeline.appendChild(row);
+
+    scrollToBottom(debugRounds);
+    return row;
 }
 
 function getTimelineIcon(type) {
     switch (type) {
+        case 'phase': return '◆';
         case 'llm': return '↻';
+        case 'skill': return '◉';
         case 'tool': return '⚡';
         case 'error': return '⚠';
-        case 'done': return '◉';
         default: return '·';
+    }
+}
+
+function getTimelineConnector(type) {
+    switch (type) {
+        case 'phase': return '─';
+        case 'llm': return '├';
+        case 'skill': return '├';
+        case 'tool': return '│';
+        default: return '│';
+    }
+}
+
+function getStatusText(status) {
+    switch (status) {
+        case 'ok': return '✓';
+        case 'fail': return '✗';
+        case 'running': return '◎';
+        default: return '';
     }
 }
 
@@ -978,8 +1070,6 @@ function handleFileSelect(input) {
         if (data.error) {
             return;
         }
-        // Switch agent first (selectAgent calls removeFile internally),
-        // then set uploadedFile and show tag — otherwise removeFile clears them
         if (currentAgent !== 'task.document-analysis') {
             selectAgent('task.document-analysis');
         }
@@ -987,7 +1077,7 @@ function handleFileSelect(input) {
         showFileTag(data.fileName);
     })
     .catch(function(err) {
-        // Upload error - shown in UI, no round context available
+        // Upload error
     });
 
     input.value = '';

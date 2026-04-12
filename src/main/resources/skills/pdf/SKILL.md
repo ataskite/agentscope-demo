@@ -1,6 +1,7 @@
 ---
 name: pdf
-description: Use this skill when the user wants to read or extract text from PDF files. If the user uploads a .pdf file or asks to analyze a PDF document, use this skill.
+description: "Use this skill when the user wants to read or extract text from PDF files. If the user uploads a .pdf file or asks to analyze a PDF document, use this skill."
+tools: parse_pdf
 ---
 
 # PDF Document Analysis

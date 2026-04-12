@@ -1,6 +1,7 @@
 ---
 name: docx-template
-description: Use when user uploads a Word document (.docx) template and wants to fill or replace variables/placeholders. Triggers include mentions of "模板", "template", "替换变量", "fill in", "变量填充", "编辑", "edit".
+description: "Use when user uploads a Word document (.docx) template and wants to fill or replace variables/placeholders. Triggers include mentions of \"模板\", \"template\", \"替换变量\", \"fill in\", \"变量填充\", \"编辑\", \"edit\"."
+tools: parse_docx, edit_docx
 ---
 
 # DOCX Template Variable Replacement

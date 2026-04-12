@@ -1,6 +1,7 @@
 ---
 name: docx
-description: Use this skill when the user wants to read, analyze, or extract content from Word documents (.docx files). Triggers include: uploading a .docx file and asking to summarize, extract key points, translate, or analyze its content.
+description: "Use this skill when the user wants to read, analyze, or extract content from Word documents (.docx files). Triggers include: uploading a .docx file and asking to summarize, extract key points, translate, or analyze its content."
+tools: parse_docx
 ---
 
 # DOCX Document Analysis

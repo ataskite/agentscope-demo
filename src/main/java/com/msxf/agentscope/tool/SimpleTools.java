@@ -1,4 +1,4 @@
-package com.msxf.agentscope.model;
+package com.msxf.agentscope.tool;
 
 import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;
@@ -33,7 +33,7 @@ public class SimpleTools {
 
     @Tool(name = "get_weather", description = "Get weather information for a city")
     public String getWeather(
-            @ToolParam(name = "city", description = "Name of the city") String city) {
+            @ToolParam(name = "city", description = "English Name of the city，first letter is uppercase") String city) throws InterruptedException {
         Map<String, String> weatherData = new HashMap<>();
         weatherData.put("Beijing", "Sunny, 25\u00B0C");
         weatherData.put("Shanghai", "Cloudy, 22\u00B0C");

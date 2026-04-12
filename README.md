@@ -27,7 +27,7 @@
 
 ### 环境要求
 
-- Java 21+
+- Java 17+
 - Maven 3.9+
 - DashScope API Key ([获取地址](https://dashscope.console.aliyun.com/))
 
@@ -127,7 +127,7 @@ spring:
 |------|------|------|
 | Spring Boot | 3.3.6 | Web 框架 |
 | AgentScope | 1.0.11 | Agent 框架 |
-| Java | 21 | 运行环境 |
+| Java | 17 | 运行环境 |
 | Apache POI | 5.3.0 | DOCX 解析 |
 | Apache PDFBox | 3.0.4 | PDF 解析 |
 | Thymeleaf | - | 模板引擎 |

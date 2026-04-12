@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Spring Boot 3.3.6 + Java 21 demo for AgentScope (v1.0.11), a Java agent framework with LLM-backed ReAct agents. Features three agent types: basic chat, tool-calling, and task-based document analysis with file parsing skills.
+Spring Boot 3.5.13 + Java 17 demo for AgentScope (v1.0.11), a Java agent framework with LLM-backed ReAct agents. Features three agent types: basic chat, tool-calling, and task-based document analysis with file parsing skills.
 
 ## Build & Run
 
@@ -78,9 +78,8 @@ Register directly via `toolkit.registerTool(new SimpleTools())` or bind via Skil
 ```
 src/main/java/com/msxf/agentscope/
 ├── AgentScopeDemoApplication.java    # Spring Boot entry point
-├── config/
+├── agent/
 │   ├── AgentConfig.java              # Agent config entity
-│   ├── AgentsConfig.java             # Root config wrapper
 │   ├── AgentConfigService.java       # Config loading and query service
 │   └── AgentFactory.java             # Agent creation from config
 ├── controller/

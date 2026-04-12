@@ -1,6 +1,7 @@
 ---
 name: xlsx
-description: Use this skill when the user wants to read, analyze, or extract data from Excel spreadsheets (.xlsx files). Triggers include: uploading an .xlsx file and asking to summarize, extract specific data, analyze trends, or perform calculations.
+description: "Use this skill when the user wants to read, analyze, or extract data from Excel spreadsheets (.xlsx files). Triggers include: uploading an .xlsx file and asking to summarize, extract specific data, analyze trends, or perform calculations."
+tools: parse_xlsx
 ---
 
 # XLSX Spreadsheet Analysis

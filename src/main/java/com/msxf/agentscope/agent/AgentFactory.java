@@ -1,8 +1,9 @@
-package com.msxf.agentscope.config;
+package com.msxf.agentscope.agent;
 
 import com.msxf.agentscope.tool.ToolRegistry;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.formatter.dashscope.DashScopeChatFormatter;
+import io.agentscope.core.hook.Hook;
 import io.agentscope.core.memory.InMemoryMemory;
 import io.agentscope.core.model.DashScopeChatModel;
 import io.agentscope.core.skill.SkillBox;
@@ -12,6 +13,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public class AgentFactory {
@@ -29,7 +32,10 @@ public class AgentFactory {
         this.toolRegistry = toolRegistry;
     }
 
-    public ReActAgent createAgent(String agentId) {
+    /**
+     * Create agent with optional hooks (creates fresh instance each time).
+     */
+    public ReActAgent createAgent(String agentId, Hook... hooks) {
         AgentConfig config = configService.getAgentConfig(agentId);
         log.info("Creating agent: {} ({})", config.getName(), agentId);
 
@@ -51,14 +57,16 @@ public class AgentFactory {
 
         Toolkit toolkit = new Toolkit();
 
-        // Register tools directly (from tools field in config)
-        for (String toolName : config.getTools()) {
-            if (toolRegistry.hasTool(toolName)) {
-                toolkit.registerTool(toolRegistry.getTool(toolName));
-                log.info("  Registered tool: {} for agent: {}", toolName, agentId);
-            } else {
-                log.error("  Tool not found in registry: {} (agent: {})", toolName, agentId);
-            }
+        // Register user tools (deduplicated — one instance per class)
+        for (Object toolInstance : toolRegistry.getDeduplicatedInstances(config.getUserTools())) {
+            toolkit.registerTool(toolInstance);
+            log.info("  Registered user tool class: {} for agent: {}", toolInstance.getClass().getSimpleName(), agentId);
+        }
+
+        // Register system tools (deduplicated — one instance per class)
+        for (Object toolInstance : toolRegistry.getDeduplicatedInstances(config.getSystemTools())) {
+            toolkit.registerTool(toolInstance);
+            log.info("  Registered system tool class: {} for agent: {}", toolInstance.getClass().getSimpleName(), agentId);
         }
 
         // Register skills with their tool bindings (from skills field in config)
@@ -82,6 +90,12 @@ public class AgentFactory {
             builder.toolkit(toolkit).skillBox(skillBox);
         } else {
             builder.toolkit(toolkit);
+        }
+
+        // Register hooks if provided
+        if (hooks != null && hooks.length > 0) {
+            builder.hooks(List.of(hooks));
+            log.info("  Registered {} hooks for agent: {}", hooks.length, agentId);
         }
 
         return builder.build();

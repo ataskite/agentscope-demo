@@ -3,6 +3,9 @@ package com.msxf.agentscope;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
+/**
+ * AgentScope Demo Application.
+ */
 @SpringBootApplication
 public class AgentScopeDemoApplication {
 

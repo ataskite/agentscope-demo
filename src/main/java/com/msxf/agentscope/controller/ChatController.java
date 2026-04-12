@@ -1,7 +1,7 @@
 package com.msxf.agentscope.controller;
 
-import com.msxf.agentscope.config.AgentConfig;
-import com.msxf.agentscope.config.AgentConfigService;
+import com.msxf.agentscope.agent.AgentConfig;
+import com.msxf.agentscope.agent.AgentConfigService;
 import com.msxf.agentscope.service.AgentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,7 +11,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -28,17 +28,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Chat Controller with Virtual Threads (Java 21+)
- *
- * Why Virtual Threads?
- * - Lightweight: Can create millions of virtual threads vs thousands of platform threads
- * - Low blocking cost: Blocking a virtual thread doesn't pin a platform thread
- * - Simple programming model: Keep traditional blocking code style
- *
- * Spring Boot 3.2+ automatically uses virtual threads when:
- * 1. spring.threads.virtual.enabled=true
- * 2. Methods are annotated with @Async
- * 3. Or explicitly run in Thread.ofVirtual().start()
+ * Chat Controller with SSE streaming support.
+ * Uses Spring's TaskExecutor for async streaming so that send endpoints return immediately.
  */
 @Controller
 public class ChatController {
@@ -52,18 +43,17 @@ public class ChatController {
     @Autowired
     private AgentConfigService agentConfigService;
 
+    @Autowired
+    private TaskExecutor taskExecutor;
+
     @GetMapping("/")
     public String chat() {
         return "chat";
     }
 
     /**
-     * Send message endpoint using virtual threads for async streaming.
-     *
-     * The @Async annotation with virtual threads enabled means:
-     * - The agentService.streamToEmitter() runs in a virtual thread
-     * - No platform thread is blocked during LLM API calls
-     * - Can handle thousands of concurrent SSE connections
+     * Send message endpoint.
+     * Submits streaming to TaskExecutor so this method returns sessionId immediately.
      */
     @PostMapping("/chat/send")
     @ResponseBody
@@ -93,30 +83,22 @@ public class ChatController {
             log.error("SSE emitter error for session: {}", sessionId, ex);
         });
 
-        // Run in virtual thread via @Async method
-        streamAsync(agentId, message, filePath, fileName, emitter, sessionId);
+        // Submit streaming task to TaskExecutor — returns sessionId immediately
+        taskExecutor.execute(() -> {
+            try {
+                log.debug("[{}] Starting stream", sessionId);
+                agentService.streamToEmitter(agentId, message, filePath, fileName, emitter);
+            } catch (Exception e) {
+                log.error("[{}] Error during agent streaming", sessionId, e);
+                emitter.completeWithError(e);
+            }
+        });
 
         return Map.of("sessionId", sessionId);
     }
 
     /**
-     * Async method that runs in a virtual thread when spring.threads.virtual.enabled=true.
-     * This blocks the virtual thread during LLM calls, but platform threads remain free.
-     */
-    @Async
-    public void streamAsync(String agentId, String message, String filePath,
-                           String fileName, SseEmitter emitter, String sessionId) {
-        try {
-            log.debug("[{}] Starting stream in virtual thread", sessionId);
-            agentService.streamToEmitter(agentId, message, filePath, fileName, emitter);
-        } catch (Exception e) {
-            log.error("[{}] Error during agent streaming", sessionId, e);
-            emitter.completeWithError(e);
-        }
-    }
-
-    /**
-     * SSE stream endpoint - returns the emitter created earlier.
+     * SSE stream endpoint - returns the emitter created in sendMessage.
      * The client polls this endpoint after getting sessionId.
      */
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -125,22 +107,20 @@ public class ChatController {
         SseEmitter emitter = emitters.get(sessionId);
         if (emitter == null) {
             SseEmitter errorEmitter = new SseEmitter();
-            streamErrorAsync(errorEmitter, sessionId);
+            taskExecutor.execute(() -> {
+                try {
+                    errorEmitter.send(SseEmitter.event()
+                        .name("message")
+                        .data("{\"type\":\"error\",\"message\":\"Session not found\"}"));
+                    errorEmitter.complete();
+                } catch (Exception e) {
+                    log.error("[{}] Failed to send error response", sessionId, e);
+                    errorEmitter.completeWithError(e);
+                }
+            });
             return errorEmitter;
         }
         return emitter;
-    }
-
-    @Async
-    public void streamErrorAsync(SseEmitter errorEmitter, String sessionId) {
-        try {
-            errorEmitter.send(SseEmitter.event()
-                .name("message")
-                .data("{\"type\":\"error\",\"message\":\"Session not found\"}"));
-            errorEmitter.complete();
-        } catch (Exception e) {
-            log.debug("[{}] Failed to send error response", sessionId, e);
-        }
     }
 
     /**
@@ -166,8 +146,33 @@ public class ChatController {
     }
 
     /**
-     * File upload endpoint - runs synchronously as file I/O is fast.
-     * Virtual threads help when many uploads happen concurrently.
+     * Get detailed information about a skill (including description).
+     */
+    @GetMapping("/api/skills/{skillName}")
+    @ResponseBody
+    public ResponseEntity<?> getSkillInfo(@PathVariable String skillName) {
+        Map<String, Object> skillInfo = agentConfigService.getSkillInfo(skillName);
+        if (skillInfo == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Skill not found: " + skillName));
+        }
+        return ResponseEntity.ok(skillInfo);
+    }
+
+    /**
+     * Get detailed information about a tool (including description).
+     */
+    @GetMapping("/api/tools/{toolName}")
+    @ResponseBody
+    public ResponseEntity<?> getToolInfo(@PathVariable String toolName) {
+        Map<String, Object> toolInfo = agentConfigService.getToolInfo(toolName);
+        if (toolInfo == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Tool not found: " + toolName));
+        }
+        return ResponseEntity.ok(toolInfo);
+    }
+
+    /**
+     * File upload endpoint.
      */
     @PostMapping("/chat/upload")
     @ResponseBody

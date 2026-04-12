@@ -153,8 +153,7 @@ public class ToolRegistry {
 
                     String skillName = (String) frontmatter.get("name");
                     String description = (String) frontmatter.get("description");
-                    @SuppressWarnings("unchecked")
-                    List<String> tools = (List<String>) frontmatter.get("tools");
+                    List<String> tools = resolveTools(frontmatter.get("tools"));
 
                     if (skillName == null || tools == null || tools.isEmpty()) {
                         log.warn("  Skipping skill with missing name or tools: {}", skillFile.getURL());
@@ -208,6 +207,19 @@ public class ToolRegistry {
         if (yaml.isEmpty()) return null;
         Yaml y = new Yaml();
         return y.load(yaml.toString());
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> resolveTools(Object toolsObj) {
+        if (toolsObj == null) return Collections.emptyList();
+        if (toolsObj instanceof List) return (List<String>) toolsObj;
+        if (toolsObj instanceof String s) {
+            return Arrays.stream(s.split(","))
+                    .map(String::trim)
+                    .filter(t -> !t.isEmpty())
+                    .collect(Collectors.toList());
+        }
+        return Collections.emptyList();
     }
 
     // ===== Core registration =====
