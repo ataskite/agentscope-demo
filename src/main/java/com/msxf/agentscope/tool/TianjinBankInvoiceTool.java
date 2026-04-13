@@ -49,11 +49,11 @@ public class TianjinBankInvoiceTool {
         InputStream templateStream = getClass().getClassLoader()
                 .getResourceAsStream("skills/tianjin_bank_invoice/assets/tianjin_bank_template.xlsx");
         if (templateStream == null) {
-            throw new IllegalStateException("Excel模板文件未找到: skills/tianjin_bank_invoice/assets/tianjin_bank_template.xlsx.xlsx");
+            throw new IllegalStateException("Excel模板文件未找到: skills/tianjin_bank_invoice/assets/tianjin_bank_template.xlsx");
         }
 
-        try (templateStream) {
-            org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook(templateStream);
+        try (templateStream;
+             org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook(templateStream)) {
             org.apache.poi.xssf.usermodel.XSSFSheet sheet = workbook.getSheetAt(0);
             org.apache.poi.xssf.usermodel.XSSFRow row = sheet.getRow(1);
 
@@ -76,17 +76,16 @@ public class TianjinBankInvoiceTool {
 
             // 生成输出文件
             String fileName = generateFileName(name, serial, "xlsx");
-            String outputDir = System.getProperty("java.io.tmpdir") + "/agentscope-uploads/";
-            java.nio.file.Files.createDirectories(java.nio.file.Paths.get(outputDir));
-            String outputPath = outputDir + fileName;
+            java.nio.file.Path outputDir = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"), "agentscope-uploads");
+            java.nio.file.Files.createDirectories(outputDir);
+            java.nio.file.Path outputPath = outputDir.resolve(fileName);
 
-            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(outputPath)) {
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(outputPath.toString())) {
                 workbook.write(fos);
             }
-            workbook.close();
 
             log.info("Excel 文件生成成功: {}", outputPath);
-            return outputPath;
+            return outputPath.toString();
         }
     }
 
