@@ -51,9 +51,9 @@ public class TianjinBankInvoiceTool {
                                  String serial) throws Exception {
         // 加载模板
         InputStream templateStream = getClass().getClassLoader()
-                .getResourceAsStream("skills/tianjin_bank_invoice/assets/tianjin_bank_template.xlsx");
+                .getResourceAsStream("skills/tianjin_bank_invoice_java/assets/tianjin_bank_template.xlsx");
         if (templateStream == null) {
-            throw new IllegalStateException("Excel模板文件未找到: skills/tianjin_bank_invoice/assets/tianjin_bank_template.xlsx");
+            throw new IllegalStateException("Excel模板文件未找到: skills/tianjin_bank_invoice_java/assets/tianjin_bank_template.xlsx");
         }
 
         try (templateStream;
@@ -111,9 +111,9 @@ public class TianjinBankInvoiceTool {
                                 String invoice, String feeType, String serial) throws Exception {
         // 加载模板
         InputStream templateStream = getClass().getClassLoader()
-                .getResourceAsStream("skills/tianjin_bank_invoice/assets/tianjin_bank_template.docx");
+                .getResourceAsStream("skills/tianjin_bank_invoice_java/assets/tianjin_bank_template.docx");
         if (templateStream == null) {
-            throw new IllegalStateException("Word模板文件未找到: skills/tianjin_bank_invoice/assets/tianjin_bank_template.docx");
+            throw new IllegalStateException("Word模板文件未找到: skills/tianjin_bank_invoice_java/assets/tianjin_bank_template.docx");
         }
 
         try (templateStream) {
