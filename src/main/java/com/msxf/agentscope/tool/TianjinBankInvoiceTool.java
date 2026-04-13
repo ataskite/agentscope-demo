@@ -99,4 +99,80 @@ public class TianjinBankInvoiceTool {
         }
         cell.setCellValue(value != null ? value : "");
     }
+
+    /**
+     * 从 classpath 加载模板并生成 Word 文件
+     */
+    private String generateWord(String name, String idCard, String phone, String email,
+                                String invoice, String feeType, String serial) throws Exception {
+        // 加载模板
+        InputStream templateStream = getClass().getClassLoader()
+                .getResourceAsStream("skills/tianjin_bank_invoice/assets/tianjin_bank_template.docx");
+        if (templateStream == null) {
+            throw new IllegalStateException("Word模板文件未找到: skills/tianjin_bank_invoice/assets/tianjin_bank_template.docx");
+        }
+
+        try (templateStream) {
+            org.apache.poi.xwpf.usermodel.XWPFDocument document = new org.apache.poi.xwpf.usermodel.XWPFDocument(templateStream);
+
+            // 获取第一个表格
+            if (document.getTables().isEmpty()) {
+                throw new IllegalStateException("Word模板中未找到表格");
+            }
+            org.apache.poi.xwpf.usermodel.XWPFTable table = document.getTables().get(0);
+
+            // 填充表格数据 (注意: cell(rowIndex, colIndex) 基于Python版推断，可能需要根据实际模板调整)
+            setTableCell(table, 1, 1, name);           // [1][1] 名称（姓名）
+            setTableCell(table, 1, 3, idCard);         // [1][3] 纳税人识别号
+            setTableCell(table, 4, 1, name + " " + phone);  // [4][1] 联系人及电话
+            setTableCell(table, 4, 3, email);          // [4][3] 邮箱
+            setTableCell(table, 8, 1, invoice);        // [8][1] 发票金额
+            setTableCell(table, 9, 1, feeType);        // [9][1] 费用类型
+
+            // 更新提交日期
+            String todayDate = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            for (org.apache.poi.xwpf.usermodel.XWPFParagraph para : document.getParagraphs()) {
+                if (para.getText().contains("提交日期：")) {
+                    // 清除现有runs并添加新文本
+                    for (int i = para.getRuns().size() - 1; i >= 0; i--) {
+                        para.removeRun(i);
+                    }
+                    para.createRun().setText("提交日期：" + todayDate);
+                    break;
+                }
+            }
+
+            // 生成输出文件
+            String fileName = generateFileName(name, serial, "docx");
+            java.nio.file.Path outputDir = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"), "agentscope-uploads");
+            java.nio.file.Files.createDirectories(outputDir);
+            java.nio.file.Path outputPath = outputDir.resolve(fileName);
+
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(outputPath.toString())) {
+                document.write(fos);
+            }
+
+            log.info("Word 文件生成成功: {}", outputPath);
+            return outputPath.toString();
+        }
+    }
+
+    /**
+     * 安全设置表格单元格值
+     */
+    private void setTableCell(org.apache.poi.xwpf.usermodel.XWPFTable table, int rowIdx, int colIdx, String value) {
+        if (table.getRows().size() <= rowIdx) {
+            log.warn("表格行数不足，跳过设置 cell({},{})", rowIdx, colIdx);
+            return;
+        }
+        org.apache.poi.xwpf.usermodel.XWPFTableRow row = table.getRow(rowIdx);
+        if (row.getTableCells().size() <= colIdx) {
+            log.warn("表格列数不足，跳过设置 cell({},{})", rowIdx, colIdx);
+            return;
+        }
+        org.apache.poi.xwpf.usermodel.XWPFTableCell cell = row.getCell(colIdx);
+        // 清除现有段落并添加新文本
+        cell.getParagraphs().get(0).getRuns().clear();
+        cell.getParagraphs().get(0).createRun().setText(value != null ? value : "");
+    }
 }
