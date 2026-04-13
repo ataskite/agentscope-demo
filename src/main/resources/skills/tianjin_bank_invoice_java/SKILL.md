@@ -1,8 +1,7 @@
 ---
 name: tianjin_bank_invoice_java
 description: Generate Tianjin Bank invoice Excel and Word documents from templates. Use when the user needs to create invoice documents for Tianjin Bank with customer information, loan details, and automatic name desensitization in filenames.
-tools:
-  - generate_tianjin_bank_invoice
+tools: generate_tianjin_bank_invoice
 ---
 
 # Tianjin Bank Invoice Generator (Java)
@@ -53,14 +52,14 @@ This skill is invoked through the AI agent. Simply provide the required informat
 ```
 请帮我生成天津银行发票。
 客户姓名：张三丰
-身份证号：123456200001011234
-手机：13800138000
+身份证号：110101199003072316
+手机：13802213478
 邮箱：test@example.com
 合同号：HT20240410001
 借据号：JD20240410001
 放款日期：2024-04-10
 贷款总额：100000
-银行放款：80000
+银行放款金额：80000
 费用类型：服务费
 发票金额：5000
 流水号：001

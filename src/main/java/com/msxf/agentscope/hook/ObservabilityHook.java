@@ -241,6 +241,7 @@ public class ObservabilityHook implements Hook {
     /** Extract skill name from load_skill_through_path params, e.g. "skills/docx/SKILL.md" → "docx" */
     /** Extract skill name from load_skill_through_path params.
      *  e.g. "{skillId=docx_classpath-skills, path=SKILL.md}" → "docx"
+     *  e.g. "{skillId=tianjin_bank_invoice_java_classpath-skills, path=SKILL.md}" → "tianjin_bank_invoice_java"
      */
     private String extractSkillName(String paramsStr) {
         if (paramsStr == null) return null;
@@ -248,7 +249,13 @@ public class ObservabilityHook implements Hook {
         int idx = paramsStr.indexOf("skillId=");
         if (idx >= 0) {
             String sub = paramsStr.substring(idx + 8); // skip "skillId="
-            int end = sub.indexOf('_');
+            // Look for the _classpath-skills suffix
+            int end = sub.indexOf("_classpath-skills");
+            if (end > 0) {
+                return sub.substring(0, end);
+            }
+            // Fallback: look for any underscore as delimiter
+            end = sub.indexOf('_');
             if (end > 0) {
                 return sub.substring(0, end);
             }

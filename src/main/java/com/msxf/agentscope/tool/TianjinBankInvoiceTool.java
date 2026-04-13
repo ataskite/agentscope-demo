@@ -179,8 +179,12 @@ public class TianjinBankInvoiceTool {
         if (cell.getParagraphs().isEmpty()) {
             cell.addParagraph();
         }
-        cell.getParagraphs().get(0).getRuns().clear();
-        cell.getParagraphs().get(0).createRun().setText(value != null ? value : "");
+        // 通过段落对象逐个删除 runs（不能直接调用 clear() 因为返回的是不可修改集合）
+        org.apache.poi.xwpf.usermodel.XWPFParagraph para = cell.getParagraphs().get(0);
+        for (int i = para.getRuns().size() - 1; i >= 0; i--) {
+            para.removeRun(i);
+        }
+        para.createRun().setText(value != null ? value : "");
     }
 
     @Tool(name = "generate_tianjin_bank_invoice",

@@ -47,12 +47,10 @@ agents:
       - docx
       - pdf
       - xlsx
-      - tianjin_bank_invoice_java
     userTools:
       - parse_docx
       - parse_pdf
       - parse_xlsx
-      - generate_tianjin_bank_invoice
     systemTools:
       - view_text_file
 
@@ -116,7 +114,13 @@ agents:
     streaming: true
     enableThinking: true
     skills:
+      - xlsx
+      - docx
       - tianjin_bank_invoice_java
     userTools:
+      - parse_docx
+      - edit_docx
       - generate_tianjin_bank_invoice
-    systemTools: []
+    systemTools:
+      - view_text_file
+      - write_text_file
