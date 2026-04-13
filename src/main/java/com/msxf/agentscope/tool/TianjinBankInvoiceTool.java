@@ -1,5 +1,6 @@
 package com.msxf.agentscope.tool;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;
 import org.slf4j.Logger;
@@ -12,6 +13,7 @@ import java.time.format.DateTimeFormatter;
 public class TianjinBankInvoiceTool {
 
     private static final Logger log = LoggerFactory.getLogger(TianjinBankInvoiceTool.class);
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * 姓名脱敏处理
@@ -177,5 +179,61 @@ public class TianjinBankInvoiceTool {
         }
         cell.getParagraphs().get(0).getRuns().clear();
         cell.getParagraphs().get(0).createRun().setText(value != null ? value : "");
+    }
+
+    @Tool(name = "generate_tianjin_bank_invoice",
+          description = "根据天津银行发票模板生成 Excel 和 Word 文件。"
+                  + "需要提供客户姓名、身份证号、手机号、邮箱、合同号、借据号、"
+                  + "放款日期、贷款总额、银行放款金额、费用类型、发票金额、流水号。"
+                  + "返回生成的文件路径和文件名。")
+    public String generateInvoice(
+            @ToolParam(name = "name", description = "客户姓名") String name,
+            @ToolParam(name = "idCard", description = "身份证号") String idCard,
+            @ToolParam(name = "phone", description = "联系电话") String phone,
+            @ToolParam(name = "email", description = "邮箱地址") String email,
+            @ToolParam(name = "contract", description = "合同号，如 HT20240410001") String contract,
+            @ToolParam(name = "loan", description = "借据号，如 JD20240410001") String loan,
+            @ToolParam(name = "date", description = "放款日期，格式 yyyy-MM-dd") String date,
+            @ToolParam(name = "amount", description = "贷款总额") String amount,
+            @ToolParam(name = "bankAmount", description = "银行放款金额") String bankAmount,
+            @ToolParam(name = "feeType", description = "费用类型，如 服务费") String feeType,
+            @ToolParam(name = "invoice", description = "发票金额") String invoice,
+            @ToolParam(name = "serial", description = "流水号，如 001") String serial) {
+
+        // 参数校验
+        if (name == null || name.isBlank()) {
+            return "{\"success\":false,\"error\":\"客户姓名不能为空\"}";
+        }
+        if (idCard == null || idCard.isBlank()) {
+            return "{\"success\":false,\"error\":\"身份证号不能为空\"}";
+        }
+        if (serial == null || serial.isBlank()) {
+            return "{\"success\":false,\"error\":\"流水号不能为空\"}";
+        }
+
+        try {
+            // 生成 Excel
+            String excelPath = generateExcel(name, idCard, phone, email, contract, loan,
+                    date, amount, bankAmount, feeType, invoice, serial);
+
+            // 生成 Word
+            String wordPath = generateWord(name, idCard, phone, email, invoice, feeType, serial);
+
+            // 构建返回结果
+            String excelFileName = excelPath.substring(excelPath.lastIndexOf('/') + 1);
+            String wordFileName = wordPath.substring(wordPath.lastIndexOf('/') + 1);
+
+            String result = String.format(
+                    "{\"success\":true,\"excelPath\":\"%s\",\"wordPath\":\"%s\",\"excelFileName\":\"%s\",\"wordFileName\":\"%s\"}",
+                    excelPath, wordPath, excelFileName, wordFileName
+            );
+
+            log.info("天津银行发票生成完成: Excel={}, Word={}", excelPath, wordPath);
+            return result;
+
+        } catch (Exception e) {
+            log.error("生成天津银行发票失败", e);
+            return "{\"success\":false,\"error\":\"" + e.getMessage() + "\"}";
+        }
     }
 }
