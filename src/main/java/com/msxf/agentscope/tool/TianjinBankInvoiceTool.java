@@ -9,6 +9,8 @@ import org.slf4j.LoggerFactory;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
+import java.util.LinkedHashMap;
 
 public class TianjinBankInvoiceTool {
 
@@ -219,21 +221,43 @@ public class TianjinBankInvoiceTool {
             // 生成 Word
             String wordPath = generateWord(name, idCard, phone, email, invoice, feeType, serial);
 
-            // 构建返回结果
-            String excelFileName = excelPath.substring(excelPath.lastIndexOf('/') + 1);
-            String wordFileName = wordPath.substring(wordPath.lastIndexOf('/') + 1);
+            // 构建返回结果 - 使用平台无关的路径处理
+            java.nio.file.Path excelFilePath = java.nio.file.Paths.get(excelPath);
+            java.nio.file.Path wordFilePath = java.nio.file.Paths.get(wordPath);
+            String excelFileName = excelFilePath.getFileName().toString();
+            String wordFileName = wordFilePath.getFileName().toString();
 
-            String result = String.format(
-                    "{\"success\":true,\"excelPath\":\"%s\",\"wordPath\":\"%s\",\"excelFileName\":\"%s\",\"wordFileName\":\"%s\"}",
-                    excelPath, wordPath, excelFileName, wordFileName
-            );
+            // 使用 ObjectMapper 进行 JSON 序列化
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("success", true);
+            result.put("excelPath", excelPath);
+            result.put("wordPath", wordPath);
+            result.put("excelFileName", excelFileName);
+            result.put("wordFileName", wordFileName);
+
+            String jsonResult;
+            try {
+                jsonResult = objectMapper.writeValueAsString(result);
+            } catch (com.fasterxml.jackson.core.JsonProcessingException jsonEx) {
+                log.error("JSON序列化失败", jsonEx);
+                return "{\"success\":false,\"error\":\"JSON序列化失败\"}";
+            }
 
             log.info("天津银行发票生成完成: Excel={}, Word={}", excelPath, wordPath);
-            return result;
+            return jsonResult;
 
         } catch (Exception e) {
             log.error("生成天津银行发票失败", e);
-            return "{\"success\":false,\"error\":\"" + e.getMessage() + "\"}";
+            // 使用 ObjectMapper 进行错误响应序列化
+            Map<String, Object> errorResult = new LinkedHashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("error", e.getMessage());
+            try {
+                return objectMapper.writeValueAsString(errorResult);
+            } catch (com.fasterxml.jackson.core.JsonProcessingException jsonEx) {
+                log.error("错误响应JSON序列化失败", jsonEx);
+                return "{\"success\":false,\"error\":\"生成失败且JSON序列化失败\"}";
+            }
         }
     }
 }
