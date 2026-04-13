@@ -172,6 +172,9 @@ public class TianjinBankInvoiceTool {
         }
         org.apache.poi.xwpf.usermodel.XWPFTableCell cell = row.getCell(colIdx);
         // 清除现有段落并添加新文本
+        if (cell.getParagraphs().isEmpty()) {
+            cell.addParagraph();
+        }
         cell.getParagraphs().get(0).getRuns().clear();
         cell.getParagraphs().get(0).createRun().setText(value != null ? value : "");
     }
