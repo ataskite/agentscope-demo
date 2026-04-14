@@ -1,5 +1,6 @@
 package com.msxf.agentscope.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.msxf.agentscope.agent.AgentConfig;
 import com.msxf.agentscope.agent.AgentConfigService;
 import com.msxf.agentscope.service.AgentService;
@@ -11,11 +12,11 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.core.task.TaskExecutor;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.publisher.Flux;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -25,17 +26,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Chat Controller with SSE streaming support.
- * Uses Spring's TaskExecutor for async streaming so that send endpoints return immediately.
+ * Chat Controller with reactive SSE streaming.
+ * POST /chat/send returns Flux<ServerSentEvent> directly — no session management needed.
  */
 @Controller
 public class ChatController {
 
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
-    private final ConcurrentHashMap<String, SseEmitter> emitters = new ConcurrentHashMap<>();
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private AgentService agentService;
@@ -43,84 +43,84 @@ public class ChatController {
     @Autowired
     private AgentConfigService agentConfigService;
 
-    @Autowired
-    private TaskExecutor taskExecutor;
-
     @GetMapping("/")
     public String chat() {
         return "chat";
     }
 
     /**
-     * Send message endpoint.
-     * Submits streaming to TaskExecutor so this method returns sessionId immediately.
+     * Send message endpoint — returns SSE stream directly.
      */
-    @PostMapping("/chat/send")
+    @PostMapping(value = "/chat/send", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @ResponseBody
-    public Map<String, String> sendMessage(@RequestBody Map<String, String> request) {
+    public Flux<ServerSentEvent<String>> sendMessage(@RequestBody Map<String, String> request) {
         String agentId = request.getOrDefault("agentId", "chat.basic");
         String message = request.get("message");
         String filePath = request.get("filePath");
         String fileName = request.get("fileName");
 
         if (message == null || message.isBlank()) {
-            return Map.of("error", "Message cannot be empty");
+            return Flux.just(
+                ServerSentEvent.<String>builder()
+                    .event("message")
+                    .data("{\"type\":\"error\",\"message\":\"Message cannot be empty\"}")
+                    .build(),
+                ServerSentEvent.<String>builder()
+                    .event("message")
+                    .data("{\"type\":\"done\"}")
+                    .build()
+            );
         }
 
-        String sessionId = UUID.randomUUID().toString();
-        SseEmitter emitter = new SseEmitter(300_000L); // 5 minute timeout
-
-        emitters.put(sessionId, emitter);
-
-        // Cleanup on completion/timeout/error
-        emitter.onCompletion(() -> emitters.remove(sessionId));
-        emitter.onTimeout(() -> {
-            emitters.remove(sessionId);
-            log.warn("SSE emitter timed out for session: {}", sessionId);
-        });
-        emitter.onError(ex -> {
-            emitters.remove(sessionId);
-            log.error("SSE emitter error for session: {}", sessionId, ex);
-        });
-
-        // Submit streaming task to TaskExecutor — returns sessionId immediately
-        taskExecutor.execute(() -> {
-            try {
-                log.debug("[{}] Starting stream", sessionId);
-                agentService.streamToEmitter(agentId, message, filePath, fileName, emitter);
-            } catch (Exception e) {
-                log.error("[{}] Error during agent streaming", sessionId, e);
-                emitter.completeWithError(e);
-            }
-        });
-
-        return Map.of("sessionId", sessionId);
-    }
-
-    /**
-     * SSE stream endpoint - returns the emitter created in sendMessage.
-     * The client polls this endpoint after getting sessionId.
-     */
-    @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @ResponseBody
-    public SseEmitter stream(@RequestParam String sessionId) {
-        SseEmitter emitter = emitters.get(sessionId);
-        if (emitter == null) {
-            SseEmitter errorEmitter = new SseEmitter();
-            taskExecutor.execute(() -> {
+        return agentService.createStreamFlux(agentId, message, filePath, fileName)
+            .map(data -> {
                 try {
-                    errorEmitter.send(SseEmitter.event()
-                        .name("message")
-                        .data("{\"type\":\"error\",\"message\":\"Session not found\"}"));
-                    errorEmitter.complete();
+                    String json = objectMapper.writeValueAsString(data);
+                    return ServerSentEvent.<String>builder()
+                        .event("message")
+                        .data(json)
+                        .build();
                 } catch (Exception e) {
-                    log.error("[{}] Failed to send error response", sessionId, e);
-                    errorEmitter.completeWithError(e);
+                    return ServerSentEvent.<String>builder()
+                        .event("message")
+                        .data("{\"type\":\"error\",\"message\":\"Serialization error\"}")
+                        .build();
+                }
+            })
+            .concatWith(Flux.just(
+                ServerSentEvent.<String>builder()
+                    .event("message")
+                    .data("{\"type\":\"done\"}")
+                    .build()
+            ))
+            .onErrorResume(e -> {
+                log.error("Agent stream error", e);
+                String errMsg = e.getMessage() != null ? e.getMessage() : "Unknown error";
+                try {
+                    return Flux.just(
+                        ServerSentEvent.<String>builder()
+                            .event("message")
+                            .data(objectMapper.writeValueAsString(
+                                Map.of("type", "error", "message", errMsg)))
+                            .build(),
+                        ServerSentEvent.<String>builder()
+                            .event("message")
+                            .data("{\"type\":\"done\"}")
+                            .build()
+                    );
+                } catch (Exception ex) {
+                    return Flux.just(
+                        ServerSentEvent.<String>builder()
+                            .event("message")
+                            .data("{\"type\":\"error\",\"message\":\"Internal error\"}")
+                            .build(),
+                        ServerSentEvent.<String>builder()
+                            .event("message")
+                            .data("{\"type\":\"done\"}")
+                            .build()
+                    );
                 }
             });
-            return errorEmitter;
-        }
-        return emitter;
     }
 
     /**
@@ -224,13 +224,10 @@ public class ChatController {
         }
 
         try {
-            // Construct file path - supports both original uploads and edited files
             Path uploadDir = Paths.get(System.getProperty("java.io.tmpdir"), "agentscope-uploads");
             Path filePath = uploadDir.resolve(fileId);
 
-            // If fileId is a UUID (no extension), try to find the file
             if (!filePath.toFile().exists() && !fileId.contains(".")) {
-                // Try common extensions
                 File[] matchingFiles = uploadDir.toFile().listFiles((dir, name) ->
                     name.startsWith(fileId) && (name.endsWith(".docx") || name.endsWith(".pdf") || name.endsWith(".xlsx"))
                 );
@@ -244,7 +241,6 @@ public class ChatController {
                 return ResponseEntity.notFound().build();
             }
 
-            // Determine content type
             String fileName = file.getName();
             String contentType = "application/octet-stream";
             if (fileName.endsWith(".docx")) {
