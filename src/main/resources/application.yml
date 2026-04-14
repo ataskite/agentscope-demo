@@ -7,15 +7,6 @@ spring:
     multipart:
       max-file-size: 50MB
       max-request-size: 50MB
-  task:
-    execution:
-      pool:
-        core-size: 10
-        max-size: 50
-        queue-capacity: 100
-        keep-alive: 60s
-        allow-core-thread-timeout: true
-      thread-name-prefix: sse-
 
 # AgentScope Configuration
 agentscope:
