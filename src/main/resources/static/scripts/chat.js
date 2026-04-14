@@ -1,12 +1,38 @@
 /* ===== STATE ===== */
 let currentAgent = null;
 let isStreaming = false;
-let currentEventSource = null;
+let currentAbortController = null;
 let messageCount = 0;
 let uploadedFile = null;
 let agentRawMarkdown = '';  // Accumulated raw markdown for current agent response
 
 const agents = {};
+
+/* ===== SSE PARSER ===== */
+function createSSEParser() {
+    var buffer = '';
+    return {
+        parse: function(chunk, onEvent) {
+            buffer += chunk;
+            var lines = buffer.split('\n');
+            buffer = lines.pop();
+            var currentEvent = {};
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i];
+                if (line.startsWith('data:')) {
+                    currentEvent.data = line.slice(5).trim();
+                } else if (line.startsWith('event:')) {
+                    currentEvent.event = line.slice(6).trim();
+                } else if (line === '') {
+                    if (currentEvent.data) {
+                        onEvent(currentEvent);
+                    }
+                    currentEvent = {};
+                }
+            }
+        }
+    };
+}
 
 /* ===== MARKED CONFIG ===== */
 if (typeof marked !== 'undefined') {
@@ -337,7 +363,6 @@ async function sendMessage() {
 
     chatEmpty.style.display = 'none';
 
-    // Collapse all previous runtime panels before starting new message
     document.querySelectorAll('.round-body:not(.collapsed)').forEach(function(body) {
         body.classList.add('collapsed');
     });
@@ -373,6 +398,8 @@ async function sendMessage() {
     }
 
     try {
+        currentAbortController = new AbortController();
+
         var response = await fetch('/chat/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -381,259 +408,245 @@ async function sendMessage() {
                 message: message,
                 filePath: fileInfo ? fileInfo.filePath : null,
                 fileName: fileInfo ? fileInfo.fileName : null
-            })
+            }),
+            signal: currentAbortController.signal
         });
 
-        var data = await response.json();
-
-        if (data.error) {
+        if (!response.ok) {
             removeTypingIndicator();
-            appendMessage('error', data.error);
+            appendMessage('error', '请求失败: ' + response.status);
             endRound('error');
             setStreamingState(false);
             return;
         }
 
-        currentEventSource = new EventSource('/chat/stream?sessionId=' + data.sessionId);
-
         removeTypingIndicator();
         messageCount++;
 
-        currentEventSource.addEventListener('message', function(event) {
-            var payload;
-            try {
-                payload = JSON.parse(event.data);
-            } catch (e) {
-                return;
-            }
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var parser = createSSEParser();
 
-            switch (payload.type) {
+        while (true) {
+            var result = await reader.read();
+            if (result.done) break;
 
-                // ===== HOOK LIFECYCLE EVENTS (from ObservabilityHook) =====
-
-                case 'agent_start':
-                    // Agent begins processing
-                    if (currentRound) {
-                        addTimelineRow('phase', 'Agent Start', payload.agentName || '', 'running');
-                    }
-                    break;
-
-                case 'agent_end':
-                    // Agent finishes - finalize metrics
-                    if (currentRound) {
-                        var totalDur = payload.duration_ms || 0;
-                        addTimelineRow('phase', 'Agent End', formatDuration(totalDur), 'ok');
-                        currentRound.totalLlmCalls = payload.totalLlmCalls || 0;
-                        currentRound.totalToolCalls = payload.totalToolCalls || 0;
-                    }
-                    break;
-
-                case 'llm_start':
-                    // LLM call begins (from Hook's PreReasoningEvent)
-                    if (currentRound) {
-                        var callNum = payload.callNumber || (currentRound.llmCallCount + 1);
-                        currentRound._currentLlmStart = Date.now();
-                        currentRound._currentLlmCallNum = callNum;
-                        // Create a "running" LLM row that will be updated on llm_end
-                        currentRound._currentLlmRow = addTimelineRow('llm', 'LLM #' + callNum, (payload.modelName || '') + ' ...', 'running');
-                    }
-                    break;
-
-                case 'llm_end':
-                    // LLM call ends (from Hook's PostReasoningEvent)
-                    if (currentRound) {
-                        currentRound.llmCallCount++;
-                        var tokens = payload.totalTokens ? payload.totalTokens.toLocaleString() + ' tokens' : '';
-                        var llmTimeSec = payload.llmTime ? payload.llmTime : 0;
-                        var llmDurMs = 0;
-                        if (currentRound._currentLlmStart) {
-                            llmDurMs = Date.now() - currentRound._currentLlmStart;
-                        }
-                        var timeStr = llmDurMs > 0 ? formatDuration(llmDurMs) : (llmTimeSec > 0 ? (llmTimeSec >= 1 ? llmTimeSec.toFixed(1) + 's' : (llmTimeSec * 1000).toFixed(0) + 'ms') : '');
-
-                        // Accumulate usage
-                        currentRound.inputTokens += (payload.inputTokens || 0);
-                        currentRound.outputTokens += (payload.outputTokens || 0);
-                        currentRound.totalTokens += (payload.totalTokens || 0);
-                        currentRound.llmTime += llmTimeSec;
-
-                        // Update the LLM row with final info
-                        if (currentRound._currentLlmRow) {
-                            var row = currentRound._currentLlmRow;
-                            var metricsEl = row.querySelector('.rtl-metrics');
-                            var statusEl = row.querySelector('.rtl-status');
-                            if (metricsEl) metricsEl.textContent = [tokens, timeStr].filter(Boolean).join(' ');
-                            if (statusEl) statusEl.textContent = '✓';
-                            row.classList.remove('status-running');
-                            row.classList.add('status-ok');
-                            currentRound._currentLlmRow = null;
-                        }
-
-                        updateRoundMetrics();
-                        currentRound._currentLlmStart = null;
-                    }
-                    break;
-
-                case 'thinking':
-                    // Thinking text chunk (from Hook's ReasoningChunkEvent)
-                    if (currentRound && !currentRound.thinkingCycleStart) {
-                        currentRound.thinkingCycleStart = Date.now();
-                    }
-                    var thinkingText = payload.content || 'Processing...';
-                    updateThinkingBox(thinkingText, fileInfo);
-                    break;
-
-                case 'reasoning_text':
-                    // Reasoning text from hook - show in thinking box
-                    var rText = payload.content || '';
-                    if (rText) {
-                        updateThinkingBox(rText, fileInfo);
-                    }
-                    break;
-
-                case 'tool_start':
-                    // Tool execution begins (from Hook's PreActingEvent)
-                    if (currentRound && currentRound.thinkingCycleStart) {
-                        currentRound.thinkingTime += Date.now() - currentRound.thinkingCycleStart;
-                        currentRound.thinkingCycleStart = null;
-                    }
-                    var tName = payload.name || 'unknown';
-                    var tParams = payload.params || '{}';
-                    var tParamsPreview = payload.paramsPreview || tParams.substring(0, 50);
-                    var isSkill = payload.isSkill === true;
-                    var tSkillName = payload.displayName || '';
-
-                    if (isSkill) {
-                        updateThinkingBox('📖 Loading skill: ' + (tSkillName || '...'), fileInfo);
-                    } else {
-                        updateThinkingBox('⚡ ' + tName + '(' + tParamsPreview + ')', fileInfo);
+            parser.parse(decoder.decode(result.value, { stream: true }), function(event) {
+                if (event.event === 'message' && event.data) {
+                    var payload;
+                    try {
+                        payload = JSON.parse(event.data);
+                    } catch (e) {
+                        return;
                     }
 
-                    if (currentRound) {
-                        currentRound.toolCallCount++;
-                        currentRound._currentToolStart = Date.now();
-                        // Create running tool row — use 'skill' type for skill-loading calls
-                        var rowType = isSkill ? 'skill' : 'tool';
-                        var rowLabel = isSkill ? ('Skill → ' + (tSkillName || '')) : ('Tool → ' + tName);
-                        currentRound._currentToolRow = addTimelineRow(rowType, rowLabel, '...', 'running');
-                        currentRound._currentToolIsSkill = isSkill;
-                        updateRoundMetrics();
+                    switch (payload.type) {
+
+                        // ===== HOOK LIFECYCLE EVENTS (from ObservabilityHook) =====
+
+                        case 'agent_start':
+                            if (currentRound) {
+                                addTimelineRow('phase', 'Agent Start', payload.agentName || '', 'running');
+                            }
+                            break;
+
+                        case 'agent_end':
+                            if (currentRound) {
+                                var totalDur = payload.duration_ms || 0;
+                                addTimelineRow('phase', 'Agent End', formatDuration(totalDur), 'ok');
+                                currentRound.totalLlmCalls = payload.totalLlmCalls || 0;
+                                currentRound.totalToolCalls = payload.totalToolCalls || 0;
+                            }
+                            break;
+
+                        case 'llm_start':
+                            if (currentRound) {
+                                var callNum = payload.callNumber || (currentRound.llmCallCount + 1);
+                                currentRound._currentLlmStart = Date.now();
+                                currentRound._currentLlmCallNum = callNum;
+                                currentRound._currentLlmRow = addTimelineRow('llm', 'LLM #' + callNum, (payload.modelName || '') + ' ...', 'running');
+                            }
+                            break;
+
+                        case 'llm_end':
+                            if (currentRound) {
+                                currentRound.llmCallCount++;
+                                var tokens = payload.totalTokens ? payload.totalTokens.toLocaleString() + ' tokens' : '';
+                                var llmTimeSec = payload.llmTime ? payload.llmTime : 0;
+                                var llmDurMs = 0;
+                                if (currentRound._currentLlmStart) {
+                                    llmDurMs = Date.now() - currentRound._currentLlmStart;
+                                }
+                                var timeStr = llmDurMs > 0 ? formatDuration(llmDurMs) : (llmTimeSec > 0 ? (llmTimeSec >= 1 ? llmTimeSec.toFixed(1) + 's' : (llmTimeSec * 1000).toFixed(0) + 'ms') : '');
+
+                                currentRound.inputTokens += (payload.inputTokens || 0);
+                                currentRound.outputTokens += (payload.outputTokens || 0);
+                                currentRound.totalTokens += (payload.totalTokens || 0);
+                                currentRound.llmTime += llmTimeSec;
+
+                                if (currentRound._currentLlmRow) {
+                                    var row = currentRound._currentLlmRow;
+                                    var metricsEl = row.querySelector('.rtl-metrics');
+                                    var statusEl = row.querySelector('.rtl-status');
+                                    if (metricsEl) metricsEl.textContent = [tokens, timeStr].filter(Boolean).join(' ');
+                                    if (statusEl) statusEl.textContent = '✓';
+                                    row.classList.remove('status-running');
+                                    row.classList.add('status-ok');
+                                    currentRound._currentLlmRow = null;
+                                }
+
+                                updateRoundMetrics();
+                                currentRound._currentLlmStart = null;
+                            }
+                            break;
+
+                        case 'thinking':
+                            if (currentRound && !currentRound.thinkingCycleStart) {
+                                currentRound.thinkingCycleStart = Date.now();
+                            }
+                            var thinkingText = payload.content || 'Processing...';
+                            updateThinkingBox(thinkingText, fileInfo);
+                            break;
+
+                        case 'reasoning_text':
+                            var rText = payload.content || '';
+                            if (rText) {
+                                updateThinkingBox(rText, fileInfo);
+                            }
+                            break;
+
+                        case 'tool_start':
+                            if (currentRound && currentRound.thinkingCycleStart) {
+                                currentRound.thinkingTime += Date.now() - currentRound.thinkingCycleStart;
+                                currentRound.thinkingCycleStart = null;
+                            }
+                            var tName = payload.name || 'unknown';
+                            var tParams = payload.params || '{}';
+                            var tParamsPreview = payload.paramsPreview || tParams.substring(0, 50);
+                            var isSkill = payload.isSkill === true;
+                            var tSkillName = payload.displayName || '';
+
+                            if (isSkill) {
+                                updateThinkingBox('📖 Loading skill: ' + (tSkillName || '...'), fileInfo);
+                            } else {
+                                updateThinkingBox('⚡ ' + tName + '(' + tParamsPreview + ')', fileInfo);
+                            }
+
+                            if (currentRound) {
+                                currentRound.toolCallCount++;
+                                currentRound._currentToolStart = Date.now();
+                                var rowType = isSkill ? 'skill' : 'tool';
+                                var rowLabel = isSkill ? ('Skill → ' + (tSkillName || '')) : ('Tool → ' + tName);
+                                currentRound._currentToolRow = addTimelineRow(rowType, rowLabel, '...', 'running');
+                                currentRound._currentToolIsSkill = isSkill;
+                                updateRoundMetrics();
+                            }
+                            break;
+
+                        case 'tool_end':
+                            var teName = payload.name || 'unknown';
+                            var teResult = payload.result || '';
+                            var teDurMs = payload.duration_ms || -1;
+                            var tePreview = payload.resultPreview || (teResult.length > 100 ? teResult.substring(0, 100) + '...' : teResult);
+                            var teIsSkill = payload.isSkill === true;
+                            updateThinkingBox('✓ ' + teName + ': ' + tePreview, fileInfo);
+
+                            var targetRound = currentRound || (rounds.length > 0 ? rounds[rounds.length - 1] : null);
+                            if (targetRound) {
+                                if (teDurMs > 0) {
+                                    targetRound.toolTime += teDurMs;
+                                } else if (targetRound._currentToolStart) {
+                                    targetRound.toolTime += Date.now() - targetRound._currentToolStart;
+                                }
+                                targetRound._currentToolStart = null;
+
+                                if (targetRound._currentToolRow) {
+                                    var tRow = targetRound._currentToolRow;
+                                    var tmEl = tRow.querySelector('.rtl-metrics');
+                                    var tsEl = tRow.querySelector('.rtl-status');
+                                    var durStr = teDurMs >= 0 ? formatDuration(teDurMs) : '';
+                                    if (tmEl) tmEl.textContent = durStr;
+                                    if (tsEl) tsEl.textContent = teDurMs >= 0 ? '✓' : '✗';
+                                    tRow.classList.remove('status-running');
+                                    tRow.classList.add(teDurMs >= 0 ? 'status-ok' : 'status-fail');
+                                    targetRound._currentToolRow = null;
+                                }
+
+                                var metricsEl2 = document.getElementById('round-metrics-' + targetRound.number);
+                                if (metricsEl2) updateRoundMetricsForRound(targetRound);
+                            }
+                            break;
+
+                        // ===== STREAM CONTENT EVENTS =====
+
+                        case 'text':
+                            if (currentRound && currentRound.thinkingCycleStart) {
+                                currentRound.thinkingTime += Date.now() - currentRound.thinkingCycleStart;
+                                currentRound.thinkingCycleStart = null;
+                            }
+                            collapseThinkingBox();
+                            if (!agentBubble) {
+                                agentBubble = addAgentBubble();
+                                agentRawMarkdown = '';
+                            }
+                            agentRawMarkdown += (payload.content || payload.text || '');
+                            agentBubble.classList.add('md-render');
+                            agentBubble.innerHTML = renderMarkdown(agentRawMarkdown);
+                            scrollToBottom(chatMessages);
+                            break;
+
+                        case 'done':
+                            completeThinkingBox();
+                            isStreaming = false;
+                            setStreamingState(false);
+                            endRound('success');
+                            scrollToBottom(chatMessages);
+                            break;
+
+                        case 'error':
+                            completeThinkingBox();
+                            if (!agentBubble) {
+                                agentBubble = addAgentBubble();
+                            }
+                            agentBubble.classList.remove('md-render');
+                            agentBubble.style.whiteSpace = 'pre-wrap';
+                            agentBubble.textContent += '\n\n[ERROR] ' + (payload.message || payload.content || 'Unknown error');
+                            agentBubble.closest('.message').classList.add('error');
+                            endRound('error');
+                            isStreaming = false;
+                            setStreamingState(false);
+                            scrollToBottom(chatMessages);
+                            break;
                     }
-                    break;
-
-                case 'tool_end':
-                    // Tool execution ends (from Hook's PostActingEvent)
-                    var teName = payload.name || 'unknown';
-                    var teResult = payload.result || '';
-                    var teDurMs = payload.duration_ms || -1;
-                    var tePreview = payload.resultPreview || (teResult.length > 100 ? teResult.substring(0, 100) + '...' : teResult);
-                    var teIsSkill = payload.isSkill === true;
-                    updateThinkingBox('✓ ' + teName + ': ' + tePreview, fileInfo);
-
-                    var targetRound = currentRound || (rounds.length > 0 ? rounds[rounds.length - 1] : null);
-                    if (targetRound) {
-                        if (teDurMs > 0) {
-                            targetRound.toolTime += teDurMs;
-                        } else if (targetRound._currentToolStart) {
-                            targetRound.toolTime += Date.now() - targetRound._currentToolStart;
-                        }
-                        targetRound._currentToolStart = null;
-
-                        // Update the tool row with final info
-                        if (targetRound._currentToolRow) {
-                            var tRow = targetRound._currentToolRow;
-                            var tmEl = tRow.querySelector('.rtl-metrics');
-                            var tsEl = tRow.querySelector('.rtl-status');
-                            var durStr = teDurMs >= 0 ? formatDuration(teDurMs) : '';
-                            if (tmEl) tmEl.textContent = durStr;
-                            if (tsEl) tsEl.textContent = teDurMs >= 0 ? '✓' : '✗';
-                            tRow.classList.remove('status-running');
-                            tRow.classList.add(teDurMs >= 0 ? 'status-ok' : 'status-fail');
-                            targetRound._currentToolRow = null;
-                        }
-
-                        var metricsEl = document.getElementById('round-metrics-' + targetRound.number);
-                        if (metricsEl) updateRoundMetricsForRound(targetRound);
-                    }
-                    break;
-
-                // ===== STREAM CONTENT EVENTS =====
-
-                case 'text':
-                    // Response text from stream (for chat area display)
-                    if (currentRound && currentRound.thinkingCycleStart) {
-                        currentRound.thinkingTime += Date.now() - currentRound.thinkingCycleStart;
-                        currentRound.thinkingCycleStart = null;
-                    }
-                    collapseThinkingBox();
-                    if (!agentBubble) {
-                        agentBubble = addAgentBubble();
-                        agentRawMarkdown = '';
-                    }
-                    agentRawMarkdown += (payload.content || payload.text || '');
-                    agentBubble.classList.add('md-render');
-                    agentBubble.innerHTML = renderMarkdown(agentRawMarkdown);
-                    scrollToBottom(chatMessages);
-                    break;
-
-                case 'done':
-                    completeThinkingBox();
-                    currentEventSource.close();
-                    currentEventSource = null;
-                    isStreaming = false;
-                    setStreamingState(false);
-                    endRound('success');
-                    scrollToBottom(chatMessages);
-                    break;
-
-                case 'error':
-                    completeThinkingBox();
-                    if (!agentBubble) {
-                        agentBubble = addAgentBubble();
-                    }
-                    agentBubble.classList.remove('md-render');
-                    agentBubble.style.whiteSpace = 'pre-wrap';
-                    agentBubble.textContent += '\n\n[ERROR] ' + (payload.message || payload.content || 'Unknown error');
-                    agentBubble.closest('.message').classList.add('error');
-                    endRound('error');
-                    currentEventSource.close();
-                    currentEventSource = null;
-                    isStreaming = false;
-                    setStreamingState(false);
-                    scrollToBottom(chatMessages);
-                    break;
-            }
-        });
-
-        currentEventSource.onerror = function() {
-            if (currentEventSource) {
-                currentEventSource.close();
-                currentEventSource = null;
-            }
-            if (isStreaming) {
-                completeThinkingBox();
-                if (!agentBubble) {
-                    agentBubble = addAgentBubble();
                 }
-                agentBubble.classList.remove('md-render');
-                agentBubble.style.whiteSpace = 'pre-wrap';
-                if (!agentBubble.textContent.trim()) {
-                    agentBubble.textContent = '[CONNECTION LOST] Please retry.';
-                    agentBubble.closest('.message').classList.add('error');
-                }
-                endRound('error');
-                isStreaming = false;
-                setStreamingState(false);
-            }
-        };
+            });
+        }
 
     } catch (err) {
+        if (err.name === 'AbortError') {
+            completeThinkingBox();
+            isStreaming = false;
+            setStreamingState(false);
+            endRound('error');
+            return;
+        }
         completeThinkingBox();
         removeTypingIndicator();
         appendMessage('error', '[NETWORK ERROR] ' + err.message);
         endRound('error');
         setStreamingState(false);
+    } finally {
+        currentAbortController = null;
     }
+}
+
+function stopStreaming() {
+    if (currentAbortController) {
+        currentAbortController.abort();
+        currentAbortController = null;
+    }
+    isStreaming = false;
+    setStreamingState(false);
 }
 
 /* ===== HELPERS ===== */
