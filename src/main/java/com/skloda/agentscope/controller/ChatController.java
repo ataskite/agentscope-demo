@@ -1,9 +1,11 @@
-package com.msxf.agentscope.controller;
+package com.skloda.agentscope.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.msxf.agentscope.agent.AgentConfig;
-import com.msxf.agentscope.agent.AgentConfigService;
-import com.msxf.agentscope.service.AgentService;
+import com.skloda.agentscope.agent.AgentConfig;
+import com.skloda.agentscope.agent.AgentConfigService;
+import com.skloda.agentscope.model.ChatEvent;
+import com.skloda.agentscope.model.ChatRequest;
+import com.skloda.agentscope.service.AgentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,13 +31,14 @@ import java.util.UUID;
 
 /**
  * Chat Controller with reactive SSE streaming.
- * POST /chat/send returns Flux<ServerSentEvent> directly — no session management needed.
+ * POST /chat/send returns Flux&lt;ServerSentEvent&gt; directly — no session management needed.
  */
 @Controller
 public class ChatController {
 
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final String SSE_EVENT_NAME = "message";
 
     @Autowired
     private AgentService agentService;
@@ -48,79 +51,66 @@ public class ChatController {
         return "chat";
     }
 
+    // ---- SSE helpers ----
+
+    private ServerSentEvent<String> sseEvent(Object payload) {
+        try {
+            return ServerSentEvent.<String>builder()
+                    .event(SSE_EVENT_NAME)
+                    .data(objectMapper.writeValueAsString(payload))
+                    .build();
+        } catch (Exception e) {
+            log.error("Failed to serialize SSE payload", e);
+            return ServerSentEvent.<String>builder()
+                    .event(SSE_EVENT_NAME)
+                    .data(toJsonString(ChatEvent.error("Serialization error")))
+                    .build();
+        }
+    }
+
+    private String toJsonString(Object obj) {
+        try {
+            return objectMapper.writeValueAsString(obj);
+        } catch (Exception e) {
+            log.error("Failed to serialize object", e);
+            return "{\"type\":\"error\",\"message\":\"Serialization error\"}";
+        }
+    }
+
+    private ServerSentEvent<String> sseDone() {
+        return sseEvent(ChatEvent.done());
+    }
+
+    private ServerSentEvent<String> sseError(String message) {
+        return sseEvent(ChatEvent.error(message));
+    }
+
+    private Flux<ServerSentEvent<String>> errorAndDone(String message) {
+        return Flux.just(sseError(message), sseDone());
+    }
+
+    // ---- Endpoints ----
+
     /**
      * Send message endpoint — returns SSE stream directly.
      */
     @PostMapping(value = "/chat/send", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @ResponseBody
-    public Flux<ServerSentEvent<String>> sendMessage(@RequestBody Map<String, String> request) {
-        String agentId = request.getOrDefault("agentId", "chat.basic");
-        String message = request.get("message");
-        String filePath = request.get("filePath");
-        String fileName = request.get("fileName");
-
+    public Flux<ServerSentEvent<String>> sendMessage(@RequestBody ChatRequest request) {
+        String message = request.getMessage();
         if (message == null || message.isBlank()) {
-            return Flux.just(
-                ServerSentEvent.<String>builder()
-                    .event("message")
-                    .data("{\"type\":\"error\",\"message\":\"Message cannot be empty\"}")
-                    .build(),
-                ServerSentEvent.<String>builder()
-                    .event("message")
-                    .data("{\"type\":\"done\"}")
-                    .build()
-            );
+            return errorAndDone("Message cannot be empty");
         }
 
-        return agentService.createStreamFlux(agentId, message, filePath, fileName)
-            .map(data -> {
-                try {
-                    String json = objectMapper.writeValueAsString(data);
-                    return ServerSentEvent.<String>builder()
-                        .event("message")
-                        .data(json)
-                        .build();
-                } catch (Exception e) {
-                    return ServerSentEvent.<String>builder()
-                        .event("message")
-                        .data("{\"type\":\"error\",\"message\":\"Serialization error\"}")
-                        .build();
-                }
-            })
-            .concatWith(Flux.just(
-                ServerSentEvent.<String>builder()
-                    .event("message")
-                    .data("{\"type\":\"done\"}")
-                    .build()
-            ))
-            .onErrorResume(e -> {
-                log.error("Agent stream error", e);
-                String errMsg = e.getMessage() != null ? e.getMessage() : "Unknown error";
-                try {
-                    return Flux.just(
-                        ServerSentEvent.<String>builder()
-                            .event("message")
-                            .data(objectMapper.writeValueAsString(
-                                Map.of("type", "error", "message", errMsg)))
-                            .build(),
-                        ServerSentEvent.<String>builder()
-                            .event("message")
-                            .data("{\"type\":\"done\"}")
-                            .build()
-                    );
-                } catch (Exception ex) {
-                    return Flux.just(
-                        ServerSentEvent.<String>builder()
-                            .event("message")
-                            .data("{\"type\":\"error\",\"message\":\"Internal error\"}")
-                            .build(),
-                        ServerSentEvent.<String>builder()
-                            .event("message")
-                            .data("{\"type\":\"done\"}")
-                            .build()
-                    );
-                }
-            });
+        return agentService.createStreamFlux(request.getAgentId(), message,
+                        request.getFilePath(), request.getFileName())
+                .map(this::sseEvent)
+                .concatWith(Flux.just(sseDone()))
+                .onErrorResume(e -> {
+                    log.error("Agent stream error", e);
+                    String errMsg = e.getMessage() != null ? e.getMessage() : "Unknown error";
+                    return errorAndDone(errMsg);
+                });
     }
 
     /**
@@ -203,9 +193,9 @@ public class ChatController {
             log.info("File uploaded: {} -> {}", originalName, filePath);
 
             return Map.of(
-                "fileId", fileId,
-                "fileName", originalName,
-                "filePath", filePath.toAbsolutePath().toString()
+                    "fileId", fileId,
+                    "fileName", originalName,
+                    "filePath", filePath.toAbsolutePath().toString()
             );
         } catch (Exception e) {
             log.error("Failed to upload file", e);
@@ -229,7 +219,7 @@ public class ChatController {
 
             if (!filePath.toFile().exists() && !fileId.contains(".")) {
                 File[] matchingFiles = uploadDir.toFile().listFiles((dir, name) ->
-                    name.startsWith(fileId) && (name.endsWith(".docx") || name.endsWith(".pdf") || name.endsWith(".xlsx"))
+                        name.startsWith(fileId) && (name.endsWith(".docx") || name.endsWith(".pdf") || name.endsWith(".xlsx"))
                 );
                 if (matchingFiles != null && matchingFiles.length > 0) {
                     filePath = matchingFiles[0].toPath();

@@ -39,12 +39,11 @@ Replace the file content with the new Flux-based implementation. The key changes
 ```java
 package com.msxf.agentscope.service;
 
-import com.msxf.agentscope.agent.AgentFactory;
-import com.msxf.agentscope.hook.ObservabilityHook;
+import agent.com.skloda.agentscope.AgentFactory;
+import hook.com.skloda.agentscope.ObservabilityHook;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.EventType;
 import io.agentscope.core.agent.StreamOptions;
-import io.agentscope.core.agent.Event;
 import io.agentscope.core.message.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,7 +70,7 @@ public class AgentService {
     }
 
     public Flux<Map<String, Object>> createStreamFlux(String agentId, String message,
-                                                       String filePath, String fileName) {
+                                                      String filePath, String fileName) {
         return Flux.create(sink -> {
             // 1. Create Hook, bridge events to sink
             ObservabilityHook hook = new ObservabilityHook();
@@ -178,9 +177,9 @@ Key changes:
 package com.msxf.agentscope.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.msxf.agentscope.agent.AgentConfig;
-import com.msxf.agentscope.agent.AgentConfigService;
-import com.msxf.agentscope.service.AgentService;
+import agent.com.skloda.agentscope.AgentConfig;
+import agent.com.skloda.agentscope.AgentConfigService;
+import service.com.skloda.agentscope.AgentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -238,66 +237,66 @@ public class ChatController {
 
         if (message == null || message.isBlank()) {
             return Flux.just(
-                ServerSentEvent.<String>builder()
-                    .event("message")
-                    .data("{\"type\":\"error\",\"message\":\"Message cannot be empty\"}")
-                    .build(),
-                ServerSentEvent.<String>builder()
-                    .event("message")
-                    .data("{\"type\":\"done\"}")
-                    .build()
+                    ServerSentEvent.<String>builder()
+                            .event("message")
+                            .data("{\"type\":\"error\",\"message\":\"Message cannot be empty\"}")
+                            .build(),
+                    ServerSentEvent.<String>builder()
+                            .event("message")
+                            .data("{\"type\":\"done\"}")
+                            .build()
             );
         }
 
         return agentService.createStreamFlux(agentId, message, filePath, fileName)
-            .map(data -> {
-                try {
-                    String json = objectMapper.writeValueAsString(data);
-                    return ServerSentEvent.<String>builder()
-                        .event("message")
-                        .data(json)
-                        .build();
-                } catch (Exception e) {
-                    return ServerSentEvent.<String>builder()
-                        .event("message")
-                        .data("{\"type\":\"error\",\"message\":\"Serialization error\"}")
-                        .build();
-                }
-            })
-            .concatWith(Flux.just(
-                ServerSentEvent.<String>builder()
-                    .event("message")
-                    .data("{\"type\":\"done\"}")
-                    .build()
-            ))
-            .onErrorResume(e -> {
-                log.error("Agent stream error", e);
-                String errMsg = e.getMessage() != null ? e.getMessage() : "Unknown error";
-                try {
-                    return Flux.just(
+                .map(data -> {
+                    try {
+                        String json = objectMapper.writeValueAsString(data);
+                        return ServerSentEvent.<String>builder()
+                                .event("message")
+                                .data(json)
+                                .build();
+                    } catch (Exception e) {
+                        return ServerSentEvent.<String>builder()
+                                .event("message")
+                                .data("{\"type\":\"error\",\"message\":\"Serialization error\"}")
+                                .build();
+                    }
+                })
+                .concatWith(Flux.just(
                         ServerSentEvent.<String>builder()
-                            .event("message")
-                            .data(objectMapper.writeValueAsString(
-                                Map.of("type", "error", "message", errMsg)))
-                            .build(),
-                        ServerSentEvent.<String>builder()
-                            .event("message")
-                            .data("{\"type\":\"done\"}")
-                            .build()
-                    );
-                } catch (Exception ex) {
-                    return Flux.just(
-                        ServerSentEvent.<String>builder()
-                            .event("message")
-                            .data("{\"type\":\"error\",\"message\":\"Internal error\"}")
-                            .build(),
-                        ServerSentEvent.<String>builder()
-                            .event("message")
-                            .data("{\"type\":\"done\"}")
-                            .build()
-                    );
-                }
-            });
+                                .event("message")
+                                .data("{\"type\":\"done\"}")
+                                .build()
+                ))
+                .onErrorResume(e -> {
+                    log.error("Agent stream error", e);
+                    String errMsg = e.getMessage() != null ? e.getMessage() : "Unknown error";
+                    try {
+                        return Flux.just(
+                                ServerSentEvent.<String>builder()
+                                        .event("message")
+                                        .data(objectMapper.writeValueAsString(
+                                                Map.of("type", "error", "message", errMsg)))
+                                        .build(),
+                                ServerSentEvent.<String>builder()
+                                        .event("message")
+                                        .data("{\"type\":\"done\"}")
+                                        .build()
+                        );
+                    } catch (Exception ex) {
+                        return Flux.just(
+                                ServerSentEvent.<String>builder()
+                                        .event("message")
+                                        .data("{\"type\":\"error\",\"message\":\"Internal error\"}")
+                                        .build(),
+                                ServerSentEvent.<String>builder()
+                                        .event("message")
+                                        .data("{\"type\":\"done\"}")
+                                        .build()
+                        );
+                    }
+                });
     }
 
     /**
@@ -380,9 +379,9 @@ public class ChatController {
             log.info("File uploaded: {} -> {}", originalName, filePath);
 
             return Map.of(
-                "fileId", fileId,
-                "fileName", originalName,
-                "filePath", filePath.toAbsolutePath().toString()
+                    "fileId", fileId,
+                    "fileName", originalName,
+                    "filePath", filePath.toAbsolutePath().toString()
             );
         } catch (Exception e) {
             log.error("Failed to upload file", e);
@@ -406,7 +405,7 @@ public class ChatController {
 
             if (!filePath.toFile().exists() && !fileId.contains(".")) {
                 File[] matchingFiles = uploadDir.toFile().listFiles((dir, name) ->
-                    name.startsWith(fileId) && (name.endsWith(".docx") || name.endsWith(".pdf") || name.endsWith(".xlsx"))
+                        name.startsWith(fileId) && (name.endsWith(".docx") || name.endsWith(".pdf") || name.endsWith(".xlsx"))
                 );
                 if (matchingFiles != null && matchingFiles.length > 0) {
                     filePath = matchingFiles[0].toPath();

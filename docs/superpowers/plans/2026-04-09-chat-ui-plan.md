@@ -139,7 +139,7 @@ Key design decisions:
 ```java
 package com.msxf.agentscope.service;
 
-import com.msxf.agentscope.tool.SimpleTools;
+import tool.com.skloda.agentscope.SimpleTools;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.EventType;
 import io.agentscope.core.agent.StreamOptions;
@@ -335,7 +335,7 @@ Data flow: POST creates emitter → stores in map → returns sessionId → fron
 ```java
 package com.msxf.agentscope.controller;
 
-import com.msxf.agentscope.service.AgentService;
+import service.com.skloda.agentscope.AgentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

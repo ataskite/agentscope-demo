@@ -1,4 +1,4 @@
-package com.msxf.agentscope.tool;
+package com.skloda.agentscope.tool;
 
 import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;

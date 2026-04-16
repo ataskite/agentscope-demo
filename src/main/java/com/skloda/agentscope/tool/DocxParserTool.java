@@ -1,4 +1,4 @@
-package com.msxf.agentscope.tool;
+package com.skloda.agentscope.tool;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;

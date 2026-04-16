@@ -333,7 +333,38 @@ messageInput.addEventListener('input', function() {
 /* ===== SELECT AGENT ===== */
 function selectAgent(agentId) {
     removeFile();
-    if (isStreaming) return;
+    // Force cleanup streaming state to allow switching
+    if (isStreaming) {
+        isStreaming = false;
+        setStreamingState(false);
+        if (currentAbortController) {
+            currentAbortController.abort();
+            currentAbortController = null;
+        }
+        // Complete the current round if it exists
+        if (currentRound) {
+            var roundNum = currentRound.number;
+            currentRound.endTime = Date.now();
+            currentRound.status = 'interrupted';
+            var card = document.getElementById('round-' + roundNum);
+            if (card) {
+                card.classList.remove('running');
+                card.classList.add('error');
+            }
+            currentRound = null;
+        }
+        // Don't clear rounds array yet - wait for any pending events to finish
+        setTimeout(function() {
+            debugRounds.innerHTML = '';
+            rounds = [];
+            roundNumber = 0;
+        }, 500);
+    } else {
+        debugRounds.innerHTML = '';
+        rounds = [];
+        currentRound = null;
+        roundNumber = 0;
+    }
     if (!agents[agentId]) return;
     currentAgent = agentId;
 
@@ -349,11 +380,14 @@ function selectAgent(agentId) {
     chatMessages.appendChild(chatEmpty);
     chatEmpty.style.display = 'flex';
 
-    debugRounds.innerHTML = '';
-    rounds = [];
-    currentRound = null;
-    roundNumber = 0;
     messageInput.focus();
+
+    // Reset agent message state
+    currentThinkingBox = null;
+    currentAgentMessageWrapper = null;
+    thinkingContent = '';
+    currentFileInfo = null;
+    agentRawMarkdown = '';
 }
 
 async function sendMessage() {
@@ -376,6 +410,12 @@ async function sendMessage() {
     var fileInfo = uploadedFile;
     removeFile();
     setStreamingState(true);
+
+    // Ensure clean state before starting new round
+    if (currentRound) {
+        console.warn('[sendMessage] currentRound already exists, cleaning up:', currentRound);
+        currentRound = null;
+    }
     startRound(message);
 
     var typingEl = document.createElement('div');
@@ -437,7 +477,13 @@ async function sendMessage() {
                     try {
                         payload = JSON.parse(event.data);
                     } catch (e) {
+                        console.error('[SSE] Failed to parse payload:', event.data, e);
                         return;
+                    }
+
+                    // Log all payload types for debugging
+                    if (payload.type === 'tool_start' || payload.type === 'tool_end') {
+                        console.log('[SSE] Received', payload.type, 'payload:', payload);
                     }
 
                     switch (payload.type) {
@@ -540,6 +586,8 @@ async function sendMessage() {
                                 currentRound._currentToolRow = addTimelineRow(rowType, rowLabel, '...', 'running');
                                 currentRound._currentToolIsSkill = isSkill;
                                 updateRoundMetrics();
+                            } else {
+                                console.warn('[tool_start] No currentRound available!', payload);
                             }
                             break;
 
@@ -570,10 +618,14 @@ async function sendMessage() {
                                     tRow.classList.remove('status-running');
                                     tRow.classList.add(teDurMs >= 0 ? 'status-ok' : 'status-fail');
                                     targetRound._currentToolRow = null;
+                                } else {
+                                    console.warn('[tool_end] No _currentToolRow for round #' + targetRound.number, payload:', payload);
                                 }
 
                                 var metricsEl2 = document.getElementById('round-metrics-' + targetRound.number);
                                 if (metricsEl2) updateRoundMetricsForRound(targetRound);
+                            } else {
+                                console.warn('[tool_end] No targetRound available! payload:', payload);
                             }
                             break;
 
@@ -596,6 +648,7 @@ async function sendMessage() {
                             break;
 
                         case 'done':
+                            console.log('[SSE] Received done event, currentRound:', currentRound ? '#' + currentRound.number : 'null');
                             completeThinkingBox();
                             isStreaming = false;
                             setStreamingState(false);
@@ -860,8 +913,6 @@ function startRound(userMessage) {
         '<div class="round-header" onclick="toggleRoundDetails(' + round.number + ')">' +
             '<span class="round-num">#' + round.number + '</span>' +
             '<span class="round-msg">' + escapeHtml(preview) + '</span>' +
-            '<span class="round-time" id="round-time-' + round.number + '">...</span>' +
-            '<span class="round-status" id="round-status-' + round.number + '"><span class="round-spinner"></span></span>' +
         '</div>' +
         '<div class="round-body" id="round-body-' + round.number + '">' +
             '<div class="round-metrics" id="round-metrics-' + round.number + '">' +
@@ -876,39 +927,54 @@ function startRound(userMessage) {
 }
 
 function endRound(status) {
-    if (!currentRound) return;
-    currentRound.endTime = Date.now();
-    currentRound.status = status;
-    updateRoundMetrics();
+    console.log('[endRound] Called with status:', status, 'currentRound:', currentRound, 'rounds.length:', rounds.length);
+
+    var roundNumber = currentRound ? currentRound.number : roundNumber;
+    var round = currentRound || (rounds.length > 0 ? rounds[rounds.length - 1] : null);
+
+    if (!round) {
+        console.error('[endRound] No round to end! rounds:', rounds);
+        return;
+    }
+
+    roundNumber = round.number;
+    console.log('[endRound] Ending round #' + roundNumber + ' with status:', status);
+
+    if (!round.endTime) {
+        round.endTime = Date.now();
+    }
+    round.status = status;
+
+    // Update metrics for the round
+    if (round === currentRound) {
+        updateRoundMetrics();
+    } else {
+        updateRoundMetricsForRound(round);
+    }
 
     // Stop all running timeline rows in this round
-    var roundCard = document.getElementById('round-' + currentRound.number);
-    if (roundCard) {
-        roundCard.querySelectorAll('.rtl-row.status-running').forEach(function(row) {
-            row.classList.remove('status-running');
-            row.classList.add('status-ok');
-        });
+    var roundCard = document.getElementById('round-' + roundNumber);
+    if (!roundCard) {
+        console.error('[endRound] Round card not found: round-' + roundNumber);
+        currentRound = null;
+        return;
     }
 
-    var card = document.getElementById('round-' + currentRound.number);
-    if (card) {
-        card.classList.remove('running');
-        card.classList.add(status === 'success' ? 'success' : 'error');
+    console.log('[endRound] Found round card, updating status');
 
-        var statusEl = document.getElementById('round-status-' + currentRound.number);
-        if (statusEl) {
-            statusEl.textContent = status === 'success' ? '✓' : '✗';
-        }
+    // Stop all running timeline rows
+    roundCard.querySelectorAll('.rtl-row.status-running').forEach(function(row) {
+        row.classList.remove('status-running');
+        row.classList.add('status-ok');
+    });
 
-        var timeEl = document.getElementById('round-time-' + currentRound.number);
-        if (timeEl) {
-            var wallMs = currentRound.endTime - currentRound.startTime;
-            timeEl.textContent = formatDuration(wallMs);
-        }
-
-    }
+    // Update round card status
+    roundCard.classList.remove('running');
+    roundCard.classList.add(status === 'success' ? 'success' : 'error');
+    console.log('[endRound] Updated card classes, running removed, ' + (status === 'success' ? 'success' : 'error') + ' added');
 
     currentRound = null;
+    console.log('[endRound] Completed');
 }
 
 function updateRoundMetrics() {

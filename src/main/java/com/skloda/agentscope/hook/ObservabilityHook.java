@@ -1,4 +1,4 @@
-package com.msxf.agentscope.hook;
+package com.skloda.agentscope.hook;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.hook.*;
@@ -183,6 +183,7 @@ public class ObservabilityHook implements Hook {
             data.put("displayName", extractSkillName(paramsStr));
         }
 
+        log.info("[tool_start] {} #{} paramsPreview: {}", toolName, toolNum, paramsPreview);
         emit("tool_start", data);
     }
 
@@ -223,6 +224,7 @@ public class ObservabilityHook implements Hook {
             data.put("isSkill", true);
         }
 
+        log.info("[tool_end] {} durationMs={} success={}", toolName, durationMs, isSuccess);
         emit("tool_end", data);
     }
 

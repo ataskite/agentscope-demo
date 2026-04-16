@@ -99,14 +99,14 @@ parse_pdf(filePath: String) -> String
 
 ### DocxParserTool
 
-- 位置：`com.msxf.agentscope.tool.DocxParserTool`
+- 位置：`tool.com.skloda.agentscope.DocxParserTool`
 - 使用 Apache POI (`XWPFDocument`) 解析 .docx
 - 提取内容：标题层级、段落文本、表格内容
 - 注册为 `@Tool(name = "parse_docx")` 的方法
 
 ### PdfParserTool
 
-- 位置：`com.msxf.agentscope.tool.PdfParserTool`
+- 位置：`tool.com.skloda.agentscope.PdfParserTool`
 - 使用 Apache PDFBox (`PDDocument`) 解析 .pdf
 - 提取内容：页面文本、元数据（标题/作者）
 - 注册为 `@Tool(name = "parse_pdf")` 的方法

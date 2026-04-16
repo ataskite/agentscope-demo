@@ -1,6 +1,6 @@
-package com.msxf.agentscope.agent;
+package com.skloda.agentscope.agent;
 
-import com.msxf.agentscope.tool.ToolRegistry;
+import com.skloda.agentscope.tool.ToolRegistry;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.formatter.dashscope.DashScopeChatFormatter;
 import io.agentscope.core.hook.Hook;

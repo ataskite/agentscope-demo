@@ -441,10 +441,7 @@ git commit -m "config: add multipart file upload limits (50MB)"
 在 AgentService.java 顶部 import 区域添加：
 
 ```java
-import io.agentscope.core.skill.SkillBox;
-import io.agentscope.core.skill.repository.ClasspathSkillRepository;
-import com.msxf.agentscope.tool.DocxParserTool;
-import com.msxf.agentscope.tool.PdfParserTool;
+
 ```
 
 - [x] **Step 2: Add "task" case to createAgent method**

@@ -1,4 +1,4 @@
-package com.msxf.agentscope.agent;
+package com.skloda.agentscope.agent;
 
 import lombok.Getter;
 import lombok.Setter;

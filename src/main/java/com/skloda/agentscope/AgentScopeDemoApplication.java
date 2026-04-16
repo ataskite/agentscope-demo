@@ -1,4 +1,4 @@
-package com.msxf.agentscope;
+package com.skloda.agentscope;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

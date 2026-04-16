@@ -193,6 +193,10 @@ ToolRegistry maps tool/skill names to `Supplier<Object>` instances. It pre-regis
 ```java
 package com.msxf.agentscope.tool;
 
+import com.skloda.agentscope.tool.DocxParserTool;
+import com.skloda.agentscope.tool.PdfParserTool;
+import com.skloda.agentscope.tool.SimpleTools;
+import com.skloda.agentscope.tool.XlsxParserTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -366,7 +370,7 @@ Builds `ReActAgent` instances from `AgentConfig` using `ToolRegistry` for tool/s
 ```java
 package com.msxf.agentscope.config;
 
-import com.msxf.agentscope.tool.ToolRegistry;
+import tool.com.skloda.agentscope.ToolRegistry;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.formatter.dashscope.DashScopeChatFormatter;
 import io.agentscope.core.memory.InMemoryMemory;
