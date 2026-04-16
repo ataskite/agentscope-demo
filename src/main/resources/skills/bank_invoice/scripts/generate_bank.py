@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-天津银行 Excel/Word 生成脚本
+XX银行 Excel/Word 生成脚本
 基于模板生成新的 Excel 和 Word 文件，姓名自动脱敏
 """
 
@@ -34,14 +34,14 @@ def desensitize_name(name: str) -> str:
 
 def generate_filename(name: str, serial: str, date_str: str = None, ext: str = "xlsx") -> str:
     """
-    生成文件名: 天津银行_脱敏姓名_YYMMDD_流水号.扩展名
+    生成文件名: XX银行_脱敏姓名_YYMMDD_流水号.扩展名
     """
     desensitized = desensitize_name(name)
 
     if date_str is None:
         date_str = datetime.now().strftime("%y%m%d")
 
-    return f"天津银行_{desensitized}_{date_str}_{serial}.{ext}"
+    return f"XX银行_{desensitized}_{date_str}_{serial}.{ext}"
 
 
 def generate_excel(
@@ -165,11 +165,11 @@ def generate_word(
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="基于模板生成天津银行 Excel 和 Word 文件（所有参数均为必填）",
+        description="基于模板生成XX银行 Excel 和 Word 文件（所有参数均为必填）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-  python generate_tianjin_bank.py \\
+  python generate_bank.py \\
     --name "张三丰" \\
     --id-card "123456200001011234" \\
     --phone "13800138000" \\
@@ -214,8 +214,8 @@ def main():
 
     # 模板路径
     template_dir = Path(args.template_dir)
-    excel_template = template_dir / 'tianjin_bank_template.xlsx'
-    word_template = template_dir / 'tianjin_bank_template.docx'
+    excel_template = template_dir / 'bank_template.xlsx'
+    word_template = template_dir / 'bank_template.docx'
 
     # 检查模板文件
     if not excel_template.exists():

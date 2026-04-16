@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Spring Boot 3.5.13 + Java 17 demo for AgentScope (v1.0.11), a Java agent framework with LLM-backed ReAct agents. Features multiple agent types: basic chat, tool-calling, document analysis, and template-based document generation (Tianjin Bank Invoice).
+Spring Boot 3.5.13 + Java 17 demo for AgentScope (v1.0.11), a Java agent framework with LLM-backed ReAct agents. Features multiple agent types: basic chat, tool-calling, document analysis, and template-based document generation (Bank Invoice).
 
 ## Build & Run
 
@@ -93,12 +93,12 @@ Register directly via `toolkit.registerTool(new SimpleTools())` or bind via Skil
 5. On send, `filePath` + `fileName` included in `/chat/send` body
 6. `AgentService.streamEvents` prepends file info to message (e.g., `[用户上传了文件: x.docx, 路径: /tmp/...]`)
 
-### Tianjin Bank Invoice Generator
+### Bank Invoice Generator
 
-Specialized agent (`tianjin-bank-invoice`) that generates Excel and Word documents from templates:
+Specialized agent (`bank-invoice`) that generates Excel and Word documents from templates:
 
-- **Tool**: `TianjinBankInvoiceTool.generateInvoice()` with 12 parameters (name, idCard, phone, email, contract, loan, date, amount, bankAmount, feeType, invoice, serial)
-- **Templates**: Located in `skills/tianjin_bank_invoice_java/assets/`
+- **Tool**: `BankInvoiceTool.generateInvoice()` with 12 parameters (name, idCard, phone, email, contract, loan, date, amount, bankAmount, feeType, invoice, serial)
+- **Templates**: Located in `skills/bank_invoice_java/assets/`
 - **Features**: Automatic name desensitization in filenames (张三丰 → 张某某), auto-submission date in Word doc
 - **Output**: Two files saved to `{java.io.tmpdir}/agentscope-uploads/`
 
@@ -129,7 +129,7 @@ src/main/java/com/msxf/agentscope/
     ├── DocxParserTool.java           # DOCX parsing via Apache POI
     ├── PdfParserTool.java            # PDF parsing via Apache PDFBox
     ├── XlsxParserTool.java           # XLSX parsing via Apache POI
-    └── TianjinBankInvoiceTool.java   # Tianjin Bank invoice generation
+    └── BankInvoiceTool.java          # Bank invoice generation
 
 src/main/resources/
 ├── application.yml                   # Config (api-key, multipart limits, logging)
@@ -140,11 +140,11 @@ src/main/resources/
 │   ├── pdf/SKILL.md                  # PDF skill definition
 │   ├── xlsx/SKILL.md                 # XLSX skill definition
 │   ├── docx-template/SKILL.md        # DOCX template skill definition
-│   └── tianjin_bank_invoice_java/    # Tianjin Bank invoice skill
+│   └── bank_invoice_java/            # Bank invoice skill
 │       ├── SKILL.md                  # Skill documentation
 │       └── assets/                   # Template files
-│           ├── tianjin_bank_template.xlsx
-│           └── tianjin_bank_template.docx
+│           ├── bank_template.xlsx
+│           └── bank_template.docx
 └── templates/
     └── chat.html                     # Single-page chat UI (vanilla JS + SSE)
 ```

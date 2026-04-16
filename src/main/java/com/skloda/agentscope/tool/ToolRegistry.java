@@ -51,7 +51,7 @@ public class ToolRegistry {
 
     public ToolRegistry() {
         // Phase A: Auto-discover user tool classes via @Tool annotation scanning
-        autoScanToolClasses("com.msxf.agentscope.tool");
+        autoScanToolClasses("com.skloda.agentscope.tool");
 
         // Phase B: Register AgentScope built-in system tools
         registerSystemTools();

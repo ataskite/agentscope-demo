@@ -9,7 +9,7 @@
   - **Tool Calling**: 带工具调用的 AI 助手（时间、计算器、天气）
   - **Task Agent**: 支持文档解析的智能助手（.docx/.pdf/.xlsx）
   - **Template Editor**: Word 模板变量替换
-  - **Tianjin Bank Invoice**: 天津银行发票自动生成
+  - **Bank Invoice**: 银行发票自动生成
 
 - **响应式流式架构**
   - 基于 Project Reactor 的 SSE 实时推送
@@ -26,7 +26,7 @@
   - PDF 解析（Apache PDFBox）
   - XLSX 解析与生成
   - Word 模板变量替换
-  - 天津银行发票 Excel/Word 自动生成
+  - 银行发票 Excel/Word 自动生成
 
 ## 快速开始
 
@@ -94,10 +94,10 @@ ToolAgent：[调用 get_current_time] [调用 calculate_sum]
 4. 自动生成填充后的文档
 ```
 
-### Tianjin Bank Invoice - 发票生成
+### Bank Invoice - 发票生成
 
 ```
-请帮我生成天津银行发票。
+请帮我生成银行发票。
 客户姓名：张三丰
 身份证号：110101199003072316
 手机：13802213478
@@ -113,8 +113,8 @@ ToolAgent：[调用 get_current_time] [调用 calculate_sum]
 ```
 
 自动生成：
-- **Excel**: `天津银行_张某某_240410_001.xlsx`
-- **Word**: `天津银行_张某某_240410_001.docx`
+- **Excel**: `XX银行_张某某_240410_001.xlsx`
+- **Word**: `XX银行_张某某_240410_001.docx`
 
 ## 项目结构
 
@@ -142,7 +142,7 @@ src/main/java/com/msxf/agentscope/
     ├── DocxParserTool.java       # DOCX 解析
     ├── PdfParserTool.java        # PDF 解析
     ├── XlsxParserTool.java       # XLSX 解析
-    └── TianjinBankInvoiceTool.java # 天津银行发票生成
+    └── BankInvoiceTool.java        # 银行发票生成
 
 src/main/resources/
 ├── skills/                       # 技能定义
@@ -150,7 +150,7 @@ src/main/resources/
 │   ├── pdf/SKILL.md
 │   ├── xlsx/SKILL.md
 │   ├── docx-template/SKILL.md
-│   └── tianjin_bank_invoice_java/
+│   └── bank_invoice_java/
 │       ├── SKILL.md
 │       └── assets/               # 模板文件
 ├── config/
@@ -232,7 +232,7 @@ agents:
 | `tool-test-simple` | Tool Calling | 时间、计算器、天气 |
 | `task-document-analysis` | Task Agent | 文档解析 |
 | `task-template-docx-editor` | Template Editor | Word 模板编辑 |
-| `tianjin-bank-invoice` | Tianjin Bank Invoice | 发票生成 |
+| `bank-invoice` | Bank Invoice | 发票生成 |
 
 ## 添加新技能
 

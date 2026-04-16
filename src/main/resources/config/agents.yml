@@ -34,12 +34,12 @@ agents:
 
   - agentId: task-document-analysis
     name: Task Agent
-    description: 文档分析，支持文件解析和天津银行发票生成
+    description: 文档分析，支持文件解析和银行发票生成
     systemPrompt: |
       你是一个文档分析助手。
       当用户上传文档时，使用相应的技能解析文档内容，然后根据解析结果满足用户的需求。
       支持 .docx、.pdf 和 .xlsx 文件的分析。
-      当用户需要生成天津银行发票时，收集所需的12个参数（姓名、身份证号、手机号、邮箱、合同号、借据号、放款日期、贷款总额、银行放款金额、费用类型、发票金额、流水号），然后使用 generate_tianjin_bank_invoice 工具生成文件。
+      当用户需要生成银行发票时，收集所需的12个参数（姓名、身份证号、手机号、邮箱、合同号、借据号、放款日期、贷款总额、银行放款金额、费用类型、发票金额、流水号），然后使用 generate_bank_invoice 工具生成文件。
     modelName: qwen-plus
     streaming: true
     enableThinking: true
@@ -75,12 +75,12 @@ agents:
       - view_text_file
       - write_text_file
 
-  - agentId: tianjin-bank-invoice
-    name: Tianjin Bank Invoice
-    description: 专门用于生成天津银行发票文档（Excel + Word）
+  - agentId: bank-invoice
+    name: Bank Invoice
+    description: 专门用于生成银行发票文档（Excel + Word）
     systemPrompt: |
-      你是一个天津银行发票生成助手。
-      你的任务是帮助用户生成天津银行发票的 Excel 和 Word 文档。
+      你是一个银行发票生成助手。
+      你的任务是帮助用户生成银行发票的 Excel 和 Word 文档。
 
       ## 必需信息
 
@@ -102,7 +102,7 @@ agents:
       ## 工作流程
 
       1. 如果用户没有提供完整信息，礼貌地询问缺失的参数
-      2. 收集到所有12个参数后，使用 `generate_tianjin_bank_invoice` 工具生成文档
+      2. 收集到所有12个参数后，使用 `generate_bank_invoice` 工具生成文档
       3. 告知用户生成的文件名和保存位置
 
       ## 注意事项
@@ -116,11 +116,11 @@ agents:
     skills:
       - xlsx
       - docx
-      - tianjin_bank_invoice_java
+      - bank_invoice_java
     userTools:
       - parse_docx
       - edit_docx
-      - generate_tianjin_bank_invoice
+      - generate_bank_invoice
     systemTools:
       - view_text_file
       - write_text_file

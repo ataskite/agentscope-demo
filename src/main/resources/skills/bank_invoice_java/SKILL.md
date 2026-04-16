@@ -1,12 +1,12 @@
 ---
-name: tianjin_bank_invoice_java
-description: Generate Tianjin Bank invoice Excel and Word documents from templates. Use when the user needs to create invoice documents for Tianjin Bank with customer information, loan details, and automatic name desensitization in filenames.
-tools: generate_tianjin_bank_invoice
+name: bank_invoice_java
+description: Generate XX Bank invoice Excel and Word documents from templates. Use when the user needs to create invoice documents with customer information, loan details, and automatic name desensitization in filenames.
+tools: generate_bank_invoice
 ---
 
-# Tianjin Bank Invoice Generator (Java)
+# XX Bank Invoice Generator (Java)
 
-Generate Excel and Word invoice documents for Tianjin Bank using predefined templates. The tool automatically handles name desensitization for generated filenames.
+Generate Excel and Word invoice documents for XX Bank using predefined templates. The tool automatically handles name desensitization for generated filenames.
 
 ## What this skill does
 
@@ -18,12 +18,12 @@ Generate Excel and Word invoice documents for Tianjin Bank using predefined temp
 ## File structure
 
 ```
-tianjin_bank_invoice_java/
+bank_invoice_java/
 ├── SKILL.md                              # This file
 ├── assets/
-│   ├── tianjin_bank_template.xlsx        # Excel template
-│   └── tianjin_bank_template.docx        # Word template
-└── (Java implementation in TianjinBankInvoiceTool.java)
+│   ├── bank_template.xlsx                # Excel template
+│   └── bank_template.docx                # Word template
+└── (Java implementation in BankInvoiceTool.java)
 ```
 
 ## Required parameters
@@ -50,7 +50,7 @@ All parameters are required:
 This skill is invoked through the AI agent. Simply provide the required information:
 
 ```
-请帮我生成天津银行发票。
+请帮我生成银行发票。
 客户姓名：张三丰
 身份证号：110101199003072316
 手机：13802213478
@@ -65,16 +65,16 @@ This skill is invoked through the AI agent. Simply provide the required informat
 流水号：001
 ```
 
-The agent will call the `generate_tianjin_bank_invoice` tool with these parameters.
+The agent will call the `generate_bank_invoice` tool with these parameters.
 
 ## Output
 
 Two files will be generated:
 
-1. **Excel**: `天津银行_张某某_YYMMDD_流水号.xlsx`
+1. **Excel**: `XX银行_张某某_YYMMDD_流水号.xlsx`
    - Contains: Name, ID card, phone, contract, loan, date, amounts, fee type, invoice amount, email
 
-2. **Word**: `天津银行_张某某_YYMMDD_流水号.docx`
+2. **Word**: `XX银行_张某某_YYMMDD_流水号.docx`
    - Digital invoice application form
    - Auto-filled with: Name, ID card (tax ID), phone, email, invoice amount, fee summary
    - Application date added automatically
@@ -95,6 +95,6 @@ The rule: Keep the first character (surname), replace all others with "某".
 ## Technical Details
 
 - **Implementation**: Pure Java using Apache POI (XSSFWorkbook for Excel, XWPFDocument for Word)
-- **Tool Class**: `TianjinBankInvoiceTool.java`
+- **Tool Class**: `BankInvoiceTool.java`
 - **Registration**: Auto-registered via `@Tool` annotation scanning
 - **No Python dependencies**: Completely self-contained Java implementation

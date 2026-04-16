@@ -12,9 +12,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.LinkedHashMap;
 
-public class TianjinBankInvoiceTool {
+/**
+ * XX银行发票生成工具
+ * 根据模板生成 Excel 和 Word 文件
+ */
+public class BankInvoiceTool {
 
-    private static final Logger log = LoggerFactory.getLogger(TianjinBankInvoiceTool.class);
+    private static final Logger log = LoggerFactory.getLogger(BankInvoiceTool.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -34,12 +38,12 @@ public class TianjinBankInvoiceTool {
     }
 
     /**
-     * 生成文件名: 天津银行_{脱敏姓名}_{YYMMDD}_{流水号}.扩展名
+     * 生成文件名: XX银行_{脱敏姓名}_{YYMMDD}_{流水号}.扩展名
      */
     private String generateFileName(String name, String serial, String ext) {
         String desensitized = desensitizeName(name);
         String dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
-        return "天津银行_" + desensitized + "_" + dateStr + "_" + serial + "." + ext;
+        return "XX银行_" + desensitized + "_" + dateStr + "_" + serial + "." + ext;
     }
 
     /**
@@ -51,9 +55,9 @@ public class TianjinBankInvoiceTool {
                                  String serial) throws Exception {
         // 加载模板
         InputStream templateStream = getClass().getClassLoader()
-                .getResourceAsStream("skills/tianjin_bank_invoice_java/assets/tianjin_bank_template.xlsx");
+                .getResourceAsStream("skills/bank_invoice_java/assets/bank_template.xlsx");
         if (templateStream == null) {
-            throw new IllegalStateException("Excel模板文件未找到: skills/tianjin_bank_invoice_java/assets/tianjin_bank_template.xlsx");
+            throw new IllegalStateException("Excel模板文件未找到: skills/bank_invoice_java/assets/bank_template.xlsx");
         }
 
         try (templateStream;
@@ -111,9 +115,9 @@ public class TianjinBankInvoiceTool {
                                 String invoice, String feeType, String serial) throws Exception {
         // 加载模板
         InputStream templateStream = getClass().getClassLoader()
-                .getResourceAsStream("skills/tianjin_bank_invoice_java/assets/tianjin_bank_template.docx");
+                .getResourceAsStream("skills/bank_invoice_java/assets/bank_template.docx");
         if (templateStream == null) {
-            throw new IllegalStateException("Word模板文件未找到: skills/tianjin_bank_invoice_java/assets/tianjin_bank_template.docx");
+            throw new IllegalStateException("Word模板文件未找到: skills/bank_invoice_java/assets/bank_template.docx");
         }
 
         try (templateStream) {
@@ -125,7 +129,7 @@ public class TianjinBankInvoiceTool {
             }
             org.apache.poi.xwpf.usermodel.XWPFTable table = document.getTables().get(0);
 
-            // 填充表格数据 (注意: cell(rowIndex, colIndex) 基于Python版推断，可能需要根据实际模板调整)
+            // 填充表格数据
             setTableCell(table, 1, 1, name);           // [1][1] 名称（姓名）
             setTableCell(table, 1, 3, idCard);         // [1][3] 纳税人识别号
             setTableCell(table, 4, 1, name + " " + phone);  // [4][1] 联系人及电话
@@ -187,8 +191,8 @@ public class TianjinBankInvoiceTool {
         para.createRun().setText(value != null ? value : "");
     }
 
-    @Tool(name = "generate_tianjin_bank_invoice",
-          description = "根据天津银行发票模板生成 Excel 和 Word 文件。"
+    @Tool(name = "generate_bank_invoice",
+          description = "根据XX银行发票模板生成 Excel 和 Word 文件。"
                   + "需要提供客户姓名、身份证号、手机号、邮箱、合同号、借据号、"
                   + "放款日期、贷款总额、银行放款金额、费用类型、发票金额、流水号。"
                   + "返回生成的文件路径和文件名。")
@@ -247,11 +251,11 @@ public class TianjinBankInvoiceTool {
                 return "{\"success\":false,\"error\":\"JSON序列化失败\"}";
             }
 
-            log.info("天津银行发票生成完成: Excel={}, Word={}", excelPath, wordPath);
+            log.info("XX银行发票生成完成: Excel={}, Word={}", excelPath, wordPath);
             return jsonResult;
 
         } catch (Exception e) {
-            log.error("生成天津银行发票失败", e);
+            log.error("生成XX银行发票失败", e);
             // 使用 ObjectMapper 进行错误响应序列化
             Map<String, Object> errorResult = new LinkedHashMap<>();
             errorResult.put("success", false);

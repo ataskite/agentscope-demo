@@ -24,9 +24,9 @@
 
 | 模块 | 功能 | 说明 |
 |------|------|------|
-| **Agent 配置** | 5 个预置 Agent | chat-basic, tool-test-simple, task-document-analysis, task-template-docx-editor, tianjin-bank-invoice |
-| **工具系统** | @Tool 注解 + 自动扫描 | SimpleTools, DocxParserTool, PdfParserTool, XlsxParserTool, TianjinBankInvoiceTool |
-| **Skill 系统** | ClasspathSkillRepository | docx, pdf, xlsx, docx-template, tianjin_bank_invoice_java |
+| **Agent 配置** | 5 个预置 Agent | chat-basic, tool-test-simple, task-document-analysis, task-template-docx-editor, bank-invoice |
+| **工具系统** | @Tool 注解 + 自动扫描 | SimpleTools, DocxParserTool, PdfParserTool, XlsxParserTool, BankInvoiceTool |
+| **Skill 系统** | ClasspathSkillRepository | docx, pdf, xlsx, docx-template, bank_invoice_java |
 | **可观测性** | ObservabilityHook | 8 种事件类型（agent_start, llm_start, thinking, llm_end, tool_start, tool_end, agent_end, error） |
 | **流式推送** | SSE + Flux | ChatController 返回 `Flux<ServerSentEvent<String>>` |
 | **文件处理** | 上传/下载 | 支持 .docx, .pdf, .xlsx，UUID 命名，临时目录存储 |

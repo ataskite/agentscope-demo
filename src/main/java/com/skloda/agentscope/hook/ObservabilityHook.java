@@ -239,10 +239,9 @@ public class ObservabilityHook implements Hook {
         ));
     }
 
-    /** Extract skill name from load_skill_through_path params, e.g. "skills/docx/SKILL.md" → "docx" */
     /** Extract skill name from load_skill_through_path params.
      *  e.g. "{skillId=docx_classpath-skills, path=SKILL.md}" → "docx"
-     *  e.g. "{skillId=tianjin_bank_invoice_java_classpath-skills, path=SKILL.md}" → "tianjin_bank_invoice_java"
+     *  e.g. "{skillId=bank_invoice_java_classpath-skills, path=SKILL.md}" → "bank_invoice_java"
      */
     private String extractSkillName(String paramsStr) {
         if (paramsStr == null) return null;

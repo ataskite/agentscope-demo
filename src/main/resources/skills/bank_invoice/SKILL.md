@@ -1,11 +1,11 @@
 ---
-name: tianjin_bank_invoice
-description: Generate Tianjin Bank invoice Excel and Word documents from templates. Use when the user needs to create invoice documents for Tianjin Bank with customer information, loan details, and automatic name desensitization in filenames.
+name: bank_invoice
+description: Generate XX Bank invoice Excel and Word documents from templates. Use when the user needs to create invoice documents with customer information, loan details, and automatic name desensitization in filenames.
 ---
 
-# Tianjin Bank Invoice Generator
+# XX Bank Invoice Generator
 
-Generate Excel and Word invoice documents for Tianjin Bank using predefined templates. The script automatically handles name desensitization for generated filenames.
+Generate Excel and Word invoice documents for XX Bank using predefined templates. The script automatically handles name desensitization for generated filenames.
 
 ## What this skill does
 
@@ -17,13 +17,13 @@ Generate Excel and Word invoice documents for Tianjin Bank using predefined temp
 ## File structure
 
 ```
-tianjin_bank_invoice/
+bank_invoice/
 ├── SKILL.md                    # This file
 ├── scripts/
-│   └── generate_tianjin_bank.py # Python generation script
+│   └── generate_bank.py        # Python generation script
 └── assets/
-    ├── tianjin_bank_template.xlsx  # Excel template
-    └── tianjin_bank_template.docx  # Word template
+    ├── bank_template.xlsx      # Excel template
+    └── bank_template.docx      # Word template
 ```
 
 ## Required parameters
@@ -58,7 +58,7 @@ All parameters are required:
 From the skill directory, run:
 
 ```bash
-python3 scripts/generate_tianjin_bank.py \
+python3 scripts/generate_bank.py \
   --name "张三丰" \
   --id-card "123456200001011234" \
   --phone "13800138000" \
@@ -77,10 +77,10 @@ python3 scripts/generate_tianjin_bank.py \
 
 Two files will be generated:
 
-1. **Excel**: `天津银行_张某某_YYMMDD_流水号.xlsx`
+1. **Excel**: `XX银行_张某某_YYMMDD_流水号.xlsx`
    - Contains: Name, ID card, phone, contract, loan, date, amounts, fee type, invoice amount, email
 
-2. **Word**: `天津银行_张某某_YYMMDD_流水号.docx`
+2. **Word**: `XX银行_张某某_YYMMDD_流水号.docx`
    - Digital invoice application form
    - Auto-filled with: Name, ID card (tax ID), phone, email, invoice amount, fee summary
    - Application date added automatically
