@@ -11,6 +11,13 @@ agents:
     skills: []
     userTools: []
     systemTools: []
+    autoContext: true
+    autoContextMsgThreshold: 30
+    autoContextLastKeep: 10
+    autoContextTokenRatio: 0.3
+    ragEnabled: true
+    ragRetrieveLimit: 3
+    ragScoreThreshold: 0.5
 
   - agentId: tool-test-simple
     name: Tool Calling
@@ -22,6 +29,10 @@ agents:
     modelName: qwen-plus
     streaming: true
     enableThinking: true
+    autoContext: true
+    autoContextMsgThreshold: 30
+    autoContextLastKeep: 10
+    autoContextTokenRatio: 0.3
     skills: []
     userTools:
       - get_current_time
@@ -124,3 +135,327 @@ agents:
     systemTools:
       - view_text_file
       - write_text_file
+
+  - agentId: rag-chat
+    name: RAG Chat
+    description: 基于知识库的智能问答
+    systemPrompt: |
+      你是一个知识库问答助手。
+      当用户提问时，优先从知识库中检索相关文档内容来回答问题。
+      如果知识库中没有相关信息，请明确告知用户。
+      回答时引用知识库中的原文，保持准确性。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    autoContext: true
+    autoContextMsgThreshold: 30
+    autoContextLastKeep: 10
+    autoContextTokenRatio: 0.3
+    ragEnabled: true
+    ragRetrieveLimit: 5
+    ragScoreThreshold: 0.3
+    skills: []
+    userTools: []
+    systemTools: []
+
+  - agentId: vision-analyzer
+    name: Vision Analyzer
+    description: 图片理解和分析
+    systemPrompt: |
+      你是一个视觉分析助手。
+      支持的功能：
+      - OCR 文字识别：从图片中提取文字信息
+      - 图表数据提取：识别图表类型、数据趋势
+      - 场景描述：描述图片中的场景、物体、人物
+      - 物体识别：识别图片中的各种物体
+      - 图片问答：回答关于图片内容的问题
+
+      回答时请：
+      1. 先描述图片的整体内容
+      2. 然后针对用户的具体问题进行回答
+      3. 如果是文字图片，先提取文字内容
+      4. 如果是图表，先说明图表类型，再提取关键数据
+    modelName: qwen-vl-max
+    streaming: true
+    enableThinking: false
+    modality: vision
+    skills: []
+    userTools: []
+    systemTools: []
+
+  - agentId: voice-assistant
+    name: Voice Assistant
+    description: 语音助手
+    systemPrompt: |
+      你是一个语音助手。
+      将用户的语音转为文字，然后理解并回答。
+      回答时保持简洁、自然。
+    modelName: qwen-audio-turbo
+    streaming: true
+    enableThinking: false
+    modality: audio
+    skills: []
+    userTools: []
+    systemTools: []
+
+  - agentId: invoice-extractor
+    name: Invoice Extractor
+    description: 发票信息提取
+    systemPrompt: |
+      你是一个发票信息提取助手。
+      从用户上传的发票图片中提取以下字段：
+      - invoiceNumber: 发票号码
+      - invoiceDate: 开票日期（格式：yyyy-MM-dd）
+      - amount: 金额（数字）
+      - vendor: 销售方名称
+      - taxId: 销售方税号
+      - purchaser: 购买方名称
+      - purchaserTaxId: 购买方税号
+
+      提取后以结构化格式返回，然后简要说明发票的主要信息。
+    modelName: qwen-vl-max
+    streaming: true
+    enableThinking: true
+    modality: vision
+    skills: []
+    userTools: []
+    systemTools: []
+
+  - agentId: idcard-extractor
+    name: ID Card Extractor
+    description: 身份证信息提取
+    systemPrompt: |
+      你是一个身份证信息提取助手。
+      从用户上传的身份证图片中提取以下字段：
+      - name: 姓名
+      - idNumber: 身份证号码
+      - gender: 性别
+      - ethnicity: 民族
+      - birthDate: 出生日期（格式：yyyy-MM-dd）
+      - address: 地址
+      - issuingAuthority: 签发机关
+      - validDate: 有效期（格式：yyyy-MM-dd）
+
+      提取后以结构化格式返回，然后简要说明身份信息。
+    modelName: qwen-vl-max
+    streaming: true
+    enableThinking: true
+    modality: vision
+    skills: []
+    userTools: []
+    systemTools: []
+
+  - agentId: search-assistant
+    name: Search Assistant
+    description: 网络搜索助手 - 实时信息查询
+    systemPrompt: |
+      你是一个网络搜索助手。
+      你可以使用 web_search 工具来搜索实时信息，包括：
+      - 最新新闻和时事
+      - 天气信息
+      - 股票价格
+      - 技术资料和文档
+      - 其他实时信息
+
+      当用户询问需要最新信息的问题时，请使用 web_search 工具。
+      搜索结果会包含标题、链接、内容摘要和相关性评分。
+      请基于搜索结果给出准确、有用的回答。
+
+      可用工具：
+      - web_search: 通用网络搜索
+      - get_current_weather: 获取天气信息
+      - get_stock_price: 获取股票价格
+      - get_news: 获取最新新闻
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    autoContext: true
+    autoContextMsgThreshold: 20
+    autoContextLastKeep: 5
+    autoContextTokenRatio: 0.3
+    skills: []
+    userTools:
+      - web_search
+      - get_current_weather
+      - get_stock_price
+      - get_news
+    systemTools: []
+
+  - agentId: project-planner
+    name: Project Planner
+    description: 项目规划和任务分解助手
+    systemPrompt: |
+      你是一个项目规划助手。
+      你可以帮助用户：
+      1. 将复杂任务分解为具体的步骤
+      2. 制定项目计划和时间表
+      3. 识别任务依赖关系和风险
+      4. 提供执行建议和最佳实践
+
+      当用户提出项目或任务时：
+      1. 首先理解目标和范围
+      2. 将任务分解为可执行的步骤
+      3. 标注每个步骤的优先级和预估时间
+      4. 识别潜在的依赖和风险
+      5. 提供清晰的行动计划
+
+      回答格式：
+      - 使用清晰的标题和步骤编号
+      - 标注优先级（高/中/低）
+      - 标注预估时间
+      - 提供必要的说明和建议
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    autoContext: true
+    autoContextMsgThreshold: 20
+    autoContextLastKeep: 8
+    autoContextTokenRatio: 0.3
+    skills: []
+    userTools: []
+    systemTools:
+      - plan_notebook
+
+# ============================================================
+# Phase 3: Multi-Agent Collaboration Configurations
+# ============================================================
+
+# === Expert Agents (used as sub-agents by Router and Handoffs) ===
+
+- agentId: doc-expert
+  name: 文档专家
+  description: 处理文档解析、分析、提取
+  systemPrompt: |
+    你是一个文档分析专家。
+    你可以解析 .docx、.pdf、.xlsx 文件，提取关键信息并进行分析。
+    当收到文档相关问题时，使用你的工具解析文档内容。
+  modelName: qwen-plus
+  streaming: true
+  enableThinking: true
+  skills: [docx, pdf, xlsx]
+  userTools: [parse_docx, parse_pdf, parse_xlsx]
+
+- agentId: search-expert
+  name: 搜索专家
+  description: 获取实时网络信息
+  systemPrompt: |
+    你是一个搜索专家。
+    你可以搜索网络获取最新信息，包括新闻、天气、股票等。
+  modelName: qwen-plus
+  streaming: true
+  enableThinking: true
+  userTools: [web_search, get_current_weather, get_news]
+
+- agentId: vision-expert
+  name: 视觉专家
+  description: 图片理解和 OCR
+  systemPrompt: |
+    你是一个视觉专家。
+    你可以理解图片内容，进行 OCR 文字识别、图表分析等。
+  modelName: qwen-vl-max
+  streaming: true
+  enableThinking: false
+  modality: vision
+
+- agentId: sales-expert
+  name: 销售专家
+  description: 产品咨询和报价
+  systemPrompt: |
+    你是一个销售专家。
+    你可以回答产品相关问题，提供报价和购买建议。
+  modelName: qwen-plus
+  streaming: true
+  enableThinking: true
+
+- agentId: support-agent
+  name: 客服专员
+  description: 一般客服咨询
+  systemPrompt: |
+    你是一个客服专员。
+    你可以回答一般性问题，帮助用户解决问题。
+  modelName: qwen-plus
+  streaming: true
+  enableThinking: true
+
+- agentId: sales-agent
+  name: 销售顾问
+  description: 销售咨询
+  systemPrompt: |
+    你是一个销售顾问。
+    你可以提供产品咨询、报价和购买建议。
+  modelName: qwen-plus
+  streaming: true
+  enableThinking: true
+
+- agentId: complaint-agent
+  name: 投诉处理
+  description: 处理客户投诉
+  systemPrompt: |
+    你是一个投诉处理专员。
+    你可以倾听客户的投诉，并提供解决方案。
+  modelName: qwen-plus
+  streaming: true
+  enableThinking: true
+
+# === Multi-Agent: Sequential Pipeline ===
+
+- agentId: doc-analysis-pipeline
+  type: SEQUENTIAL
+  name: 文档分析流水线
+  description: 串行执行文档解析、信息提取、报告生成
+  modelName: qwen-plus
+  streaming: true
+  enableThinking: true
+  subAgents:
+    - agentId: doc-expert
+      description: 解析文档内容
+    - agentId: search-expert
+      description: 搜索补充信息
+  parallel: false
+
+# === Multi-Agent: Routing ===
+
+- agentId: smart-router
+  type: ROUTING
+  name: 智能路由器
+  description: 根据用户问题自动分发到专家 Agent
+  modelName: qwen-plus
+  streaming: true
+  enableThinking: true
+  subAgents:
+    - agentId: doc-expert
+      description: 文档分析专家，处理文档解析、分析、提取相关问题
+    - agentId: search-expert
+      description: 搜索专家，获取实时网络信息
+    - agentId: vision-expert
+      description: 视觉专家，处理图片理解和 OCR
+    - agentId: sales-expert
+      description: 销售专家，处理产品咨询和报价
+  parallel: false
+
+# === Multi-Agent: Handoffs ===
+
+- agentId: customer-service
+  type: HANDOFFS
+  name: 智能客服
+  description: 支持智能体交接的客服系统
+  modelName: qwen-plus
+  streaming: true
+  enableThinking: true
+  subAgents:
+    - agentId: support-agent
+      description: 一般客服
+    - agentId: sales-agent
+      description: 销售顾问
+    - agentId: complaint-agent
+      description: 投诉处理
+  handoffTriggers:
+    - type: INTENT
+      keywords: ["转销售", "购买", "价格", "报价"]
+      target: sales-agent
+    - type: INTENT
+      keywords: ["投诉", "不满"]
+      target: complaint-agent
+    - type: EXPLICIT
+      keywords: ["转人工", "客服"]
+      target: support-agent
