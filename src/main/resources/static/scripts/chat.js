@@ -4,7 +4,10 @@ let isStreaming = false;
 let currentAbortController = null;
 let messageCount = 0;
 let uploadedFile = null;
+let uploadedImages = [];  // Array of {fileId, fileName, filePath, fileType}
+let uploadedAudio = null;  // {fileId, fileName, filePath, fileType}
 let agentRawMarkdown = '';  // Accumulated raw markdown for current agent response
+let currentSessionId = null;  // Active session ID
 
 const agents = {};
 
@@ -43,12 +46,168 @@ if (typeof marked !== 'undefined') {
 }
 
 function renderMarkdown(text) {
+    // Check if text contains structured data
+    var structuredData = extractStructuredData(text);
+    if (structuredData) {
+        return renderStructuredData(structuredData, text);
+    }
+
     if (typeof marked !== 'undefined') {
         return marked.parse(text);
     }
     var div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Extract structured data from text (JSON or special format)
+function extractStructuredData(text) {
+    // Try to find JSON in code blocks
+    var jsonMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+    if (jsonMatch) {
+        try {
+            return JSON.parse(jsonMatch[1]);
+        } catch (e) {
+            // Not valid JSON, continue
+        }
+    }
+
+    // Try to find raw JSON
+    try {
+        if (text.trim().startsWith('{') && text.trim().endsWith('}')) {
+            return JSON.parse(text);
+        }
+    } catch (e) {
+        // Not valid JSON
+    }
+
+    return null;
+}
+
+// Render structured data as a table
+function renderStructuredData(data, originalText) {
+    var html = '';
+
+    // Add export button
+    html += '<div class="structured-data-actions">' +
+        '<button class="export-btn" onclick="exportStructuredData(this)" data-data=\'' + JSON.stringify(data).replace(/'/g, "\\'") + '\'">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
+        '导出 JSON</button>' +
+        '</div>';
+
+    // Render as table
+    if (typeof data === 'object' && data !== null) {
+        if (Array.isArray(data)) {
+            // Array of objects
+            if (data.length > 0 && typeof data[0] === 'object') {
+                html += renderObjectTable(data);
+            } else {
+                // Simple array
+                html += '<div class="structured-data-list">' +
+                    data.map(function(item) { return '<div class="structured-data-item">' + escapeHtml(String(item)) + '</div>'; }).join('') +
+                    '</div>';
+            }
+        } else {
+            // Single object
+            html += renderObjectTable([data]);
+        }
+    }
+
+    // Add original text as markdown if available
+    if (originalText && originalText !== JSON.stringify(data)) {
+        html += '<div class="structured-data-original">';
+        if (typeof marked !== 'undefined') {
+            html += marked.parse(originalText);
+        } else {
+            html += '<p>' + escapeHtml(originalText) + '</p>';
+        }
+        html += '</div>';
+    }
+
+    return html;
+}
+
+// Render array of objects as table
+function renderObjectTable(dataArray) {
+    if (!dataArray || dataArray.length === 0) {
+        return '<div class="structured-data-empty">无数据</div>';
+    }
+
+    // Get all unique keys from all objects
+    var keys = {};
+    dataArray.forEach(function(obj) {
+        if (typeof obj === 'object' && obj !== null) {
+            Object.keys(obj).forEach(function(key) {
+                keys[key] = true;
+            });
+        }
+    });
+    var columns = Object.keys(keys);
+
+    if (columns.length === 0) {
+        return '<div class="structured-data-empty">无数据字段</div>';
+    }
+
+    var html = '<div class="structured-data-table-wrapper"><table class="structured-data-table">';
+
+    // Header
+    html += '<thead><tr>';
+    columns.forEach(function(col) {
+        html += '<th>' + escapeHtml(col) + '</th>';
+    });
+    html += '</tr></thead>';
+
+    // Body
+    html += '<tbody>';
+    dataArray.forEach(function(row) {
+        html += '<tr>';
+        columns.forEach(function(col) {
+            var value = row[col];
+            var displayValue = formatValue(value);
+            html += '<td>' + displayValue + '</td>';
+        });
+        html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+
+    return html;
+}
+
+// Format value for display
+function formatValue(value) {
+    if (value === null || value === undefined) {
+        return '<span class="value-null">-</span>';
+    }
+    if (typeof value === 'object') {
+        return '<code class="value-object">' + escapeHtml(JSON.stringify(value)) + '</code>';
+    }
+    if (typeof value === 'number') {
+        return '<span class="value-number">' + escapeHtml(String(value)) + '</span>';
+    }
+    if (typeof value === 'boolean') {
+        return '<span class="value-boolean">' + (value ? '是' : '否') + '</span>';
+    }
+    return escapeHtml(String(value));
+}
+
+// Export structured data as JSON file
+function exportStructuredData(btn) {
+    var dataStr = btn.getAttribute('data-data');
+    try {
+        var data = JSON.parse(dataStr);
+        var jsonStr = JSON.stringify(data, null, 2);
+        var blob = new Blob([jsonStr], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'structured-data-' + Date.now() + '.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        console.error('Export failed:', e);
+    }
 }
 
 /* ===== DOM REFERENCES ===== */
@@ -118,7 +277,7 @@ function showAgentConfig(agentId) {
     var skillsHtml;
     if (config.skills && config.skills.length > 0) {
         skillsHtml = '<div class="config-field-value tags">' +
-            config.skills.map(function(s) { return '<span class="config-tag" onclick="showSkillInfo(\'' + escapeHtml(s) + '\')">' + escapeHtml(s) + '</span>'; }).join('') +
+            config.skills.map(function(s) { return '<span class="config-tag" onclick="showSkillInfo(\'' + String(s).replace(/'/g, "\\'").replace(/"/g, '\\"') + '\')">' + escapeHtml(s) + '</span>'; }).join('') +
             '</div>';
     } else {
         skillsHtml = '<div class="config-field-value tags"><span class="config-tag none">None</span></div>';
@@ -127,7 +286,7 @@ function showAgentConfig(agentId) {
     var userToolsHtml;
     if (config.userTools && config.userTools.length > 0) {
         userToolsHtml = '<div class="config-field-value tags">' +
-            config.userTools.map(function(t) { return '<span class="config-tag tool" onclick="showToolInfo(\'' + escapeHtml(t) + '\')">' + escapeHtml(t) + '</span>'; }).join('') +
+            config.userTools.map(function(t) { return '<span class="config-tag tool" onclick="showToolInfo(\'' + String(t).replace(/'/g, "\\'").replace(/"/g, '\\"') + '\')">' + escapeHtml(t) + '</span>'; }).join('') +
             '</div>';
     } else {
         userToolsHtml = '<div class="config-field-value tags"><span class="config-tag none">None</span></div>';
@@ -136,7 +295,7 @@ function showAgentConfig(agentId) {
     var systemToolsHtml;
     if (config.systemTools && config.systemTools.length > 0) {
         systemToolsHtml = '<div class="config-field-value tags">' +
-            config.systemTools.map(function(t) { return '<span class="config-tag system-tool" onclick="showToolInfo(\'' + escapeHtml(t) + '\')">' + escapeHtml(t) + '</span>'; }).join('') +
+            config.systemTools.map(function(t) { return '<span class="config-tag system-tool" onclick="showToolInfo(\'' + String(t).replace(/'/g, "\\'").replace(/"/g, '\\"') + '\')">' + escapeHtml(t) + '</span>'; }).join('') +
             '</div>';
     } else {
         systemToolsHtml = '<div class="config-field-value tags"><span class="config-tag none">None</span></div>';
@@ -239,7 +398,7 @@ async function showSkillInfo(skillName) {
                 '<div class="config-field-label">Available Tools</div>' +
                 '<div class="config-field-value tags">';
             info.tools.forEach(function(t) {
-                content += '<span class="config-tag tool" onclick="showToolInfo(\'' + escapeHtml(t.name) + '\')">' + escapeHtml(t.name) + '</span>';
+                content += '<span class="config-tag tool" onclick="showToolInfo(\'' + String(t.name).replace(/'/g, "\\'").replace(/"/g, '\\"') + '\')">' + escapeHtml(t.name) + '</span>';
             });
             content += '</div></div>';
         }
@@ -388,12 +547,15 @@ function selectAgent(agentId) {
     thinkingContent = '';
     currentFileInfo = null;
     agentRawMarkdown = '';
+
+    // Auto-create a new session for this agent
+    createNewSession();
 }
 
 async function sendMessage() {
     var input = messageInput;
     var message = input.value.trim();
-    if ((!message && !uploadedFile) || isStreaming) return;
+    if ((!message && !uploadedFile && uploadedImages.length === 0 && !uploadedAudio) || isStreaming) return;
 
     chatEmpty.style.display = 'none';
 
@@ -401,14 +563,22 @@ async function sendMessage() {
         body.classList.add('collapsed');
     });
 
-    appendMessage('user', message, uploadedFile);
+    // Build user message with media info
+    var mediaInfo = {
+        file: uploadedFile,
+        images: uploadedImages.length > 0 ? uploadedImages : null,
+        audio: uploadedAudio
+    };
+    appendMessage('user', message, mediaInfo);
     messageCount++;
 
     input.value = '';
     input.style.height = 'auto';
 
     var fileInfo = uploadedFile;
-    removeFile();
+    var imagesCopy = uploadedImages.slice();
+    var audioCopy = uploadedAudio;
+    clearAllMedia();
     setStreamingState(true);
 
     // Ensure clean state before starting new round
@@ -440,15 +610,31 @@ async function sendMessage() {
     try {
         currentAbortController = new AbortController();
 
+        // Build request payload with multi-modal support
+        var payload = {
+            agentId: currentAgent,
+            message: message,
+            filePath: fileInfo ? fileInfo.filePath : null,
+            fileName: fileInfo ? fileInfo.fileName : null,
+            sessionId: currentSessionId || null
+        };
+
+        // Add images if any
+        if (imagesCopy.length > 0) {
+            payload.images = imagesCopy.map(function(img) {
+                return { path: img.filePath, fileName: img.fileName };
+            });
+        }
+
+        // Add audio if any
+        if (audioCopy) {
+            payload.audio = { path: audioCopy.filePath, fileName: audioCopy.fileName };
+        }
+
         var response = await fetch('/chat/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                agentId: currentAgent,
-                message: message,
-                filePath: fileInfo ? fileInfo.filePath : null,
-                fileName: fileInfo ? fileInfo.fileName : null
-            }),
+            body: JSON.stringify(payload),
             signal: currentAbortController.signal
         });
 
@@ -619,13 +805,13 @@ async function sendMessage() {
                                     tRow.classList.add(teDurMs >= 0 ? 'status-ok' : 'status-fail');
                                     targetRound._currentToolRow = null;
                                 } else {
-                                    console.warn('[tool_end] No _currentToolRow for round #' + targetRound.number, payload:', payload);
+                                    console.warn('[tool_end] No _currentToolRow for round #' + targetRound.number, 'payload:', payload);
                                 }
 
                                 var metricsEl2 = document.getElementById('round-metrics-' + targetRound.number);
                                 if (metricsEl2) updateRoundMetricsForRound(targetRound);
                             } else {
-                                console.warn('[tool_end] No targetRound available! payload:', payload);
+                                console.warn('[tool_end] No targetRound available!', 'payload:', payload);
                             }
                             break;
 
@@ -669,6 +855,24 @@ async function sendMessage() {
                             isStreaming = false;
                             setStreamingState(false);
                             scrollToBottom(chatMessages);
+                            break;
+
+                        // ===== MULTI-AGENT EVENTS =====
+
+                        case 'pipeline_start':
+                            handlePipelineStart(payload);
+                            break;
+                        case 'pipeline_step_start':
+                            handlePipelineStepStart(payload);
+                            break;
+                        case 'pipeline_step_end':
+                            handlePipelineStepEnd(payload);
+                            break;
+                        case 'routing_decision':
+                            handleRoutingDecision(payload);
+                            break;
+                        case 'handoff_start':
+                            handleHandoffStart(payload);
                             break;
                     }
                 }
@@ -718,10 +922,55 @@ function appendMessage(role, text, fileInfo) {
     var content = document.createElement('div');
     content.className = 'message-content';
 
+    // Handle media info (can be fileInfo object or mediaInfo object with file/images/audio)
     if (fileInfo && role === 'user') {
-        var fileListNode = document.createElement('div');
-        fileListNode.innerHTML = createFileList(fileInfo);
-        content.appendChild(fileListNode.firstChild);
+        // Handle legacy fileInfo (document file)
+        if (fileInfo.fileName && !fileInfo.images && !fileInfo.audio) {
+            var fileListNode = document.createElement('div');
+            fileListNode.innerHTML = createFileList(fileInfo);
+            content.appendChild(fileListNode.firstChild);
+        }
+        // Handle new mediaInfo structure
+        else {
+            // Document file
+            if (fileInfo.file) {
+                var fileListNode = document.createElement('div');
+                fileListNode.innerHTML = createFileList(fileInfo.file);
+                content.appendChild(fileListNode.firstChild);
+            }
+            // Images
+            if (fileInfo.images && fileInfo.images.length > 0) {
+                var imagesContainer = document.createElement('div');
+                imagesContainer.className = 'message-images';
+                fileInfo.images.forEach(function(img) {
+                    var imgWrapper = document.createElement('div');
+                    imgWrapper.className = 'message-image-wrapper';
+                    var imgEl = document.createElement('img');
+                    imgEl.src = '/chat/download?fileId=' + img.fileId;
+                    imgEl.alt = escapeHtml(img.fileName);
+                    imgEl.onclick = function() {
+                        showImageModal(img); // Use the image from the array
+                    };
+                    imgWrapper.appendChild(imgEl);
+                    imagesContainer.appendChild(imgWrapper);
+                });
+                content.appendChild(imagesContainer);
+            }
+            // Audio
+            if (fileInfo.audio) {
+                var audioContainer = document.createElement('div');
+                audioContainer.className = 'message-audio';
+                var audioEl = document.createElement('audio');
+                audioEl.controls = true;
+                audioEl.src = '/chat/download?fileId=' + fileInfo.audio.fileId;
+                var audioLabel = document.createElement('div');
+                audioLabel.className = 'message-audio-label';
+                audioLabel.textContent = escapeHtml(fileInfo.audio.fileName);
+                audioContainer.appendChild(audioEl);
+                audioContainer.appendChild(audioLabel);
+                content.appendChild(audioContainer);
+            }
+        }
     }
 
     var bubble = document.createElement('div');
@@ -1077,20 +1326,11 @@ function clearDebug() {
 
 function clearSession() {
     if (isStreaming) return;
-    chatMessages.innerHTML = '';
-    messageCount = 0;
-    agentRawMarkdown = '';
-    currentThinkingBox = null;
-    currentAgentMessageWrapper = null;
-    thinkingContent = '';
-    currentFileInfo = null;
-    chatMessages.appendChild(chatEmpty);
-    chatEmpty.style.display = 'flex';
-    removeFile();
-    debugRounds.innerHTML = '';
-    rounds = [];
-    currentRound = null;
-    roundNumber = 0;
+    if (currentSessionId) {
+        deleteSession(currentSessionId);
+    } else {
+        clearChatArea();
+    }
 }
 
 function scrollToBottom(element) {
@@ -1132,7 +1372,16 @@ function handleFileSelect(input) {
     if (!file) return;
 
     var lowerName = file.name.toLowerCase();
-    if (!lowerName.endsWith('.docx') && !lowerName.endsWith('.pdf') && !lowerName.endsWith('.xlsx')) {
+
+    // Check file type
+    var isDoc = lowerName.endsWith('.docx') || lowerName.endsWith('.pdf') || lowerName.endsWith('.xlsx');
+    var isImage = lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg') ||
+                  lowerName.endsWith('.png') || lowerName.endsWith('.gif') ||
+                  lowerName.endsWith('.webp');
+    var isAudio = lowerName.endsWith('.wav') || lowerName.endsWith('.mp3') ||
+                  lowerName.endsWith('.m4a') || lowerName.endsWith('.mp4');
+
+    if (!isDoc && !isImage && !isAudio) {
         input.value = '';
         return;
     }
@@ -1147,16 +1396,35 @@ function handleFileSelect(input) {
     .then(function(response) { return response.json(); })
     .then(function(data) {
         if (data.error) {
+            console.error('Upload error:', data.error);
             return;
         }
-        if (currentAgent !== 'task.document-analysis') {
-            selectAgent('task.document-analysis');
+
+        // Handle based on file type
+        if (isDoc) {
+            if (currentAgent !== 'task-document-analysis') {
+                selectAgent('task-document-analysis');
+            }
+            uploadedFile = data;
+            showFileTag(data.fileName);
+        } else if (isImage) {
+            uploadedImages.push(data);
+            showImagePreviews();
+            // Auto-switch to vision agent if available
+            if (agents['vision-analyzer']) {
+                selectAgent('vision-analyzer');
+            }
+        } else if (isAudio) {
+            uploadedAudio = data;
+            showAudioPreview();
+            // Auto-switch to voice agent if available
+            if (agents['voice-assistant']) {
+                selectAgent('voice-assistant');
+            }
         }
-        uploadedFile = data;
-        showFileTag(data.fileName);
     })
     .catch(function(err) {
-        // Upload error
+        console.error('Upload error:', err);
     });
 
     input.value = '';
@@ -1170,8 +1438,88 @@ function showFileTag(fileName) {
         '</div>';
 }
 
+function showImagePreviews() {
+    var area = document.getElementById('fileTagArea');
+    var html = '';
+
+    // Show document file if any
+    if (uploadedFile) {
+        html += '<div class="file-tag">' +
+            '<span class="file-tag-name">' + escapeHtml(uploadedFile.fileName) + '</span>' +
+            '<span class="file-tag-remove" onclick="removeFile()">×</span>' +
+            '</div>';
+    }
+
+    // Show images
+    uploadedImages.forEach(function(img, index) {
+        html += '<div class="file-tag image-tag">' +
+            '<span class="file-tag-name image-preview" onclick="showImageModal(' + index + ')">' + escapeHtml(img.fileName) + '</span>' +
+            '<span class="file-tag-remove" onclick="removeImage(' + index + ')">×</span>' +
+            '</div>';
+    });
+
+    // Show audio if any
+    if (uploadedAudio) {
+        html += '<div class="file-tag audio-tag">' +
+            '<span class="file-tag-name">' + escapeHtml(uploadedAudio.fileName) + '</span>' +
+            '<span class="file-tag-remove" onclick="removeAudio()">×</span>' +
+            '</div>';
+    }
+
+    area.innerHTML = html;
+}
+
+function showAudioPreview() {
+    showImagePreviews(); // Reuse the same function
+}
+
 function removeFile() {
     uploadedFile = null;
+    showImagePreviews();
+}
+
+function removeImage(index) {
+    uploadedImages.splice(index, 1);
+    showImagePreviews();
+}
+
+function removeAudio() {
+    uploadedAudio = null;
+    showImagePreviews();
+}
+
+function showImageModal(index) {
+    var img = uploadedImages[index];
+    if (!img) return;
+
+    var overlay = document.createElement('div');
+    overlay.className = 'image-modal-overlay';
+    overlay.id = 'imageModal';
+    overlay.onclick = function(e) {
+        if (e.target === overlay) closeImageModal();
+    };
+
+    overlay.innerHTML =
+        '<div class="image-modal-content">' +
+            '<button class="image-modal-close" onclick="closeImageModal()">×</button>' +
+            '<img src="/chat/download?fileId=' + img.fileId + '" alt="' + escapeHtml(img.fileName) + '">' +
+            '<div class="image-modal-filename">' + escapeHtml(img.fileName) + '</div>' +
+        '</div>';
+
+    document.body.appendChild(overlay);
+}
+
+function closeImageModal() {
+    var modal = document.getElementById('imageModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function clearAllMedia() {
+    uploadedFile = null;
+    uploadedImages = [];
+    uploadedAudio = null;
     document.getElementById('fileTagArea').innerHTML = '';
 }
 
@@ -1212,8 +1560,231 @@ function createFileList(fileInfo) {
         '</div>';
 }
 
+/* ===== SESSION MANAGEMENT ===== */
+async function loadSessions() {
+    try {
+        var response = await fetch('/api/sessions');
+        var sessions = await response.json();
+        var listEl = document.getElementById('sessionList');
+        listEl.innerHTML = '';
+
+        sessions.forEach(function(s) {
+            var item = document.createElement('div');
+            item.className = 'session-item' + (s.sessionId === currentSessionId ? ' active' : '');
+            item.dataset.sessionId = s.sessionId;
+            item.onclick = function() { selectSession(s.sessionId, s.agentId); };
+
+            var preview = s.agentName || s.agentId || 'Unknown';
+            if (s.messageCount > 0) {
+                preview += ' <span class="session-msg-count">(' + s.messageCount + ')</span>';
+            }
+
+            item.innerHTML =
+                '<div class="session-item-info">' +
+                    '<div class="session-item-name">' + preview + '</div>' +
+                    '<div class="session-item-time">' + (s.lastAccessedAt || '') + '</div>' +
+                '</div>' +
+                '<button class="session-item-delete" onclick="event.stopPropagation(); deleteSession(\'' + s.sessionId + '\')">×</button>';
+
+            listEl.appendChild(item);
+        });
+    } catch (err) {
+        console.error('Failed to load sessions', err);
+    }
+}
+
+async function createNewSession() {
+    if (!currentAgent) return;
+    try {
+        var response = await fetch('/api/sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agentId: currentAgent })
+        });
+        var data = await response.json();
+        if (data.sessionId) {
+            currentSessionId = data.sessionId;
+            clearChatArea();
+            loadSessions();
+        }
+    } catch (err) {
+        console.error('Failed to create session', err);
+    }
+}
+
+async function selectSession(sessionId, agentId) {
+    if (isStreaming) return;
+
+    // Switch agent if needed
+    if (agentId && agentId !== currentAgent) {
+        selectAgent(agentId);
+    }
+
+    currentSessionId = sessionId;
+    clearChatArea();
+    loadSessions();
+}
+
+async function deleteSession(sessionId) {
+    if (isStreaming) return;
+    try {
+        await fetch('/api/sessions/' + sessionId, { method: 'DELETE' });
+        if (currentSessionId === sessionId) {
+            currentSessionId = null;
+            clearChatArea();
+        }
+        loadSessions();
+    } catch (err) {
+        console.error('Failed to delete session', err);
+    }
+}
+
+function clearChatArea() {
+    chatMessages.innerHTML = '';
+    messageCount = 0;
+    agentRawMarkdown = '';
+    currentThinkingBox = null;
+    currentAgentMessageWrapper = null;
+    thinkingContent = '';
+    currentFileInfo = null;
+    chatMessages.appendChild(chatEmpty);
+    chatEmpty.style.display = 'flex';
+    removeFile();
+    debugRounds.innerHTML = '';
+    rounds = [];
+    currentRound = null;
+    roundNumber = 0;
+}
+
+/* ===== KNOWLEDGE MANAGEMENT ===== */
+async function loadKnowledgeDocs() {
+    try {
+        var response = await fetch('/api/knowledge/documents');
+        var docs = await response.json();
+        var docsEl = document.getElementById('knowledgeDocs');
+        docsEl.innerHTML = '';
+
+        if (docs.length === 0) {
+            docsEl.innerHTML = '<div class="knowledge-empty">No documents</div>';
+            return;
+        }
+
+        docs.forEach(function(name) {
+            var item = document.createElement('div');
+            item.className = 'knowledge-doc-item';
+            item.innerHTML =
+                '<span class="knowledge-doc-name">' + escapeHtml(name) + '</span>' +
+                '<button class="session-item-delete" onclick="removeKnowledgeDoc(\'' + escapeHtml(name) + '\')">×</button>';
+            docsEl.appendChild(item);
+        });
+    } catch (err) {
+        console.error('Failed to load knowledge docs', err);
+    }
+}
+
+async function uploadToKnowledge(input) {
+    var file = input.files[0];
+    if (!file) return;
+
+    var formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        var response = await fetch('/api/knowledge/upload', {
+            method: 'POST',
+            body: formData
+        });
+        var data = await response.json();
+        if (data.error) {
+            console.error('Knowledge upload error:', data.error);
+            return;
+        }
+        loadKnowledgeDocs();
+    } catch (err) {
+        console.error('Knowledge upload failed', err);
+    }
+
+    input.value = '';
+}
+
+async function removeKnowledgeDoc(fileName) {
+    try {
+        await fetch('/api/knowledge/documents/' + encodeURIComponent(fileName), { method: 'DELETE' });
+        loadKnowledgeDocs();
+    } catch (err) {
+        console.error('Failed to remove knowledge doc', err);
+    }
+}
+
+/* ===== MULTI-AGENT EVENT HANDLERS ===== */
+
+function handlePipelineStart(data) {
+    var debugRounds = document.getElementById('debugRounds');
+    if (!debugRounds) return;
+    var pipelineDiv = document.createElement('div');
+    pipelineDiv.className = 'debug-pipeline';
+    pipelineDiv.id = 'pipeline-' + Date.now();
+    pipelineDiv.innerHTML = '<div class="debug-pipeline-header">' +
+        '<span class="debug-pipeline-title">Pipeline: ' + escapeHtml(data.pipelineId || '') + '</span>' +
+        '<span class="debug-pipeline-steps">' + (data.subAgents ? data.subAgents.length : 0) + ' steps</span>' +
+        '</div>' +
+        '<div class="debug-pipeline-steps-container" id="' + pipelineDiv.id + '-steps"></div>';
+    debugRounds.appendChild(pipelineDiv);
+}
+
+function handlePipelineStepStart(data) {
+    var container = document.querySelector('.debug-pipeline-steps-container:last-child');
+    if (!container) return;
+    var stepDiv = document.createElement('div');
+    stepDiv.className = 'debug-pipeline-step active';
+    stepDiv.id = 'step-' + data.stepIndex;
+    stepDiv.innerHTML = '<span class="debug-step-number">' + (data.stepIndex + 1) + '</span>' +
+        '<span class="debug-step-agent">' + escapeHtml(data.agentId || '') + '</span>' +
+        '<span class="debug-step-status">Running...</span>';
+    container.appendChild(stepDiv);
+}
+
+function handlePipelineStepEnd(data) {
+    var stepDiv = document.getElementById('step-' + data.stepIndex);
+    if (stepDiv) {
+        stepDiv.classList.remove('active');
+        stepDiv.classList.add('complete');
+        var statusSpan = stepDiv.querySelector('.debug-step-status');
+        if (statusSpan) statusSpan.textContent = 'Done (' + (data.duration_ms || 0) + 'ms)';
+    }
+}
+
+function handleRoutingDecision(data) {
+    var debugRounds = document.getElementById('debugRounds');
+    if (!debugRounds) return;
+    var routingDiv = document.createElement('div');
+    routingDiv.className = 'debug-routing';
+    routingDiv.innerHTML = '<div class="debug-routing-header">' +
+        '<span class="debug-routing-title">Routing Decision</span></div>' +
+        '<div class="debug-routing-content">' +
+        '<div class="debug-routing-selected"><span class="debug-routing-label">Selected:</span> ' +
+        '<span class="debug-routing-agent">' + escapeHtml(data.selectedAgent || '') + '</span></div>' +
+        '<div class="debug-routing-reasoning"><span class="debug-routing-label">Reasoning:</span> ' +
+        '<span class="debug-routing-text">' + escapeHtml(data.reasoning || '') + '</span></div></div>';
+    debugRounds.appendChild(routingDiv);
+}
+
+function handleHandoffStart(data) {
+    var debugRounds = document.getElementById('debugRounds');
+    if (!debugRounds) return;
+    var handoffDiv = document.createElement('div');
+    handoffDiv.className = 'debug-handoff';
+    handoffDiv.innerHTML = '<div class="debug-handoff-header">' +
+        '<span class="debug-handoff-icon">\u2192</span>' +
+        '<span class="debug-handoff-text">Handoff: <strong>' + escapeHtml(data.fromAgent || '') + '</strong> \u2192 <strong>' + escapeHtml(data.toAgent || '') + '</strong></span></div>' +
+        '<div class="debug-handoff-reason">Reason: ' + escapeHtml(data.reason || '') + '</div>';
+    debugRounds.appendChild(handoffDiv);
+}
+
 /* ===== INIT ===== */
 loadAgents();
+loadSessions();
+loadKnowledgeDocs();
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         closeConfigModal();
