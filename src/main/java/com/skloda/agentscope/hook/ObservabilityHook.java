@@ -32,6 +32,18 @@ public class ObservabilityHook implements Hook {
     private static final Logger log = LoggerFactory.getLogger(ObservabilityHook.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
+    // Multi-agent events
+    public static final String PIPELINE_START = "pipeline_start";
+    public static final String PIPELINE_STEP_START = "pipeline_step_start";
+    public static final String PIPELINE_STEP_END = "pipeline_step_end";
+    public static final String PIPELINE_END = "pipeline_end";
+    public static final String ROUTING_START = "routing_start";
+    public static final String ROUTING_DECISION = "routing_decision";
+    public static final String ROUTING_END = "routing_end";
+    public static final String HANDOFF_START = "handoff_start";
+    public static final String HANDOFF_COMPLETE = "handoff_complete";
+    public static final String HANDOFF_ERROR = "handoff_error";
+
     /** Per-session event consumer: (eventType, dataMap) */
     private final List<BiConsumer<String, Map<String, Object>>> consumers = Collections.synchronizedList(new ArrayList<>());
 
@@ -270,6 +282,87 @@ public class ObservabilityHook implements Hook {
     private void handleError(ErrorEvent e) {
         emit("error", Map.of(
                 "message", e.getError() != null ? e.getError().getMessage() : "Unknown error",
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    // ---- Multi-agent event emitters ----
+
+    public void emitPipelineStart(String pipelineId, List<String> subAgents) {
+        emit(PIPELINE_START, Map.of(
+                "pipelineId", pipelineId,
+                "subAgents", subAgents,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitPipelineStepStart(String pipelineId, int stepIndex, String agentId) {
+        emit(PIPELINE_STEP_START, Map.of(
+                "pipelineId", pipelineId,
+                "stepIndex", stepIndex,
+                "agentId", agentId,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitPipelineStepEnd(String pipelineId, int stepIndex, String agentId, long durationMs) {
+        emit(PIPELINE_STEP_END, Map.of(
+                "pipelineId", pipelineId,
+                "stepIndex", stepIndex,
+                "agentId", agentId,
+                "duration_ms", durationMs,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitPipelineEnd(String pipelineId, int totalSteps, long totalDurationMs) {
+        emit(PIPELINE_END, Map.of(
+                "pipelineId", pipelineId,
+                "totalSteps", totalSteps,
+                "duration_ms", totalDurationMs,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitRoutingDecision(String routingId, String selectedAgent, String reasoning) {
+        emit(ROUTING_DECISION, Map.of(
+                "routingId", routingId,
+                "selectedAgent", selectedAgent,
+                "reasoning", reasoning,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitRoutingEnd(String routingId, String selectedAgent) {
+        emit(ROUTING_END, Map.of(
+                "routingId", routingId,
+                "selectedAgent", selectedAgent,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitHandoffStart(String fromAgent, String toAgent, String reason) {
+        emit(HANDOFF_START, Map.of(
+                "fromAgent", fromAgent,
+                "toAgent", toAgent,
+                "reason", reason,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitHandoffComplete(String fromAgent, String toAgent) {
+        emit(HANDOFF_COMPLETE, Map.of(
+                "fromAgent", fromAgent,
+                "toAgent", toAgent,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitHandoffError(String fromAgent, String toAgent, String error) {
+        emit(HANDOFF_ERROR, Map.of(
+                "fromAgent", fromAgent,
+                "toAgent", toAgent,
+                "error", error,
                 "timestamp", System.currentTimeMillis()
         ));
     }
