@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
@@ -39,6 +40,7 @@ class CompositeAgentFactoryTest {
     @BeforeEach
     void setUp() {
         factory = new CompositeAgentFactory(singleAgentFactory, configService);
+        ReflectionTestUtils.setField(factory, "apiKey", "test-api-key");
     }
 
     @Test
@@ -217,16 +219,81 @@ class CompositeAgentFactoryTest {
         verify(singleAgentFactory).createAgent("sub-1");
     }
 
-    // --- Stub tests for Tasks 12-13 ---
+    // --- Routing agent tests (Task 12) ---
 
     @Test
-    void testCreateRoutingAgentThrowsNotImplemented() {
+    void testCreateRoutingAgentRequiresSubAgents() {
         AgentConfig config = new AgentConfig();
-        config.setType(AgentType.ROUTING);
+        config.setAgentId("route-agent");
+        config.setSubAgents(List.of());
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> factory.createRoutingAgent(config, mockMemory));
+        assertThrows(IllegalArgumentException.class,
+                () -> factory.createRoutingAgent(config, null));
     }
+
+    @Test
+    void testCreateRoutingAgentWithNullSubAgents() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("route-agent");
+        config.setSubAgents(null);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> factory.createRoutingAgent(config, null));
+    }
+
+    @Test
+    void testCreateRoutingAgentCreatesReActAgent() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("route-agent");
+        config.setName("Test Router");
+        config.setSubAgents(List.of(
+                SubAgentConfig.builder().agentId("sub-1").description("Handles documents").build(),
+                SubAgentConfig.builder().agentId("sub-2").description("Handles chat").build()
+        ));
+
+        when(singleAgentFactory.createAgent("sub-1")).thenReturn(mockAgent);
+        when(singleAgentFactory.createAgent("sub-2")).thenReturn(mockAgent);
+
+        ReActAgent router = factory.createRoutingAgent(config, null);
+
+        assertNotNull(router);
+        verify(singleAgentFactory).createAgent("sub-1");
+        verify(singleAgentFactory).createAgent("sub-2");
+    }
+
+    @Test
+    void testCreateRoutingAgentWithMemory() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("route-agent");
+        config.setSubAgents(List.of(
+                SubAgentConfig.builder().agentId("sub-1").build()
+        ));
+
+        when(singleAgentFactory.createAgentForSession("sub-1", mockMemory)).thenReturn(mockAgent);
+
+        ReActAgent router = factory.createRoutingAgent(config, mockMemory);
+
+        assertNotNull(router);
+        verify(singleAgentFactory).createAgentForSession("sub-1", mockMemory);
+    }
+
+    @Test
+    void testCreateRoutingAgentWithHook() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("route-agent");
+        config.setSubAgents(List.of(
+                SubAgentConfig.builder().agentId("sub-1").build()
+        ));
+
+        Hook hook = new ObservabilityHook();
+        when(singleAgentFactory.createAgent("sub-1")).thenReturn(mockAgent);
+
+        ReActAgent router = factory.createRoutingAgent(config, null, hook);
+
+        assertNotNull(router);
+    }
+
+    // --- Stub tests for Task 13 ---
 
     @Test
     void testCreateHandoffsAgentThrowsNotImplemented() {

@@ -4,17 +4,26 @@ import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.AgentConfigService;
 import com.skloda.agentscope.agent.AgentFactory;
 import com.skloda.agentscope.agent.AgentType;
+import com.skloda.agentscope.agent.SubAgentConfig;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.AgentBase;
+import io.agentscope.core.agent.StreamOptions;
+import io.agentscope.core.formatter.dashscope.DashScopeChatFormatter;
 import io.agentscope.core.hook.Hook;
+import io.agentscope.core.memory.InMemoryMemory;
 import io.agentscope.core.memory.Memory;
+import io.agentscope.core.model.DashScopeChatModel;
 import io.agentscope.core.pipeline.FanoutPipeline;
 import io.agentscope.core.pipeline.SequentialPipeline;
+import io.agentscope.core.tool.Toolkit;
+import io.agentscope.core.tool.subagent.SubAgentProvider;
+import io.agentscope.core.tool.subagent.SubAgentTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -137,8 +146,116 @@ public class CompositeAgentFactory {
         return builder.build();
     }
 
+    /**
+     * Create a routing agent that uses LLM to decide which sub-agent to dispatch to.
+     * Each sub-agent is registered as a SubAgentTool, and the router's system prompt
+     * describes each sub-agent's capabilities for intelligent routing.
+     */
     public ReActAgent createRoutingAgent(AgentConfig config, Memory memory, Hook... hooks) {
-        throw new UnsupportedOperationException("ROUTING agent creation not yet implemented");
+        if (config.getSubAgents() == null || config.getSubAgents().isEmpty()) {
+            throw new IllegalArgumentException("ROUTING agent requires at least one sub-agent: " + config.getAgentId());
+        }
+
+        log.info("Creating ROUTING agent for: {} with {} sub-agents", config.getAgentId(), config.getSubAgents().size());
+
+        Memory effectiveMemory = memory != null ? memory : new InMemoryMemory();
+
+        // Build routing system prompt
+        String routingPrompt = buildRoutingSystemPrompt(config);
+
+        // Create model for the router
+        DashScopeChatModel model = DashScopeChatModel.builder()
+                .apiKey(apiKey)
+                .modelName(config.getModelName())
+                .stream(config.isStreaming())
+                .enableThinking(config.isEnableThinking())
+                .formatter(new DashScopeChatFormatter())
+                .build();
+
+        // Create toolkit with SubAgentTools
+        Toolkit toolkit = new Toolkit();
+        List<ReActAgent> subAgents = new ArrayList<>();
+
+        for (SubAgentConfig subConfig : config.getSubAgents()) {
+            ReActAgent subAgent = (memory != null)
+                    ? singleAgentFactory.createAgentForSession(subConfig.getAgentId(), memory)
+                    : singleAgentFactory.createAgent(subConfig.getAgentId());
+            subAgents.add(subAgent);
+
+            // Create SubAgentProvider for this sub-agent
+            SubAgentProvider<ReActAgent> provider = () -> subAgent;
+
+            // Build SubAgentConfig for the framework
+            io.agentscope.core.tool.subagent.SubAgentConfig frameworkSubConfig =
+                    io.agentscope.core.tool.subagent.SubAgentConfig.builder()
+                            .toolName(subConfig.getAgentId())
+                            .description(subConfig.getDescription() != null
+                                    ? subConfig.getDescription()
+                                    : "Sub-agent: " + subConfig.getAgentId())
+                            .forwardEvents(true)
+                            .streamOptions(StreamOptions.builder()
+                                    .eventTypes(io.agentscope.core.agent.EventType.REASONING,
+                                            io.agentscope.core.agent.EventType.TOOL_RESULT)
+                                    .incremental(true)
+                                    .includeReasoningResult(true)
+                                    .build())
+                            .build();
+
+            SubAgentTool subAgentTool = new SubAgentTool(provider, frameworkSubConfig);
+            toolkit.registerTool(subAgentTool);
+            log.info("  Registered SubAgentTool: {} for routing agent: {}",
+                    subConfig.getAgentId(), config.getAgentId());
+        }
+
+        // Build the router agent
+        ReActAgent.Builder builder = ReActAgent.builder()
+                .name(config.getName() != null ? config.getName() : config.getAgentId())
+                .sysPrompt(routingPrompt)
+                .model(model)
+                .memory(effectiveMemory)
+                .toolkit(toolkit);
+
+        if (hooks != null && hooks.length > 0) {
+            builder.hooks(List.of(hooks));
+        }
+
+        return builder.build();
+    }
+
+    /**
+     * Build a routing system prompt that describes each sub-agent's capabilities.
+     */
+    private String buildRoutingSystemPrompt(AgentConfig config) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("你是一个智能路由助手，负责将用户请求分配给最合适的子代理处理。\n\n");
+        sb.append("## 你的职责\n");
+        sb.append("分析用户的请求，选择最合适的子代理来处理。你应该：\n");
+        sb.append("1. 理解用户的意图\n");
+        sb.append("2. 选择最匹配的子代理\n");
+        sb.append("3. 调用对应的子代理工具\n\n");
+
+        if (config.getDescription() != null && !config.getDescription().isBlank()) {
+            sb.append("## 路由器描述\n");
+            sb.append(config.getDescription()).append("\n\n");
+        }
+
+        sb.append("## 可用的子代理\n");
+        for (SubAgentConfig subConfig : config.getSubAgents()) {
+            sb.append("- **").append(subConfig.getAgentId()).append("**");
+            if (subConfig.getDescription() != null) {
+                sb.append(": ").append(subConfig.getDescription());
+            }
+            sb.append("\n");
+        }
+        sb.append("\n请根据用户请求的内容，选择最合适的子代理工具来处理。\n");
+
+        String customPrompt = config.getSystemPrompt();
+        if (customPrompt != null && !customPrompt.isBlank()) {
+            sb.append("\n## 额外指示\n");
+            sb.append(customPrompt).append("\n");
+        }
+
+        return sb.toString();
     }
 
     public ReActAgent createHandoffsAgent(AgentConfig config, Memory memory, Hook... hooks) {

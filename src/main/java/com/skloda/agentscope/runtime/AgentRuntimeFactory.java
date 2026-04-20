@@ -124,6 +124,33 @@ public class AgentRuntimeFactory {
         return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
     }
 
+    /**
+     * Create a runtime for routing agents (stateless mode).
+     * Routing agents are ReActAgents with SubAgentTools, so they use AgentRuntime.
+     */
+    public AgentRuntime createRoutingRuntime(String agentId) {
+        log.debug("Creating RoutingRuntime for agent: {}", agentId);
+
+        ObservabilityHook hook = new ObservabilityHook();
+        ReActAgent agent = compositeFactory.createRoutingAgent(
+                configService.getAgentConfig(agentId), null, hook);
+
+        return new AgentRuntime(agent, hook);
+    }
+
+    /**
+     * Create a runtime for routing agents (session mode with shared memory).
+     */
+    public AgentRuntime createRoutingRuntimeWithMemory(String agentId, Memory memory) {
+        log.debug("Creating RoutingRuntime with shared memory for agent: {}", agentId);
+
+        ObservabilityHook hook = new ObservabilityHook();
+        ReActAgent agent = compositeFactory.createRoutingAgent(
+                configService.getAgentConfig(agentId), memory, hook);
+
+        return new AgentRuntime(agent, hook);
+    }
+
     public CompositeAgentFactory getCompositeFactory() {
         return compositeFactory;
     }
