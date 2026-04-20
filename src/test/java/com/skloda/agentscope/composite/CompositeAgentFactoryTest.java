@@ -293,15 +293,92 @@ class CompositeAgentFactoryTest {
         assertNotNull(router);
     }
 
-    // --- Stub tests for Task 13 ---
+    // --- Handoffs agent tests (Task 13) ---
 
     @Test
-    void testCreateHandoffsAgentThrowsNotImplemented() {
+    void testCreateHandoffsAgentRequiresSubAgents() {
         AgentConfig config = new AgentConfig();
-        config.setType(AgentType.HANDOFFS);
+        config.setAgentId("handoff-agent");
+        config.setSubAgents(List.of());
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> factory.createHandoffsAgent(config, mockMemory));
+        assertThrows(IllegalArgumentException.class,
+                () -> factory.createHandoffsAgent(config, null));
+    }
+
+    @Test
+    void testCreateHandoffsAgentCreatesReActAgent() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("handoff-agent");
+        config.setName("Test Handoffs");
+        config.setSubAgents(List.of(
+                SubAgentConfig.builder().agentId("sub-1").description("Handles documents").build(),
+                SubAgentConfig.builder().agentId("sub-2").description("Handles chat").build()
+        ));
+        config.setHandoffTriggers(List.of(
+                HandoffTrigger.builder().type(TriggerType.INTENT)
+                        .keywords(List.of("文档", "docx", "file"))
+                        .target("sub-1").build(),
+                HandoffTrigger.builder().type(TriggerType.INTENT)
+                        .keywords(List.of("聊天", "hello", "help"))
+                        .target("sub-2").build()
+        ));
+
+        when(singleAgentFactory.createAgent("sub-1")).thenReturn(mockAgent);
+        when(singleAgentFactory.createAgent("sub-2")).thenReturn(mockAgent);
+
+        ReActAgent handoffAgent = factory.createHandoffsAgent(config, null);
+
+        assertNotNull(handoffAgent);
+        verify(singleAgentFactory).createAgent("sub-1");
+        verify(singleAgentFactory).createAgent("sub-2");
+    }
+
+    @Test
+    void testCreateHandoffsAgentWithMemory() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("handoff-agent");
+        config.setSubAgents(List.of(
+                SubAgentConfig.builder().agentId("sub-1").build()
+        ));
+
+        when(singleAgentFactory.createAgentForSession("sub-1", mockMemory)).thenReturn(mockAgent);
+
+        ReActAgent handoffAgent = factory.createHandoffsAgent(config, mockMemory);
+
+        assertNotNull(handoffAgent);
+        verify(singleAgentFactory).createAgentForSession("sub-1", mockMemory);
+    }
+
+    @Test
+    void testCreateHandoffsAgentWithHook() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("handoff-agent");
+        config.setSubAgents(List.of(
+                SubAgentConfig.builder().agentId("sub-1").build()
+        ));
+
+        Hook hook = new ObservabilityHook();
+        when(singleAgentFactory.createAgent("sub-1")).thenReturn(mockAgent);
+
+        ReActAgent handoffAgent = factory.createHandoffsAgent(config, null, hook);
+
+        assertNotNull(handoffAgent);
+    }
+
+    @Test
+    void testCreateHandoffsAgentWithNoTriggers() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("handoff-agent");
+        config.setSubAgents(List.of(
+                SubAgentConfig.builder().agentId("sub-1").build()
+        ));
+        // No handoff triggers - should still work (falls back to LLM routing)
+
+        when(singleAgentFactory.createAgent("sub-1")).thenReturn(mockAgent);
+
+        ReActAgent handoffAgent = factory.createHandoffsAgent(config, null);
+
+        assertNotNull(handoffAgent);
     }
 
     @Test

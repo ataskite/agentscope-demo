@@ -151,6 +151,33 @@ public class AgentRuntimeFactory {
         return new AgentRuntime(agent, hook);
     }
 
+    /**
+     * Create a runtime for handoffs agents (stateless mode).
+     * Handoffs agents are ReActAgents with SubAgentTools and trigger-based routing.
+     */
+    public AgentRuntime createHandoffsRuntime(String agentId) {
+        log.debug("Creating HandoffsRuntime for agent: {}", agentId);
+
+        ObservabilityHook hook = new ObservabilityHook();
+        ReActAgent agent = compositeFactory.createHandoffsAgent(
+                configService.getAgentConfig(agentId), null, hook);
+
+        return new AgentRuntime(agent, hook);
+    }
+
+    /**
+     * Create a runtime for handoffs agents (session mode with shared memory).
+     */
+    public AgentRuntime createHandoffsRuntimeWithMemory(String agentId, Memory memory) {
+        log.debug("Creating HandoffsRuntime with shared memory for agent: {}", agentId);
+
+        ObservabilityHook hook = new ObservabilityHook();
+        ReActAgent agent = compositeFactory.createHandoffsAgent(
+                configService.getAgentConfig(agentId), memory, hook);
+
+        return new AgentRuntime(agent, hook);
+    }
+
     public CompositeAgentFactory getCompositeFactory() {
         return compositeFactory;
     }

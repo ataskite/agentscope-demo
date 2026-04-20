@@ -4,7 +4,9 @@ import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.AgentConfigService;
 import com.skloda.agentscope.agent.AgentFactory;
 import com.skloda.agentscope.agent.AgentType;
+import com.skloda.agentscope.agent.HandoffTrigger;
 import com.skloda.agentscope.agent.SubAgentConfig;
+import com.skloda.agentscope.agent.TriggerType;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.AgentBase;
 import io.agentscope.core.agent.StreamOptions;
@@ -258,7 +260,128 @@ public class CompositeAgentFactory {
         return sb.toString();
     }
 
+    /**
+     * Create a handoffs agent with intent-based triggers.
+     * Built on top of the routing agent pattern, but enhanced with explicit
+     * handoff trigger rules that guide the LLM's routing decisions.
+     */
     public ReActAgent createHandoffsAgent(AgentConfig config, Memory memory, Hook... hooks) {
-        throw new UnsupportedOperationException("HANDOFFS agent creation not yet implemented");
+        if (config.getSubAgents() == null || config.getSubAgents().isEmpty()) {
+            throw new IllegalArgumentException("HANDOFFS agent requires at least one sub-agent: " + config.getAgentId());
+        }
+
+        log.info("Creating HANDOFFS agent for: {} with {} sub-agents and {} triggers",
+                config.getAgentId(), config.getSubAgents().size(),
+                config.getHandoffTriggers() != null ? config.getHandoffTriggers().size() : 0);
+
+        Memory effectiveMemory = memory != null ? memory : new InMemoryMemory();
+
+        // Build handoffs system prompt with trigger rules
+        String handoffsPrompt = buildHandoffsSystemPrompt(config);
+
+        // Create model for the handoffs agent
+        DashScopeChatModel model = DashScopeChatModel.builder()
+                .apiKey(apiKey)
+                .modelName(config.getModelName())
+                .stream(config.isStreaming())
+                .enableThinking(config.isEnableThinking())
+                .formatter(new DashScopeChatFormatter())
+                .build();
+
+        // Create toolkit with SubAgentTools
+        Toolkit toolkit = new Toolkit();
+
+        for (SubAgentConfig subConfig : config.getSubAgents()) {
+            ReActAgent subAgent = (memory != null)
+                    ? singleAgentFactory.createAgentForSession(subConfig.getAgentId(), memory)
+                    : singleAgentFactory.createAgent(subConfig.getAgentId());
+
+            SubAgentProvider<ReActAgent> provider = () -> subAgent;
+
+            io.agentscope.core.tool.subagent.SubAgentConfig frameworkSubConfig =
+                    io.agentscope.core.tool.subagent.SubAgentConfig.builder()
+                            .toolName(subConfig.getAgentId())
+                            .description(subConfig.getDescription() != null
+                                    ? subConfig.getDescription()
+                                    : "Sub-agent: " + subConfig.getAgentId())
+                            .forwardEvents(true)
+                            .streamOptions(StreamOptions.builder()
+                                    .eventTypes(io.agentscope.core.agent.EventType.REASONING,
+                                            io.agentscope.core.agent.EventType.TOOL_RESULT)
+                                    .incremental(true)
+                                    .includeReasoningResult(true)
+                                    .build())
+                            .build();
+
+            SubAgentTool subAgentTool = new SubAgentTool(provider, frameworkSubConfig);
+            toolkit.registerTool(subAgentTool);
+            log.info("  Registered SubAgentTool: {} for handoffs agent: {}",
+                    subConfig.getAgentId(), config.getAgentId());
+        }
+
+        // Build the handoffs agent
+        ReActAgent.Builder builder = ReActAgent.builder()
+                .name(config.getName() != null ? config.getName() : config.getAgentId())
+                .sysPrompt(handoffsPrompt)
+                .model(model)
+                .memory(effectiveMemory)
+                .toolkit(toolkit);
+
+        if (hooks != null && hooks.length > 0) {
+            builder.hooks(List.of(hooks));
+        }
+
+        return builder.build();
+    }
+
+    /**
+     * Build a handoffs system prompt with explicit trigger rules.
+     * Includes both the trigger-based routing rules and sub-agent descriptions.
+     */
+    private String buildHandoffsSystemPrompt(AgentConfig config) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("你是一个智能代理协调器，负责根据用户意图将请求转交给合适的子代理处理。\n\n");
+        sb.append("## 你的职责\n");
+        sb.append("分析用户的消息，根据预定义的触发规则和子代理能力，选择最合适的子代理。\n\n");
+
+        if (config.getDescription() != null && !config.getDescription().isBlank()) {
+            sb.append("## 协调器描述\n");
+            sb.append(config.getDescription()).append("\n\n");
+        }
+
+        // Handoff trigger rules
+        if (config.getHandoffTriggers() != null && !config.getHandoffTriggers().isEmpty()) {
+            sb.append("## 转交触发规则\n");
+            sb.append("以下规则帮助你决定何时将请求转交给特定的子代理：\n\n");
+            for (HandoffTrigger trigger : config.getHandoffTriggers()) {
+                sb.append("- **转交目标**: ").append(trigger.getTarget()).append("\n");
+                sb.append("  - **触发类型**: ").append(trigger.getType().getDescription()).append("\n");
+                if (trigger.getKeywords() != null && !trigger.getKeywords().isEmpty()) {
+                    sb.append("  - **触发关键词**: ");
+                    sb.append(String.join(", ", trigger.getKeywords()));
+                    sb.append("\n");
+                }
+                sb.append("\n");
+            }
+        }
+
+        // Sub-agent descriptions
+        sb.append("## 可用的子代理\n");
+        for (SubAgentConfig subConfig : config.getSubAgents()) {
+            sb.append("- **").append(subConfig.getAgentId()).append("**");
+            if (subConfig.getDescription() != null) {
+                sb.append(": ").append(subConfig.getDescription());
+            }
+            sb.append("\n");
+        }
+        sb.append("\n请根据触发规则和用户请求的内容，选择最合适的子代理工具来处理请求。\n");
+
+        String customPrompt = config.getSystemPrompt();
+        if (customPrompt != null && !customPrompt.isBlank()) {
+            sb.append("\n## 额外指示\n");
+            sb.append(customPrompt).append("\n");
+        }
+
+        return sb.toString();
     }
 }
