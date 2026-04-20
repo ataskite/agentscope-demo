@@ -7,6 +7,7 @@ import com.skloda.agentscope.composite.CompositeAgentFactory;
 import com.skloda.agentscope.hook.ObservabilityHook;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.memory.Memory;
+import io.agentscope.core.pipeline.FanoutPipeline;
 import io.agentscope.core.pipeline.SequentialPipeline;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,6 +94,32 @@ public class AgentRuntimeFactory {
         AgentConfig config = configService.getAgentConfig(agentId);
         ObservabilityHook hook = new ObservabilityHook();
         SequentialPipeline pipeline = compositeFactory.createSequentialAgent(config, memory);
+
+        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
+    }
+
+    /**
+     * Create a pipeline runtime for parallel (fanout) agents (stateless mode).
+     */
+    public PipelineAgentRuntime createParallelRuntime(String agentId) {
+        log.debug("Creating ParallelRuntime for agent: {}", agentId);
+
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        FanoutPipeline pipeline = compositeFactory.createParallelAgent(config, null);
+
+        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
+    }
+
+    /**
+     * Create a pipeline runtime for parallel (fanout) agents (session mode with shared memory).
+     */
+    public PipelineAgentRuntime createParallelRuntimeWithMemory(String agentId, Memory memory) {
+        log.debug("Creating ParallelRuntime with shared memory for agent: {}", agentId);
+
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        FanoutPipeline pipeline = compositeFactory.createParallelAgent(config, memory);
 
         return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
     }

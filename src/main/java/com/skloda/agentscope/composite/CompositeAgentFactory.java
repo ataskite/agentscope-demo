@@ -8,6 +8,7 @@ import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.AgentBase;
 import io.agentscope.core.hook.Hook;
 import io.agentscope.core.memory.Memory;
+import io.agentscope.core.pipeline.FanoutPipeline;
 import io.agentscope.core.pipeline.SequentialPipeline;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,8 +112,29 @@ public class CompositeAgentFactory {
                 .build();
     }
 
-    public AgentBase createParallelAgent(AgentConfig config, Memory memory) {
-        throw new UnsupportedOperationException("PARALLEL agent creation not yet implemented");
+    /**
+     * Create a parallel (fanout) pipeline of sub-agents.
+     * All sub-agents receive the same message and execute concurrently.
+     * Uses config.parallel flag to determine concurrent vs sequential fanout.
+     */
+    public FanoutPipeline createParallelAgent(AgentConfig config, Memory memory) {
+        if (config.getSubAgents() == null || config.getSubAgents().isEmpty()) {
+            throw new IllegalArgumentException("PARALLEL agent requires at least one sub-agent: " + config.getAgentId());
+        }
+
+        boolean concurrent = config.getParallel() != null ? config.getParallel() : true;
+        log.info("Creating PARALLEL pipeline for: {} with {} sub-agents (concurrent={})",
+                config.getAgentId(), config.getSubAgents().size(), concurrent);
+
+        List<AgentBase> subAgents = (memory != null)
+                ? createSubAgentsWithMemory(config, memory)
+                : createSubAgents(config);
+
+        FanoutPipeline.Builder builder = FanoutPipeline.builder()
+                .addAgents(subAgents)
+                .concurrent(concurrent);
+
+        return builder.build();
     }
 
     public ReActAgent createRoutingAgent(AgentConfig config, Memory memory, Hook... hooks) {

@@ -6,6 +6,7 @@ import io.agentscope.core.ReActAgent;
 import io.agentscope.core.hook.Hook;
 import io.agentscope.core.memory.InMemoryMemory;
 import io.agentscope.core.memory.Memory;
+import io.agentscope.core.pipeline.FanoutPipeline;
 import io.agentscope.core.pipeline.SequentialPipeline;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -135,16 +136,88 @@ class CompositeAgentFactoryTest {
         verify(singleAgentFactory).createAgentForSession("sub-1", mockMemory);
     }
 
-    // --- Stub tests for Tasks 11-13 ---
+    // --- Parallel agent tests (Task 11) ---
 
     @Test
-    void testCreateParallelAgentThrowsNotImplemented() {
+    void testCreateParallelAgentRequiresSubAgents() {
         AgentConfig config = new AgentConfig();
-        config.setType(AgentType.PARALLEL);
+        config.setAgentId("par-agent");
+        config.setSubAgents(List.of());
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> factory.createParallelAgent(config, mockMemory));
+        assertThrows(IllegalArgumentException.class,
+                () -> factory.createParallelAgent(config, null));
     }
+
+    @Test
+    void testCreateParallelAgentWithNullSubAgents() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("par-agent");
+        config.setSubAgents(null);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> factory.createParallelAgent(config, null));
+    }
+
+    @Test
+    void testCreateParallelAgentCreatesFanoutPipeline() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("par-agent");
+        config.setSubAgents(List.of(
+                SubAgentConfig.builder().agentId("sub-1").description("First").build(),
+                SubAgentConfig.builder().agentId("sub-2").description("Second").build()
+        ));
+        config.setParallel(true);
+
+        ReActAgent mockSub1 = mock(ReActAgent.class);
+        ReActAgent mockSub2 = mock(ReActAgent.class);
+        when(singleAgentFactory.createAgent("sub-1")).thenReturn(mockSub1);
+        when(singleAgentFactory.createAgent("sub-2")).thenReturn(mockSub2);
+
+        FanoutPipeline pipeline = factory.createParallelAgent(config, null);
+
+        assertNotNull(pipeline);
+        assertEquals(2, pipeline.size());
+        verify(singleAgentFactory).createAgent("sub-1");
+        verify(singleAgentFactory).createAgent("sub-2");
+    }
+
+    @Test
+    void testCreateParallelAgentSequentialMode() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("par-agent");
+        config.setSubAgents(List.of(
+                SubAgentConfig.builder().agentId("sub-1").build()
+        ));
+        config.setParallel(false);
+
+        when(singleAgentFactory.createAgent("sub-1")).thenReturn(mockAgent);
+
+        FanoutPipeline pipeline = factory.createParallelAgent(config, null);
+
+        assertNotNull(pipeline);
+        assertEquals(1, pipeline.size());
+    }
+
+    @Test
+    void testCreateParallelAgentDefaultIsConcurrent() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("par-agent");
+        config.setSubAgents(List.of(
+                SubAgentConfig.builder().agentId("sub-1").build()
+        ));
+        // parallel is null -> defaults to true
+
+        when(singleAgentFactory.createAgent("sub-1")).thenReturn(mockAgent);
+
+        FanoutPipeline pipeline = factory.createParallelAgent(config, null);
+
+        assertNotNull(pipeline);
+        assertEquals(1, pipeline.size());
+        // Verify that when parallel is null, concurrent(true) was called
+        verify(singleAgentFactory).createAgent("sub-1");
+    }
+
+    // --- Stub tests for Tasks 12-13 ---
 
     @Test
     void testCreateRoutingAgentThrowsNotImplemented() {
