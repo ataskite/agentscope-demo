@@ -6,13 +6,14 @@ import io.agentscope.core.ReActAgent;
 import io.agentscope.core.hook.Hook;
 import io.agentscope.core.memory.InMemoryMemory;
 import io.agentscope.core.memory.Memory;
+import io.agentscope.core.pipeline.SequentialPipeline;
 import org.junit.jupiter.api.BeforeEach;
-
-import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -72,14 +73,69 @@ class CompositeAgentFactoryTest {
         assertSame(expectedMemory, result);
     }
 
-    @Test
-    void testCreateSequentialAgentThrowsNotImplemented() {
-        AgentConfig config = new AgentConfig();
-        config.setType(AgentType.SEQUENTIAL);
+    // --- Sequential agent tests (Task 10) ---
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> factory.createSequentialAgent(config, mockMemory));
+    @Test
+    void testCreateSequentialAgentRequiresSubAgents() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("seq-agent");
+        config.setSubAgents(List.of());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> factory.createSequentialAgent(config, null));
     }
+
+    @Test
+    void testCreateSequentialAgentWithNullSubAgents() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("seq-agent");
+        config.setSubAgents(null);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> factory.createSequentialAgent(config, null));
+    }
+
+    @Test
+    void testCreateSequentialAgentCreatesPipeline() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("seq-agent");
+        config.setSubAgents(List.of(
+                SubAgentConfig.builder().agentId("sub-1").description("First").build(),
+                SubAgentConfig.builder().agentId("sub-2").description("Second").build()
+        ));
+
+        ReActAgent mockSub1 = mock(ReActAgent.class);
+        ReActAgent mockSub2 = mock(ReActAgent.class);
+        when(singleAgentFactory.createAgent("sub-1")).thenReturn(mockSub1);
+        when(singleAgentFactory.createAgent("sub-2")).thenReturn(mockSub2);
+
+        SequentialPipeline pipeline = factory.createSequentialAgent(config, null);
+
+        assertNotNull(pipeline);
+        assertEquals(2, pipeline.size());
+        verify(singleAgentFactory).createAgent("sub-1");
+        verify(singleAgentFactory).createAgent("sub-2");
+    }
+
+    @Test
+    void testCreateSequentialAgentWithSharedMemory() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("seq-agent");
+        config.setSubAgents(List.of(
+                SubAgentConfig.builder().agentId("sub-1").build()
+        ));
+
+        when(singleAgentFactory.createAgentForSession("sub-1", mockMemory))
+                .thenReturn(mockAgent);
+
+        SequentialPipeline pipeline = factory.createSequentialAgent(config, mockMemory);
+
+        assertNotNull(pipeline);
+        assertEquals(1, pipeline.size());
+        verify(singleAgentFactory).createAgentForSession("sub-1", mockMemory);
+    }
+
+    // --- Stub tests for Tasks 11-13 ---
 
     @Test
     void testCreateParallelAgentThrowsNotImplemented() {

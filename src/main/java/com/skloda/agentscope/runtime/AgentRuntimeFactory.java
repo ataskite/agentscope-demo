@@ -7,6 +7,7 @@ import com.skloda.agentscope.composite.CompositeAgentFactory;
 import com.skloda.agentscope.hook.ObservabilityHook;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.memory.Memory;
+import io.agentscope.core.pipeline.SequentialPipeline;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -14,6 +15,10 @@ import org.springframework.stereotype.Component;
 /**
  * Factory for creating AgentRuntime instances.
  * Uses CompositeAgentFactory to support both single and composite agent types.
+ *
+ * SINGLE agents produce AgentRuntime (wrapping ReActAgent).
+ * SEQUENTIAL/PARALLEL agents produce PipelineAgentRuntime (wrapping Pipeline).
+ * ROUTING/HANDOFFS agents will produce AgentRuntime (wrapping ReActAgent with SubAgentTools).
  */
 @Component
 public class AgentRuntimeFactory {
@@ -30,8 +35,7 @@ public class AgentRuntimeFactory {
     }
 
     /**
-     * Create a new AgentRuntime with a fresh agent (stateless mode).
-     * Supports SINGLE agent type; composite types are not yet supported in stateless mode.
+     * Create a new runtime for stateless agent interaction.
      */
     public AgentRuntime createRuntime(String agentId) {
         log.debug("Creating AgentRuntime for agent: {}", agentId);
@@ -39,19 +43,17 @@ public class AgentRuntimeFactory {
         AgentConfig config = configService.getAgentConfig(agentId);
         AgentType type = config.getType() != null ? config.getType() : AgentType.SINGLE;
 
-        if (type == AgentType.SINGLE) {
-            return createSingleRuntime(agentId);
-        }
-
-        // Composite types: will be handled by future tasks
-        throw new UnsupportedOperationException(
-                "Agent type " + type + " is not yet supported in stateless mode");
+        return switch (type) {
+            case SINGLE -> createSingleRuntime(agentId);
+            case SEQUENTIAL -> throw createPipelineException(type);
+            case PARALLEL -> throw createPipelineException(type);
+            case ROUTING -> throw createPipelineException(type);
+            case HANDOFFS -> throw createPipelineException(type);
+        };
     }
 
     /**
-     * Create AgentRuntime with an existing memory (session mode).
-     * A new agent is created per request but shares the same memory instance,
-     * so conversation history persists across requests.
+     * Create runtime with shared memory (session mode).
      */
     public AgentRuntime createRuntimeWithMemory(String agentId, Memory memory) {
         log.debug("Creating AgentRuntime with shared memory for agent: {}", agentId);
@@ -59,25 +61,46 @@ public class AgentRuntimeFactory {
         AgentConfig config = configService.getAgentConfig(agentId);
         AgentType type = config.getType() != null ? config.getType() : AgentType.SINGLE;
 
-        if (type == AgentType.SINGLE) {
-            return createSingleRuntimeWithMemory(agentId, memory);
-        }
-
-        // Composite types: will be handled by future tasks
-        throw new UnsupportedOperationException(
-                "Agent type " + type + " is not yet supported in session mode");
+        return switch (type) {
+            case SINGLE -> createSingleRuntimeWithMemory(agentId, memory);
+            case SEQUENTIAL -> throw createPipelineException(type);
+            case PARALLEL -> throw createPipelineException(type);
+            case ROUTING -> throw createPipelineException(type);
+            case HANDOFFS -> throw createPipelineException(type);
+        };
     }
 
     /**
-     * Get the composite factory for direct use by composite agent runtimes.
+     * Create a pipeline runtime for sequential agents (stateless mode).
+     * Returns PipelineAgentRuntime which provides the same Flux interface.
      */
+    public PipelineAgentRuntime createSequentialRuntime(String agentId) {
+        log.debug("Creating SequentialRuntime for agent: {}", agentId);
+
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        SequentialPipeline pipeline = compositeFactory.createSequentialAgent(config, null);
+
+        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
+    }
+
+    /**
+     * Create a pipeline runtime for sequential agents (session mode with shared memory).
+     */
+    public PipelineAgentRuntime createSequentialRuntimeWithMemory(String agentId, Memory memory) {
+        log.debug("Creating SequentialRuntime with shared memory for agent: {}", agentId);
+
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        SequentialPipeline pipeline = compositeFactory.createSequentialAgent(config, memory);
+
+        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
+    }
+
     public CompositeAgentFactory getCompositeFactory() {
         return compositeFactory;
     }
 
-    /**
-     * Get the config service for looking up agent configurations.
-     */
     public AgentConfigService getConfigService() {
         return configService;
     }
@@ -92,5 +115,10 @@ public class AgentRuntimeFactory {
         ObservabilityHook hook = new ObservabilityHook();
         ReActAgent agent = compositeFactory.createSingleAgentForSession(agentId, memory, hook);
         return new AgentRuntime(agent, hook);
+    }
+
+    private UnsupportedOperationException createPipelineException(AgentType type) {
+        return new UnsupportedOperationException(
+                "Agent type " + type + " requires createPipelineRuntime(). Use the appropriate factory method.");
     }
 }

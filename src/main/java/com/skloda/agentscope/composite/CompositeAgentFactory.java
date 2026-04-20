@@ -8,6 +8,7 @@ import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.AgentBase;
 import io.agentscope.core.hook.Hook;
 import io.agentscope.core.memory.Memory;
+import io.agentscope.core.pipeline.SequentialPipeline;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -89,9 +90,25 @@ public class CompositeAgentFactory {
                 .toList();
     }
 
-    // Stub methods for Tasks 10-13
-    public AgentBase createSequentialAgent(AgentConfig config, Memory memory) {
-        throw new UnsupportedOperationException("SEQUENTIAL agent creation not yet implemented");
+    // Stub methods for Tasks 11-13
+    /**
+     * Create a sequential pipeline of sub-agents.
+     * Each sub-agent processes the message in order; the output of one feeds into the next.
+     */
+    public SequentialPipeline createSequentialAgent(AgentConfig config, Memory memory) {
+        if (config.getSubAgents() == null || config.getSubAgents().isEmpty()) {
+            throw new IllegalArgumentException("SEQUENTIAL agent requires at least one sub-agent: " + config.getAgentId());
+        }
+
+        log.info("Creating SEQUENTIAL pipeline for: {} with {} sub-agents", config.getAgentId(), config.getSubAgents().size());
+
+        List<AgentBase> subAgents = (memory != null)
+                ? createSubAgentsWithMemory(config, memory)
+                : createSubAgents(config);
+
+        return SequentialPipeline.builder()
+                .addAgents(subAgents)
+                .build();
     }
 
     public AgentBase createParallelAgent(AgentConfig config, Memory memory) {
