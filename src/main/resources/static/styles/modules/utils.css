@@ -1,0 +1,107 @@
+/* ===== UTILITY CLASSES ===== */
+/* Text utilities */
+.text-cyan { color: var(--neon-cyan); }
+.text-green { color: var(--neon-green); }
+.text-blue { color: var(--neon-blue); }
+.text-muted { color: var(--text-muted); }
+
+/* Flexbox utilities */
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.gap-sm { gap: var(--space-sm); }
+.gap-md { gap: var(--space-md); }
+
+/* Spacing utilities */
+.m-0 { margin: 0; }
+.mt-sm { margin-top: var(--space-sm); }
+.mb-sm { margin-bottom: var(--space-sm); }
+.p-0 { padding: 0; }
+.p-md { padding: var(--space-md); }
+
+/* Border utilities */
+.border { border: 1px solid var(--border-dim); }
+.border-cyan { border-color: var(--neon-cyan); }
+.rounded { border-radius: 6px; }
+
+/* ===== STRUCTURED DATA ===== */
+.structured-data-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: var(--space-sm);
+}
+
+.export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--bg-input);
+    border: 1px solid var(--border-dim);
+    border-radius: 4px;
+    color: var(--neon-cyan);
+    cursor: pointer;
+    font-size: 11px;
+}
+
+.export-btn:hover {
+    border-color: var(--neon-cyan);
+}
+
+.structured-data-table-wrapper {
+    overflow-x: auto;
+    margin: var(--space-sm) 0;
+}
+
+.structured-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.structured-data-table th,
+.structured-data-table td {
+    padding: var(--space-sm);
+    text-align: left;
+    border: 1px solid var(--border-dim);
+}
+
+.structured-data-table th {
+    background: var(--bg-card);
+    color: var(--neon-cyan);
+    font-weight: 600;
+}
+
+.structured-data-table td {
+    background: var(--bg-input);
+}
+
+.structured-data-empty {
+    text-align: center;
+    color: var(--text-muted);
+    padding: var(--space-lg);
+    font-size: 12px;
+}
+
+.structured-data-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.structured-data-item {
+    padding: var(--space-sm);
+    background: var(--bg-input);
+    border-radius: 4px;
+}
+
+.value-null { color: var(--text-muted); }
+.value-number { color: var(--neon-green); }
+.value-boolean { color: var(--neon-cyan); }
+.value-object {
+    font-family: var(--font-body);
+    font-size: 11px;
+    color: var(--neon-purple);
+}

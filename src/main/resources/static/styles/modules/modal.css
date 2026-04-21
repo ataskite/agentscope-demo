@@ -1,0 +1,126 @@
+/* ===== CONFIG MODAL ===== */
+.config-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1500;
+    backdrop-filter: blur(4px);
+}
+
+.config-modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border-accent);
+    border-radius: 12px;
+    max-width: 600px;
+    max-height: 80vh;
+    width: 90%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 40px rgba(0, 245, 255, 0.1);
+}
+
+.config-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--border-dim);
+}
+
+.config-modal-title {
+    font-family: var(--font-heading);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--neon-cyan);
+}
+
+.config-modal-close {
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 18px;
+}
+
+.config-modal-close:hover {
+    color: var(--text-primary);
+}
+
+.config-modal-body {
+    padding: var(--space-lg);
+    overflow-y: auto;
+}
+
+.config-field {
+    margin-bottom: var(--space-md);
+}
+
+.config-field-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: var(--space-xs);
+}
+
+.config-field-value {
+    font-size: 13px;
+    color: var(--text-primary);
+    word-wrap: break-word;
+}
+
+.config-field-value.mono {
+    font-family: var(--font-body);
+    background: var(--bg-input);
+    padding: var(--space-sm);
+    border-radius: 4px;
+}
+
+.config-field-value.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+}
+
+.config-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-dim);
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.config-tag.none {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.config-tag.tool {
+    border-color: var(--neon-green);
+}
+
+.config-tag.system-tool {
+    border-color: var(--neon-purple);
+}
+
+.config-tag:hover {
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+}
+
+.config-divider {
+    border: none;
+    border-top: 1px solid var(--border-dim);
+    margin: var(--space-lg) 0;
+}

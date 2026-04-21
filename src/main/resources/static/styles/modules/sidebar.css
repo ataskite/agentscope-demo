@@ -1,0 +1,207 @@
+/* ===== SIDEBAR ===== */
+.sidebar {
+    width: 320px;
+    background: var(--bg-card);
+    border-right: 1px solid var(--border-dim);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.sidebar-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-dim);
+}
+
+.sidebar-tab {
+    flex: 1;
+    padding: var(--space-md);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.sidebar-tab:hover {
+    color: var(--text-primary);
+}
+
+.sidebar-tab.active {
+    color: var(--neon-cyan);
+    border-bottom-color: var(--neon-cyan);
+}
+
+.sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-md);
+}
+
+.sidebar-section {
+    margin-bottom: var(--space-lg);
+}
+
+.sidebar-section-title {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: var(--space-sm);
+}
+
+/* ===== AGENT CARDS ===== */
+.agent-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    background: var(--bg-input);
+    border: 1px solid var(--border-dim);
+    border-radius: 8px;
+    margin-bottom: var(--space-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.agent-card:hover {
+    border-color: var(--border-accent);
+    background: var(--bg-card-hover);
+}
+
+.agent-card.active {
+    border-color: var(--neon-cyan);
+    background: var(--bg-card-active);
+}
+
+.agent-card-info-btn {
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.agent-card-info-btn:hover {
+    color: var(--neon-cyan);
+}
+
+.agent-card-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.agent-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.agent-card-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.agent-card-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ===== SESSION LIST ===== */
+.session-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-input);
+    border: 1px solid var(--border-dim);
+    border-radius: 6px;
+    margin-bottom: var(--space-xs);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.session-item:hover {
+    border-color: var(--border-accent);
+}
+
+.session-item.active {
+    border-color: var(--neon-cyan);
+}
+
+.session-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.session-item-name {
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+.session-item-time {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.session-item-delete {
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.session-item-delete:hover {
+    color: var(--status-error);
+}
+
+/* ===== KNOWLEDGE DOCS ===== */
+.knowledge-doc-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-input);
+    border: 1px solid var(--border-dim);
+    border-radius: 6px;
+    margin-bottom: var(--space-xs);
+}
+
+.knowledge-doc-name {
+    font-size: 12px;
+    color: var(--text-primary);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.knowledge-empty {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: var(--space-lg);
+}

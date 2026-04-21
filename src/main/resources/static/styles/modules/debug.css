@@ -1,0 +1,241 @@
+/* ===== DEBUG PANEL ===== */
+#debugPanel {
+    background: var(--bg-debug);
+    border-top: 1px solid var(--border-dim);
+    display: flex;
+    flex-direction: column;
+    max-height: 300px;
+    transition: all 0.3s;
+}
+
+#debugPanel.collapsed {
+    max-height: 40px;
+}
+
+#debugToggle {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-dim);
+    border-radius: 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#debugToggle:hover {
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+}
+
+#debugRounds {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-md);
+}
+
+/* ===== ROUND CARDS ===== */
+.round-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-dim);
+    border-radius: 8px;
+    margin-bottom: var(--space-sm);
+    overflow: hidden;
+}
+
+.round-card.running {
+    border-color: var(--neon-cyan);
+}
+
+.round-card.success {
+    border-color: var(--neon-green);
+}
+
+.round-card.error {
+    border-color: var(--status-error);
+}
+
+.round-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-input);
+    cursor: pointer;
+    user-select: none;
+}
+
+.round-num {
+    font-size: 11px;
+    color: var(--neon-cyan);
+    font-weight: 600;
+}
+
+.round-msg {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.round-body {
+    padding: var(--space-md);
+}
+
+.round-body.collapsed {
+    display: none;
+}
+
+.round-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.rm-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+}
+
+.rm-label {
+    color: var(--text-muted);
+}
+
+.rm-value {
+    color: var(--text-primary);
+}
+
+.tokens-in, .tokens-out {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tokens-in { color: var(--neon-green); }
+.tokens-out { color: var(--neon-cyan); }
+
+.token-icon {
+    width: 12px;
+    height: 12px;
+}
+
+/* ===== ROUND TIMELINE ===== */
+.round-timeline {
+    margin-top: var(--space-sm);
+}
+
+.rtl-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) 0;
+    font-size: 11px;
+}
+
+.rtl-connector {
+    color: var(--text-muted);
+    min-width: 12px;
+}
+
+.rtl-icon {
+    color: var(--neon-cyan);
+    min-width: 16px;
+}
+
+.rtl-label {
+    flex: 1;
+    color: var(--text-secondary);
+}
+
+.rtl-metrics {
+    color: var(--text-muted);
+}
+
+.rtl-status {
+    min-width: 20px;
+    text-align: right;
+}
+
+.rtl-row.status-running .rtl-status {
+    color: var(--neon-cyan);
+}
+
+.rtl-row.status-ok .rtl-status {
+    color: var(--neon-green);
+}
+
+.rtl-row.status-fail .rtl-status {
+    color: var(--status-error);
+}
+
+/* ===== DEBUG PIPELINE ===== */
+.debug-pipeline {
+    background: var(--bg-input);
+    border: 1px solid var(--border-dim);
+    border-radius: 6px;
+    margin-bottom: var(--space-sm);
+    padding: var(--space-sm);
+}
+
+.debug-pipeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--neon-purple);
+    font-weight: 600;
+}
+
+.debug-pipeline-steps-container {
+    margin-top: var(--space-sm);
+}
+
+.debug-pipeline-step {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--bg-card);
+    border-radius: 4px;
+    margin-bottom: 2px;
+}
+
+.debug-pipeline-step.active {
+    border-color: var(--neon-cyan);
+}
+
+.debug-pipeline-step.complete {
+    border-color: var(--neon-green);
+}
+
+.debug-step-number {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--bg-input);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.debug-step-agent {
+    flex: 1;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.debug-step-status {
+    font-size: 10px;
+    color: var(--text-muted);
+}

@@ -1,0 +1,119 @@
+/* ===== CYBERPUNK TERMINAL UI - BASE STYLES ===== */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    /* Base Colors - Cyberpunk Dark Theme */
+    --bg-void: #0f0f1a;
+    --bg-void-alt: #1a1a2e;
+    --bg-card: #1e1e30;
+    --bg-card-hover: #262640;
+    --bg-card-active: #2e2e50;
+    --bg-input: #16161e;
+    --bg-debug: #141420;
+
+    /* Neon Accents */
+    --neon-cyan: #00F5FF;
+    --neon-green: #39FF14;
+    --neon-magenta: #FF10F0;
+    --neon-blue: #4D9FFF;
+    --neon-purple: #B794F6;
+    --neon-pink: #FF6B9D;
+
+    /* Text Colors */
+    --text-primary: #e8e4f0;
+    --text-secondary: #8886a0;
+    --text-muted: #585670;
+    --text-glow: rgba(0, 245, 255, 0.7);
+
+    /* Status Colors */
+    --status-thinking: var(--neon-blue);
+    --status-tool: var(--neon-green);
+    --status-error: #FF4757;
+    --status-user: var(--neon-cyan);
+
+    /* Borders */
+    --border-dim: #2a2a40;
+    --border-accent: rgba(0, 245, 255, 0.3);
+    --border-glow: rgba(0, 245, 255, 0.5);
+
+    /* Spacing */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 12px;
+    --space-lg: 16px;
+    --space-xl: 24px;
+
+    /* Typography */
+    --font-heading: 'Orbitron', sans-serif;
+    --font-body: 'JetBrains Mono', monospace;
+}
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--text-primary);
+    background: var(--bg-void);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===== SCANLINE OVERLAY ===== */
+.scanlines {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1000;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.1),
+        rgba(0, 0, 0, 0.1) 1px,
+        transparent 1px,
+        transparent 2px
+    );
+    opacity: 0.3;
+}
+
+/* ===== GRID BACKGROUND ===== */
+.grid-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    background-image:
+        linear-gradient(rgba(0, 245, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 245, 255, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+}
+
+/* ===== MARKDOWN STYLES ===== */
+.md-render p { margin: 0.5em 0; }
+.md-render h1, .md-render h2, .md-render h3 { margin: 0.8em 0 0.4em; color: var(--neon-cyan); }
+.md-render ul, .md-render ol { margin: 0.5em 0; padding-left: 1.5em; }
+.md-render li { margin: 0.3em 0; }
+.md-render code { background: var(--bg-input); padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+.md-render pre { background: var(--bg-input); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 12px 0; }
+.md-render pre code { background: transparent; padding: 0; }
+.md-render blockquote { border-left: 3px solid var(--neon-cyan); padding-left: 12px; margin: 12px 0; color: var(--text-secondary); }
+.md-render a { color: var(--neon-blue); text-decoration: none; }
+.md-render a:hover { text-decoration: underline; }
+.md-render table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+.md-render th, .md-render td { border: 1px solid var(--border-dim); padding: 8px 12px; text-align: left; }
+.md-render th { background: var(--bg-card); color: var(--neon-cyan); }
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-void); }
+::-webkit-scrollbar-thumb { background: var(--border-dim); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-accent); }
