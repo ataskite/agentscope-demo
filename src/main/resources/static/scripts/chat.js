@@ -4,6 +4,7 @@ import { renderMarkdown, escapeHtml, getTimestamp, formatDuration, scrollToBotto
 import { chatMessages, messageInput, sendBtn, chatEmpty, chatHeaderName, chatHeaderDesc, debugPanel, debugRounds, debugToggle, appendMessage, createThinkingBox, updateThinkingBox, collapseThinkingBox, completeThinkingBox, addAgentBubble, removeTypingIndicator, setStreamingState, showTypingIndicator } from './modules/ui.js';
 import { startRound, endRound, addTimelineRow, clearDebug, toggleDebug, handlePipelineStart, handlePipelineStepStart, handlePipelineStepEnd, handleRoutingDecision, handleHandoffStart } from './modules/debug.js';
 import { loadAgents, selectAgent, showAgentConfig, showSkillInfo, showToolInfo } from './modules/agents.js';
+import { loadSessions, createNewSession, selectSession, deleteSession, clearSession as clearSessionFn } from './modules/session.js';
 
 /* ===== INPUT HANDLING ===== */
 messageInput.addEventListener('keydown', function(e) {
@@ -367,15 +368,6 @@ function stopStreaming() {
     setStreamingState(false);
 }
 
-function clearSession() {
-    if (isStreaming) return;
-    if (currentSessionId) {
-        deleteSession(currentSessionId);
-    } else {
-        clearChatArea();
-    }
-}
-
 /* ===== FILE UPLOAD ===== */
 async function handleFileSelect(input) {
     var file = input.files[0];
@@ -480,96 +472,6 @@ function clearAllMedia() {
     uploadedImages = [];
     uploadedAudio = null;
     document.getElementById('fileTagArea').innerHTML = '';
-}
-
-/* ===== SESSION MANAGEMENT ===== */
-async function loadSessions() {
-    try {
-        var sessions = await fetchSessions();
-        var listEl = document.getElementById('sessionList');
-        listEl.innerHTML = '';
-
-        sessions.forEach(function(s) {
-            var item = document.createElement('div');
-            item.className = 'session-item' + (s.sessionId === currentSessionId ? ' active' : '');
-            item.dataset.sessionId = s.sessionId;
-            item.onclick = function() { selectSession(s.sessionId, s.agentId); };
-
-            var preview = s.agentName || s.agentId || 'Unknown';
-            if (s.messageCount > 0) {
-                preview += ' <span class="session-msg-count">(' + s.messageCount + ')</span>';
-            }
-
-            item.innerHTML =
-                '<div class="session-item-info">' +
-                    '<div class="session-item-name">' + preview + '</div>' +
-                    '<div class="session-item-time">' + (s.lastAccessedAt || '') + '</div>' +
-                '</div>' +
-                '<button class="session-item-delete" onclick="event.stopPropagation(); deleteSession(\'' + s.sessionId + '\')">×</button>';
-
-            listEl.appendChild(item);
-        });
-    } catch (err) {
-        console.error('Failed to load sessions', err);
-    }
-}
-
-async function createNewSession() {
-    if (!currentAgent) return;
-    try {
-        var data = await createSessionApi(currentAgent);
-        if (data.sessionId) {
-            currentSessionId = data.sessionId;
-            clearChatArea();
-            loadSessions();
-        }
-    } catch (err) {
-        console.error('Failed to create session', err);
-    }
-}
-
-async function selectSession(sessionId, agentId) {
-    if (isStreaming) return;
-
-    // Switch agent if needed
-    if (agentId && agentId !== currentAgent) {
-        selectAgent(agentId);
-    }
-
-    currentSessionId = sessionId;
-    clearChatArea();
-    loadSessions();
-}
-
-async function deleteSession(sessionId) {
-    if (isStreaming) return;
-    try {
-        await deleteSessionApi(sessionId);
-        if (currentSessionId === sessionId) {
-            currentSessionId = null;
-            clearChatArea();
-        }
-        loadSessions();
-    } catch (err) {
-        console.error('Failed to delete session', err);
-    }
-}
-
-function clearChatArea() {
-    chatMessages.innerHTML = '';
-    messageCount = 0;
-    agentRawMarkdown = '';
-    currentThinkingBox = null;
-    currentAgentMessageWrapper = null;
-    thinkingContent = '';
-    currentFileInfo = null;
-    chatMessages.appendChild(chatEmpty);
-    chatEmpty.style.display = 'flex';
-    removeFile();
-    debugRounds.innerHTML = '';
-    rounds = [];
-    currentRound = null;
-    roundNumber = 0;
 }
 
 /* ===== KNOWLEDGE MANAGEMENT ===== */
