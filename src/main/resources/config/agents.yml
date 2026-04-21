@@ -316,12 +316,13 @@ agents:
     systemTools:
       - plan_notebook
 
-  # ============================================================
-  # Phase 3: Multi-Agent Collaboration Configurations
-  # ============================================================
+# ============================================================
+# Phase 3: Multi-Agent Collaboration Configurations
+# ============================================================
 
-  # === Expert Agents (used as sub-agents by Router and Handoffs) ===
-  - agentId: doc-expert
+# === Expert Agents (used as sub-agents by Router and Handoffs) ===
+
+- agentId: doc-expert
   name: 文档专家
   description: 处理文档解析、分析、提取
   systemPrompt: |

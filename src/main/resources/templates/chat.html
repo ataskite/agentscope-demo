@@ -17,28 +17,11 @@
             <div class="header-title">AGENT<span class="header-scope">SCOPE</span> <span class="header-subtitle">// TERMINAL v1.0</span></div>
         </header>
         <div class="app-body">
-            <!-- Left Sidebar: Agent Selector + Session List -->
+            <!-- Left Sidebar: Agent Selector -->
             <aside class="sidebar">
                 <div class="sidebar-header"><div class="sidebar-header-dot"></div>Select Agent</div>
                 <div class="agent-list" id="agentList">
                     <!-- Agent cards rendered dynamically by loadAgents() -->
-                </div>
-                <div class="sidebar-divider"></div>
-                <div class="sidebar-header session-header">
-                    <div class="sidebar-header-dot"></div>Sessions
-                    <button class="session-new-btn" onclick="createNewSession()" title="New session">+</button>
-                </div>
-                <div class="session-list" id="sessionList">
-                    <!-- Session items rendered dynamically -->
-                </div>
-                <div class="sidebar-divider"></div>
-                <div class="sidebar-header">
-                    <div class="sidebar-header-dot"></div>Knowledge
-                    <button class="session-new-btn" onclick="document.getElementById('knowledgeFileInput').click()" title="Upload document">+</button>
-                </div>
-                <input type="file" id="knowledgeFileInput" accept=".pdf,.docx,.txt,.md" style="display:none" onchange="uploadToKnowledge(this)">
-                <div class="knowledge-docs" id="knowledgeDocs">
-                    <!-- Knowledge documents rendered dynamically -->
                 </div>
             </aside>
 
@@ -61,7 +44,7 @@
                     <div id="fileTagArea" style="padding: 0 0 8px 0; min-height: 0;"></div>
                     <div class="chat-input-row">
                         <button class="upload-btn" id="uploadBtn" onclick="document.getElementById('fileInput').click()" title="Upload file">+</button>
-                        <input type="file" id="fileInput" accept=".docx,.pdf,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.wav,.mp3,.m4a,.mp4" style="display:none" onchange="handleFileSelect(this)">
+                        <input type="file" id="fileInput" accept=".docx,.pdf,.xlsx" style="display:none" onchange="handleFileSelect(this)">
                         <textarea class="chat-input" id="messageInput" placeholder="Enter command or message..." rows="1"></textarea>
                         <button class="send-btn" id="sendBtn" onclick="sendMessage()">SEND</button>
                     </div>
