@@ -1,30 +1,5 @@
 import './state.js';
-
-/* ===== SSE PARSER ===== */
-function createSSEParser() {
-    var buffer = '';
-    return {
-        parse: function(chunk, onEvent) {
-            buffer += chunk;
-            var lines = buffer.split('\n');
-            buffer = lines.pop();
-            var currentEvent = {};
-            for (var i = 0; i < lines.length; i++) {
-                var line = lines[i];
-                if (line.startsWith('data:')) {
-                    currentEvent.data = line.slice(5).trim();
-                } else if (line.startsWith('event:')) {
-                    currentEvent.event = line.slice(6).trim();
-                } else if (line === '') {
-                    if (currentEvent.data) {
-                        onEvent(currentEvent);
-                    }
-                    currentEvent = {};
-                }
-            }
-        }
-    };
-}
+import { createSSEParser, uploadFile, fetchAgents, fetchSessions, createSession as createSessionApi, deleteSession as deleteSessionApi, fetchKnowledgeDocs, uploadKnowledgeDoc, removeKnowledgeDoc as removeKnowledgeDocApi, fetchSkillInfo, fetchToolInfo } from './api.js';
 
 /* ===== MARKED CONFIG ===== */
 if (typeof marked !== 'undefined') {
@@ -213,8 +188,7 @@ const debugToggle = document.getElementById('debugToggle');
 /* ===== LOAD AGENTS ===== */
 async function loadAgents() {
     try {
-        const response = await fetch('/api/agents');
-        const agentList = await response.json();
+        const agentList = await fetchAgents();
 
         const agentListEl = document.getElementById('agentList');
         agentListEl.innerHTML = '';
@@ -355,13 +329,7 @@ function closeConfigModal() {
 
 async function showSkillInfo(skillName) {
     try {
-        var response = await fetch('/api/skills/' + skillName);
-        if (!response.ok) {
-            var err = await response.json();
-            showInfoModal('Error', err.error || 'Skill not found');
-            return;
-        }
-        var info = await response.json();
+        var info = await fetchSkillInfo(skillName);
 
         var content = '<div class="config-field">' +
             '<div class="config-field-label">Name</div>' +
@@ -389,19 +357,13 @@ async function showSkillInfo(skillName) {
 
         showInfoModal('Skill Details', content);
     } catch (err) {
-        showInfoModal('Error', 'Failed to load skill info: ' + err.message);
+        showInfoModal('Error', err.message);
     }
 }
 
 async function showToolInfo(toolName) {
     try {
-        var response = await fetch('/api/tools/' + toolName);
-        if (!response.ok) {
-            var err = await response.json();
-            showInfoModal('Error', err.error || 'Tool not found');
-            return;
-        }
-        var info = await response.json();
+        var info = await fetchToolInfo(toolName);
 
         var content = '<div class="config-field">' +
             '<div class="config-field-label">Name</div>' +
@@ -431,7 +393,7 @@ async function showToolInfo(toolName) {
 
         showInfoModal('Tool Details', content);
     } catch (err) {
-        showInfoModal('Error', 'Failed to load tool info: ' + err.message);
+        showInfoModal('Error', err.message);
     }
 }
 
@@ -1346,7 +1308,7 @@ function toggleDebug() {
 }
 
 /* ===== FILE UPLOAD ===== */
-function handleFileSelect(input) {
+async function handleFileSelect(input) {
     var file = input.files[0];
     if (!file) return;
 
@@ -1365,15 +1327,8 @@ function handleFileSelect(input) {
         return;
     }
 
-    var formData = new FormData();
-    formData.append('file', file);
-
-    fetch('/chat/upload', {
-        method: 'POST',
-        body: formData
-    })
-    .then(function(response) { return response.json(); })
-    .then(function(data) {
+    try {
+        var data = await uploadFile(file);
         if (data.error) {
             console.error('Upload error:', data.error);
             return;
@@ -1401,10 +1356,9 @@ function handleFileSelect(input) {
                 selectAgent('voice-assistant');
             }
         }
-    })
-    .catch(function(err) {
+    } catch (err) {
         console.error('Upload error:', err);
-    });
+    }
 
     input.value = '';
 }
@@ -1542,8 +1496,7 @@ function createFileList(fileInfo) {
 /* ===== SESSION MANAGEMENT ===== */
 async function loadSessions() {
     try {
-        var response = await fetch('/api/sessions');
-        var sessions = await response.json();
+        var sessions = await fetchSessions();
         var listEl = document.getElementById('sessionList');
         listEl.innerHTML = '';
 
@@ -1575,12 +1528,7 @@ async function loadSessions() {
 async function createNewSession() {
     if (!currentAgent) return;
     try {
-        var response = await fetch('/api/sessions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ agentId: currentAgent })
-        });
-        var data = await response.json();
+        var data = await createSessionApi(currentAgent);
         if (data.sessionId) {
             currentSessionId = data.sessionId;
             clearChatArea();
@@ -1607,7 +1555,7 @@ async function selectSession(sessionId, agentId) {
 async function deleteSession(sessionId) {
     if (isStreaming) return;
     try {
-        await fetch('/api/sessions/' + sessionId, { method: 'DELETE' });
+        await deleteSessionApi(sessionId);
         if (currentSessionId === sessionId) {
             currentSessionId = null;
             clearChatArea();
@@ -1638,8 +1586,7 @@ function clearChatArea() {
 /* ===== KNOWLEDGE MANAGEMENT ===== */
 async function loadKnowledgeDocs() {
     try {
-        var response = await fetch('/api/knowledge/documents');
-        var docs = await response.json();
+        var docs = await fetchKnowledgeDocs();
         var docsEl = document.getElementById('knowledgeDocs');
         docsEl.innerHTML = '';
 
@@ -1665,15 +1612,8 @@ async function uploadToKnowledge(input) {
     var file = input.files[0];
     if (!file) return;
 
-    var formData = new FormData();
-    formData.append('file', file);
-
     try {
-        var response = await fetch('/api/knowledge/upload', {
-            method: 'POST',
-            body: formData
-        });
-        var data = await response.json();
+        var data = await uploadKnowledgeDoc(file);
         if (data.error) {
             console.error('Knowledge upload error:', data.error);
             return;
@@ -1688,7 +1628,7 @@ async function uploadToKnowledge(input) {
 
 async function removeKnowledgeDoc(fileName) {
     try {
-        await fetch('/api/knowledge/documents/' + encodeURIComponent(fileName), { method: 'DELETE' });
+        await removeKnowledgeDocApi(fileName);
         loadKnowledgeDocs();
     } catch (err) {
         console.error('Failed to remove knowledge doc', err);
