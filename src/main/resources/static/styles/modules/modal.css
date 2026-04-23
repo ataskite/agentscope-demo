@@ -22,7 +22,7 @@
     width: 90%;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 0 40px rgba(0, 245, 255, 0.1);
+    box-shadow: 0 0 30px rgba(0, 240, 255, 0.15), 0 0 60px rgba(0, 240, 255, 0.05);
 }
 
 .config-modal-header {
@@ -38,6 +38,7 @@
     font-size: 16px;
     font-weight: 600;
     color: var(--neon-cyan);
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.5), 0 0 15px rgba(0, 240, 255, 0.2);
 }
 
 .config-modal-close {
@@ -107,16 +108,30 @@
 }
 
 .config-tag.tool {
-    border-color: var(--neon-green);
+    border: 1px solid var(--neon-green);
+    color: var(--neon-green);
+    text-shadow: 0 0 5px rgba(0, 255, 136, 0.3);
+    box-shadow: 0 0 5px rgba(0, 255, 136, 0.2);
 }
 
 .config-tag.system-tool {
-    border-color: var(--neon-purple);
+    border: 1px solid var(--neon-purple);
+    color: var(--neon-purple);
+    text-shadow: 0 0 5px rgba(200, 0, 255, 0.3);
+    box-shadow: 0 0 5px rgba(200, 0, 255, 0.2);
+}
+
+.config-tag.skill {
+    border: 1px solid #ff9500;
+    color: #ff9500;
+    text-shadow: 0 0 5px rgba(255, 149, 0, 0.3);
+    box-shadow: 0 0 5px rgba(255, 149, 0, 0.2);
 }
 
 .config-tag:hover {
     border-color: var(--neon-cyan);
     color: var(--neon-cyan);
+    text-shadow: 0 0 5px rgba(0, 240, 255, 0.5);
 }
 
 .config-divider {

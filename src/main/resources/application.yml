@@ -39,6 +39,17 @@ agentscope:
     # Enable built-in tools
     enabled: true
 
+  # Session Configuration
+  session:
+    enabled: true
+    storage-path: ${user.home}/.agentscope/demo-sessions
+
+  # Knowledge Configuration
+  knowledge:
+    enabled: true
+    embedding-model: text-embedding-v3
+    dimensions: 1024
+
 # Logging Configuration
 logging:
   level:

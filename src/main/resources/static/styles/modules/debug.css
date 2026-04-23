@@ -1,43 +1,110 @@
 /* ===== DEBUG PANEL ===== */
-#debugPanel {
-    background: var(--bg-debug);
-    border-top: 1px solid var(--border-dim);
+.debug-panel {
+    width: 320px;
+    background: linear-gradient(180deg, var(--bg-debug) 0%, var(--bg-void-alt) 100%);
+    border-left: 1px solid var(--border-accent);
     display: flex;
     flex-direction: column;
-    max-height: 300px;
+    max-height: 100%;
     transition: all 0.3s;
+    box-shadow: -2px 0 25px rgba(0, 240, 255, 0.06);
 }
 
-#debugPanel.collapsed {
+.debug-panel.collapsed {
     max-height: 40px;
 }
 
-#debugToggle {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 24px;
-    height: 24px;
-    background: var(--bg-card);
-    border: 1px solid var(--border-dim);
-    border-radius: 4px;
+.debug-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-input);
+    border-bottom: 1px solid var(--border-accent);
+}
+
+.debug-title {
+    font-size: 11px;
+    color: var(--neon-cyan);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.7), 0 0 20px rgba(0, 240, 255, 0.3);
+}
+
+.debug-toggle {
+    width: 26px;
+    height: 26px;
+    background: transparent;
+    border: none;
     color: var(--text-muted);
     cursor: pointer;
     font-size: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s ease;
 }
 
-#debugToggle:hover {
-    border-color: var(--neon-cyan);
+.debug-toggle:hover {
+    background: var(--bg-card);
     color: var(--neon-cyan);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3), 0 0 20px rgba(0, 240, 255, 0.1);
 }
 
-#debugRounds {
+.debug-toggle:active {
+    transform: scale(0.95);
+}
+
+.debug-rounds {
     flex: 1;
     overflow-y: auto;
     padding: var(--space-md);
+}
+
+.debug-clear {
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-input);
+    border-top: 1px solid var(--border-dim);
+}
+
+.debug-clear button {
+    width: 100%;
+    padding: 8px 12px;
+    background: transparent;
+    border: 1px solid var(--border-dim);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.debug-clear button:hover {
+    border-color: var(--neon-magenta);
+    color: var(--neon-magenta);
+    background: rgba(255, 0, 204, 0.1);
+    box-shadow: 0 0 10px rgba(255, 0, 204, 0.4), 0 0 25px rgba(255, 0, 204, 0.15);
+    text-shadow: 0 0 8px rgba(255, 0, 204, 0.6);
+}
+
+.debug-clear button:active {
+    transform: scale(0.98);
+}
+
+#debugPanel {
+    background: var(--bg-debug);
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+    transition: all 0.3s;
+}
+
+#debugPanel.collapsed {
+    max-height: 40px;
 }
 
 /* ===== ROUND CARDS ===== */
@@ -51,14 +118,17 @@
 
 .round-card.running {
     border-color: var(--neon-cyan);
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.25), 0 0 25px rgba(0, 240, 255, 0.08);
 }
 
 .round-card.success {
     border-color: var(--neon-green);
+    box-shadow: 0 0 12px rgba(0, 255, 136, 0.2), 0 0 25px rgba(0, 255, 136, 0.06);
 }
 
 .round-card.error {
     border-color: var(--status-error);
+    box-shadow: 0 0 12px rgba(255, 42, 74, 0.25), 0 0 25px rgba(255, 42, 74, 0.08);
 }
 
 .round-header {
@@ -75,6 +145,7 @@
     font-size: 11px;
     color: var(--neon-cyan);
     font-weight: 600;
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.6), 0 0 15px rgba(0, 240, 255, 0.2);
 }
 
 .round-msg {
@@ -120,8 +191,8 @@
     gap: 4px;
 }
 
-.tokens-in { color: var(--neon-green); }
-.tokens-out { color: var(--neon-cyan); }
+.tokens-in { color: var(--neon-green); text-shadow: 0 0 5px rgba(0, 255, 136, 0.6), 0 0 12px rgba(0, 255, 136, 0.2); }
+.tokens-out { color: var(--neon-cyan); text-shadow: 0 0 5px rgba(0, 240, 255, 0.6), 0 0 12px rgba(0, 240, 255, 0.2); }
 
 .token-icon {
     width: 12px;
@@ -149,6 +220,7 @@
 .rtl-icon {
     color: var(--neon-cyan);
     min-width: 16px;
+    text-shadow: 0 0 5px rgba(0, 240, 255, 0.6), 0 0 12px rgba(0, 240, 255, 0.2);
 }
 
 .rtl-label {
@@ -167,14 +239,17 @@
 
 .rtl-row.status-running .rtl-status {
     color: var(--neon-cyan);
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.7), 0 0 15px rgba(0, 240, 255, 0.3);
 }
 
 .rtl-row.status-ok .rtl-status {
     color: var(--neon-green);
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.7), 0 0 15px rgba(0, 255, 136, 0.3);
 }
 
 .rtl-row.status-fail .rtl-status {
     color: var(--status-error);
+    text-shadow: 0 0 8px rgba(255, 42, 74, 0.7), 0 0 15px rgba(255, 42, 74, 0.3);
 }
 
 /* ===== DEBUG PIPELINE ===== */
@@ -193,6 +268,7 @@
     font-size: 11px;
     color: var(--neon-purple);
     font-weight: 600;
+    text-shadow: 0 0 8px rgba(200, 0, 255, 0.6), 0 0 15px rgba(200, 0, 255, 0.2);
 }
 
 .debug-pipeline-steps-container {
@@ -211,10 +287,12 @@
 
 .debug-pipeline-step.active {
     border-color: var(--neon-cyan);
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
 }
 
 .debug-pipeline-step.complete {
     border-color: var(--neon-green);
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
 }
 
 .debug-step-number {

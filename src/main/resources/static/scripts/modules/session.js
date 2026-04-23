@@ -1,4 +1,4 @@
-import { fetchSessions, createSession, deleteSession as deleteSessionApi } from './api.js';
+import { fetchSessions, createSession, deleteSession as deleteSessionApi } from '../api.js';
 import { escapeHtml } from './utils.js';
 
 /* ===== SESSION MANAGEMENT ===== */
@@ -6,6 +6,8 @@ export async function loadSessions() {
     try {
         var sessions = await fetchSessions();
         var listEl = document.getElementById('sessionList');
+        if (!listEl) return;  // Element not in current page
+
         listEl.innerHTML = '';
 
         sessions.forEach(function(s) {
@@ -50,15 +52,20 @@ export async function createNewSession(agentId) {
 export async function selectSession(sessionId, agentId) {
     if (window.isStreaming) return;
 
-    // Switch agent if needed (dynamic import to avoid circular dependency)
-    var { selectAgent } = await import('./agents.js');
-    if (agentId && agentId !== window.currentAgent) {
-        selectAgent(agentId);
-    }
-
     window.currentSessionId = sessionId;
     clearChatArea();
     loadSessions();
+
+    // Switch agent if needed (dynamic import to avoid circular dependency)
+    if (agentId && agentId !== window.currentAgent) {
+        var { selectAgent } = await import('./agents.js');
+        await selectAgent(agentId);
+    } else {
+        // Focus input if not switching agents
+        setTimeout(function() {
+            document.getElementById('messageInput').focus();
+        }, 100);
+    }
 }
 
 export async function deleteSession(sessionId) {
@@ -85,6 +92,8 @@ export function clearSession() {
 }
 
 function clearChatArea() {
+    // Save chatEmpty reference before clearing
+    var chatEmpty = document.getElementById('chatEmpty');
     document.getElementById('chatMessages').innerHTML = '';
     window.messageCount = 0;
     window.agentRawMarkdown = '';
@@ -92,8 +101,10 @@ function clearChatArea() {
     window.currentAgentMessageWrapper = null;
     window.thinkingContent = '';
     window.currentFileInfo = null;
-    document.getElementById('chatMessages').appendChild(document.getElementById('chatEmpty'));
-    document.getElementById('chatEmpty').style.display = 'flex';
+    if (chatEmpty) {
+        document.getElementById('chatMessages').appendChild(chatEmpty);
+        chatEmpty.style.display = 'flex';
+    }
 
     // Clear file tags
     window.uploadedFile = null;

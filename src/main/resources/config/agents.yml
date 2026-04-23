@@ -322,140 +322,140 @@ agents:
 
 # === Expert Agents (used as sub-agents by Router and Handoffs) ===
 
-- agentId: doc-expert
-  name: 文档专家
-  description: 处理文档解析、分析、提取
-  systemPrompt: |
-    你是一个文档分析专家。
-    你可以解析 .docx、.pdf、.xlsx 文件，提取关键信息并进行分析。
-    当收到文档相关问题时，使用你的工具解析文档内容。
-  modelName: qwen-plus
-  streaming: true
-  enableThinking: true
-  skills: [docx, pdf, xlsx]
-  userTools: [parse_docx, parse_pdf, parse_xlsx]
+  - agentId: doc-expert
+    name: 文档专家
+    description: 处理文档解析、分析、提取
+    systemPrompt: |
+      你是一个文档分析专家。
+      你可以解析 .docx、.pdf、.xlsx 文件，提取关键信息并进行分析。
+      当收到文档相关问题时，使用你的工具解析文档内容。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    skills: [docx, pdf, xlsx]
+    userTools: [parse_docx, parse_pdf, parse_xlsx]
 
-- agentId: search-expert
-  name: 搜索专家
-  description: 获取实时网络信息
-  systemPrompt: |
-    你是一个搜索专家。
-    你可以搜索网络获取最新信息，包括新闻、天气、股票等。
-  modelName: qwen-plus
-  streaming: true
-  enableThinking: true
-  userTools: [web_search, get_current_weather, get_news]
+  - agentId: search-expert
+    name: 搜索专家
+    description: 获取实时网络信息
+    systemPrompt: |
+      你是一个搜索专家。
+      你可以搜索网络获取最新信息，包括新闻、天气、股票等。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    userTools: [web_search, get_current_weather, get_news]
 
-- agentId: vision-expert
-  name: 视觉专家
-  description: 图片理解和 OCR
-  systemPrompt: |
-    你是一个视觉专家。
-    你可以理解图片内容，进行 OCR 文字识别、图表分析等。
-  modelName: qwen-vl-max
-  streaming: true
-  enableThinking: false
-  modality: vision
+  - agentId: vision-expert
+    name: 视觉专家
+    description: 图片理解和 OCR
+    systemPrompt: |
+      你是一个视觉专家。
+      你可以理解图片内容，进行 OCR 文字识别、图表分析等。
+    modelName: qwen-vl-max
+    streaming: true
+    enableThinking: false
+    modality: vision
 
-- agentId: sales-expert
-  name: 销售专家
-  description: 产品咨询和报价
-  systemPrompt: |
-    你是一个销售专家。
-    你可以回答产品相关问题，提供报价和购买建议。
-  modelName: qwen-plus
-  streaming: true
-  enableThinking: true
+  - agentId: sales-expert
+    name: 销售专家
+    description: 产品咨询和报价
+    systemPrompt: |
+      你是一个销售专家。
+      你可以回答产品相关问题，提供报价和购买建议。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
 
-- agentId: support-agent
-  name: 客服专员
-  description: 一般客服咨询
-  systemPrompt: |
-    你是一个客服专员。
-    你可以回答一般性问题，帮助用户解决问题。
-  modelName: qwen-plus
-  streaming: true
-  enableThinking: true
+  - agentId: support-agent
+    name: 客服专员
+    description: 一般客服咨询
+    systemPrompt: |
+      你是一个客服专员。
+      你可以回答一般性问题，帮助用户解决问题。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
 
-- agentId: sales-agent
-  name: 销售顾问
-  description: 销售咨询
-  systemPrompt: |
-    你是一个销售顾问。
-    你可以提供产品咨询、报价和购买建议。
-  modelName: qwen-plus
-  streaming: true
-  enableThinking: true
+  - agentId: sales-agent
+    name: 销售顾问
+    description: 销售咨询
+    systemPrompt: |
+      你是一个销售顾问。
+      你可以提供产品咨询、报价和购买建议。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
 
-- agentId: complaint-agent
-  name: 投诉处理
-  description: 处理客户投诉
-  systemPrompt: |
-    你是一个投诉处理专员。
-    你可以倾听客户的投诉，并提供解决方案。
-  modelName: qwen-plus
-  streaming: true
-  enableThinking: true
+  - agentId: complaint-agent
+    name: 投诉处理
+    description: 处理客户投诉
+    systemPrompt: |
+      你是一个投诉处理专员。
+      你可以倾听客户的投诉，并提供解决方案。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
 
 # === Multi-Agent: Sequential Pipeline ===
 
-- agentId: doc-analysis-pipeline
-  type: SEQUENTIAL
-  name: 文档分析流水线
-  description: 串行执行文档解析、信息提取、报告生成
-  modelName: qwen-plus
-  streaming: true
-  enableThinking: true
-  subAgents:
-    - agentId: doc-expert
-      description: 解析文档内容
-    - agentId: search-expert
-      description: 搜索补充信息
-  parallel: false
+  - agentId: doc-analysis-pipeline
+    type: SEQUENTIAL
+    name: 文档分析流水线
+    description: 串行执行文档解析、信息提取、报告生成
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    subAgents:
+      - agentId: doc-expert
+        description: 解析文档内容
+      - agentId: search-expert
+        description: 搜索补充信息
+    parallel: false
 
 # === Multi-Agent: Routing ===
 
-- agentId: smart-router
-  type: ROUTING
-  name: 智能路由器
-  description: 根据用户问题自动分发到专家 Agent
-  modelName: qwen-plus
-  streaming: true
-  enableThinking: true
-  subAgents:
-    - agentId: doc-expert
-      description: 文档分析专家，处理文档解析、分析、提取相关问题
-    - agentId: search-expert
-      description: 搜索专家，获取实时网络信息
-    - agentId: vision-expert
-      description: 视觉专家，处理图片理解和 OCR
-    - agentId: sales-expert
-      description: 销售专家，处理产品咨询和报价
-  parallel: false
+  - agentId: smart-router
+    type: ROUTING
+    name: 智能路由器
+    description: 根据用户问题自动分发到专家 Agent
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    subAgents:
+      - agentId: doc-expert
+        description: 文档分析专家，处理文档解析、分析、提取相关问题
+      - agentId: search-expert
+        description: 搜索专家，获取实时网络信息
+      - agentId: vision-expert
+        description: 视觉专家，处理图片理解和 OCR
+      - agentId: sales-expert
+        description: 销售专家，处理产品咨询和报价
+    parallel: false
 
 # === Multi-Agent: Handoffs ===
 
-- agentId: customer-service
-  type: HANDOFFS
-  name: 智能客服
-  description: 支持智能体交接的客服系统
-  modelName: qwen-plus
-  streaming: true
-  enableThinking: true
-  subAgents:
-    - agentId: support-agent
-      description: 一般客服
-    - agentId: sales-agent
-      description: 销售顾问
-    - agentId: complaint-agent
-      description: 投诉处理
-  handoffTriggers:
-    - type: INTENT
-      keywords: ["转销售", "购买", "价格", "报价"]
-      target: sales-agent
-    - type: INTENT
-      keywords: ["投诉", "不满"]
-      target: complaint-agent
-    - type: EXPLICIT
-      keywords: ["转人工", "客服"]
-      target: support-agent
+  - agentId: customer-service
+    type: HANDOFFS
+    name: 智能客服
+    description: 支持智能体交接的客服系统
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    subAgents:
+      - agentId: support-agent
+        description: 一般客服
+      - agentId: sales-agent
+        description: 销售顾问
+      - agentId: complaint-agent
+        description: 投诉处理
+    handoffTriggers:
+      - type: INTENT
+        keywords: ["转销售", "购买", "价格", "报价"]
+        target: sales-agent
+      - type: INTENT
+        keywords: ["投诉", "不满"]
+        target: complaint-agent
+      - type: EXPLICIT
+        keywords: ["转人工", "客服"]
+        target: support-agent

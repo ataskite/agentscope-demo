@@ -2,7 +2,7 @@ import './state.js';
 import { createSSEParser, uploadFile, fetchAgents, fetchSessions, createSession as createSessionApi, deleteSession as deleteSessionApi, fetchKnowledgeDocs, uploadKnowledgeDoc, removeKnowledgeDoc as removeKnowledgeDocApi, fetchSkillInfo, fetchToolInfo } from './api.js';
 import { renderMarkdown, escapeHtml, getTimestamp, formatDuration, scrollToBottom, createFileList } from './modules/utils.js';
 import { chatMessages, messageInput, sendBtn, chatEmpty, chatHeaderName, chatHeaderDesc, debugPanel, debugRounds, debugToggle, appendMessage, createThinkingBox, updateThinkingBox, collapseThinkingBox, completeThinkingBox, addAgentBubble, removeTypingIndicator, setStreamingState, showTypingIndicator } from './modules/ui.js';
-import { startRound, endRound, addTimelineRow, clearDebug, toggleDebug, handlePipelineStart, handlePipelineStepStart, handlePipelineStepEnd, handleRoutingDecision, handleHandoffStart } from './modules/debug.js';
+import { startRound, endRound, addTimelineRow, addTimelineRowForRound, clearDebug, toggleDebug, handlePipelineStart, handlePipelineStepStart, handlePipelineStepEnd, handleRoutingDecision, handleHandoffStart, updateRoundMetrics, updateRoundMetricsForRound } from './modules/debug.js';
 import { loadAgents, selectAgent, showAgentConfig, showSkillInfo, showToolInfo } from './modules/agents.js';
 import { loadSessions, createNewSession, selectSession, deleteSession, clearSession as clearSessionFn } from './modules/session.js';
 import { loadKnowledgeDocs, uploadToKnowledge, removeKnowledgeDoc } from './modules/knowledge.js';
@@ -55,6 +55,7 @@ async function sendMessage() {
         console.warn('[sendMessage] currentRound already exists, cleaning up:', currentRound);
         currentRound = null;
     }
+    roundNumber++;
     startRound(message, roundNumber, currentAgent, agents);
 
     showTypingIndicator();
@@ -141,17 +142,25 @@ async function sendMessage() {
                         // ===== HOOK LIFECYCLE EVENTS (from ObservabilityHook) =====
 
                         case 'agent_start':
+                            console.log('[SSE] agent_start received, currentRound:', currentRound ? '#' + currentRound.number : 'null');
                             if (currentRound) {
                                 addTimelineRow('phase', 'Agent Start', payload.agentName || '', 'running');
+                            } else {
+                                console.warn('[agent_start] No currentRound available!');
                             }
                             break;
 
                         case 'agent_end':
-                            if (currentRound) {
+                            console.log('[SSE] agent_end received, currentRound:', currentRound ? '#' + currentRound.number : 'null', 'payload:', payload);
+                            var targetRound = currentRound || (rounds.length > 0 ? rounds[rounds.length - 1] : null);
+                            if (targetRound) {
                                 var totalDur = payload.duration_ms || 0;
-                                addTimelineRow('phase', 'Agent End', formatDuration(totalDur), 'ok');
-                                currentRound.totalLlmCalls = payload.totalLlmCalls || 0;
-                                currentRound.totalToolCalls = payload.totalToolCalls || 0;
+                                addTimelineRowForRound(targetRound, 'phase', 'Agent End', formatDuration(totalDur), 'ok');
+                                targetRound.totalLlmCalls = payload.totalLlmCalls || 0;
+                                targetRound.totalToolCalls = payload.totalToolCalls || 0;
+                                updateRoundMetricsForRound(targetRound);
+                            } else {
+                                console.error('[agent_end] No round available! payload:', payload);
                             }
                             break;
 
@@ -361,6 +370,13 @@ async function sendMessage() {
     }
 }
 
+function clearAllMedia() {
+    window.uploadedFile = null;
+    window.uploadedImages = [];
+    window.uploadedAudio = null;
+    document.getElementById('fileTagArea').innerHTML = '';
+}
+
 function stopStreaming() {
     if (currentAbortController) {
         currentAbortController.abort();
@@ -369,6 +385,13 @@ function stopStreaming() {
     isStreaming = false;
     setStreamingState(false);
 }
+
+/* ===== GLOBAL FUNCTIONS FOR ONCLICK ===== */
+window.sendMessage = sendMessage;
+window.clearSession = clearSessionFn;
+window.toggleDebug = toggleDebug;
+window.clearDebug = clearDebug;
+window.handleFileSelect = handleFileSelect;
 
 /* ===== INIT ===== */
 loadAgents();

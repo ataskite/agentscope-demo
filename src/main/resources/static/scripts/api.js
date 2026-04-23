@@ -26,6 +26,7 @@ export function createSSEParser() {
 
 /* ===== FILE UPLOAD API ===== */
 export async function uploadFile(file) {
+    console.log('[api] uploadFile called for:', file.name);
     var formData = new FormData();
     formData.append('file', file);
 
@@ -33,7 +34,10 @@ export async function uploadFile(file) {
         method: 'POST',
         body: formData
     });
-    return await response.json();
+    console.log('[api] upload response status:', response.status);
+    var result = await response.json();
+    console.log('[api] upload response data:', result);
+    return result;
 }
 
 /* ===== AGENT LIST API ===== */

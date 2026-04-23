@@ -1,4 +1,4 @@
-import { fetchKnowledgeDocs, uploadKnowledgeDoc, removeKnowledgeDoc as removeKnowledgeDocApi } from './api.js';
+import { fetchKnowledgeDocs, uploadKnowledgeDoc, removeKnowledgeDoc as removeKnowledgeDocApi } from '../api.js';
 import { escapeHtml } from './utils.js';
 
 /* ===== KNOWLEDGE MANAGEMENT ===== */
@@ -6,6 +6,8 @@ export async function loadKnowledgeDocs() {
     try {
         var docs = await fetchKnowledgeDocs();
         var docsEl = document.getElementById('knowledgeDocs');
+        if (!docsEl) return;  // Element not in current page
+
         docsEl.innerHTML = '';
 
         if (docs.length === 0) {
@@ -18,7 +20,7 @@ export async function loadKnowledgeDocs() {
             item.className = 'knowledge-doc-item';
             item.innerHTML =
                 '<span class="knowledge-doc-name">' + escapeHtml(name) + '</span>' +
-                '<button class="session-item-delete" onclick="removeKnowledgeDoc(\'' + escapeHtml(name) + '\')">×</button>';
+                '<button class="session-item-delete" onclick="removeKnowledgeDoc(\'' + escapeHtml(name).replace(/'/g, "\\'") + '\')">×</button>';
             docsEl.appendChild(item);
         });
     } catch (err) {
@@ -52,3 +54,6 @@ export async function removeKnowledgeDoc(fileName) {
         console.error('Failed to remove knowledge doc', err);
     }
 }
+
+// Global function for onclick
+window.removeKnowledgeDoc = removeKnowledgeDoc;

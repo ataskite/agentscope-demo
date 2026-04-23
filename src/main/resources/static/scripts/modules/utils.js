@@ -1,8 +1,31 @@
 /* ===== MARKED CONFIG ===== */
 if (typeof marked !== 'undefined') {
-    marked.setOptions({
+    marked.use({
         breaks: true,
-        gfm: true
+        gfm: true,
+        renderer: {
+            code: function(_ref) {
+                var text = _ref.text;
+                var lang = _ref.lang || '';
+                var highlighted;
+                if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
+                    try {
+                        highlighted = hljs.highlight(text, { language: lang }).value;
+                    } catch (e) {
+                        highlighted = escapeHtml(text);
+                    }
+                } else if (typeof hljs !== 'undefined') {
+                    try {
+                        highlighted = hljs.highlightAuto(text).value;
+                    } catch (e) {
+                        highlighted = escapeHtml(text);
+                    }
+                } else {
+                    highlighted = escapeHtml(text);
+                }
+                return '<pre><code class="hljs' + (lang ? ' language-' + lang : '') + '">' + highlighted + '</code></pre>';
+            }
+        }
     });
 }
 

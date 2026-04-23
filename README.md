@@ -1,32 +1,45 @@
 # AgentScope Demo
 
-基于 [AgentScope](https://java.agentscope.io/) 的 Java AI Agent 演示项目，支持多种 Agent 类型、工具调用、文档解析和模板生成。
+基于 [AgentScope](https://java.agentscope.io/) 的 Java AI Agent 演示项目，支持多种 Agent 类型、工具调用、文档解析、多模态交互、RAG 知识库和多智能体协作。
 
 ## 特性
 
-- **多种 Agent 类型**
-  - **Basic Chat**: 纯对话 AI 助手
-  - **Tool Calling**: 带工具调用的 AI 助手（时间、计算器、天气）
-  - **Task Agent**: 支持文档解析的智能助手（.docx/.pdf/.xlsx）
-  - **Template Editor**: Word 模板变量替换
-  - **Bank Invoice**: 银行发票自动生成
+### 🤖 多种 Agent 类型
+- **Basic Chat**: 纯对话 AI 助手
+- **Tool Calling**: 带工具调用的 AI 助手（时间、计算器、天气）
+- **Task Agent**: 支持文档解析的智能助手（.docx/.pdf/.xlsx）
+- **Template Editor**: Word 模板变量替换
+- **Bank Invoice**: 银行发票自动生成
+- **Vision Analyzer**: 图片理解和 OCR 文字识别
+- **Voice Assistant**: 语音交互助手
+- **Search Assistant**: 网络搜索和实时信息查询
+- **Project Planner**: 项目规划和任务分解
 
-- **响应式流式架构**
-  - 基于 Project Reactor 的 SSE 实时推送
-  - 完整的可观测性：Agent 生命周期、LLM 调用、工具执行、Token 使用量
-  - 调试面板实时显示思考过程和工具调用状态
+### 🎨 多模态支持
+- **文本**: 自然语言对话
+- **图片**: OCR 文字识别、图表分析、场景理解
+- **语音**: 语音转文字、语音交互
 
-- **技能系统 (SkillBox)**
-  - 通过 ClasspathSkillRepository 加载技能
-  - 支持渐进式工具披露（Progressive Tool Disclosure）
-  - 纯 Java 实现，无 Python 依赖
+### 🔍 RAG 知识库
+- 上传文档（PDF、DOCX、TXT、MD）
+- 向量相似度搜索
+- 智能问答
 
-- **文档处理**
-  - DOCX 解析与生成（Apache POI）
-  - PDF 解析（Apache PDFBox）
-  - XLSX 解析与生成
-  - Word 模板变量替换
-  - 银行发票 Excel/Word 自动生成
+### 🗂️ 会话管理
+- 持久化会话历史
+- 会话隔离
+- 多会话管理
+
+### 🤝 多智能体协作
+- **Sequential Pipeline**: 串行执行多个子智能体
+- **Intelligent Routing**: 自动路由到专家智能体
+- **Agent Handoffs**: 智能体交接
+
+### 📊 实时调试面板
+- Agent 生命周期追踪
+- LLM 调用详情（Token 使用量）
+- 工具执行状态和耗时
+- 思考过程可视化
 
 ## 快速开始
 
@@ -79,19 +92,28 @@ ToolAgent：[调用 get_current_time] [调用 calculate_sum]
 ### Task Agent - 文档解析
 
 ```
-1. 点击上传按钮（📎）
+1. 点击上传按钮（+）
 2. 选择 .docx、.pdf 或 .xlsx 文件
 3. 输入指令："请总结这个文档的核心内容"
 4. TaskAgent 自动调用对应解析工具
 ```
 
-### Template Editor - Word 模板编辑
+### Vision Analyzer - 图片分析
 
 ```
-1. 上传 .docx 模板文件（包含变量占位符）
-2. Agent 解析模板识别占位符
-3. 提供需要填入的值
-4. 自动生成填充后的文档
+1. 点击上传按钮（+）
+2. 选择图片文件（.jpg, .png, .gif, .webp）
+3. 自动切换到视觉分析智能体
+4. 输入问题："图片中有什么文字？"
+```
+
+### RAG Chat - 知识库问答
+
+```
+1. 点击知识库图标
+2. 上传文档（PDF、DOCX、TXT）
+3. 切换到 "RAG Chat" 智能体
+4. 提问与文档相关的问题
 ```
 
 ### Bank Invoice - 发票生成
@@ -119,45 +141,73 @@ ToolAgent：[调用 get_current_time] [调用 calculate_sum]
 ## 项目结构
 
 ```
-src/main/java/com/msxf/agentscope/
+src/main/java/com/skloda/agentscope/
 ├── controller/
-│   └── ChatController.java       # 响应式 SSE 聊天 + 文件上传
+│   ├── ChatController.java         # 响应式 SSE 聊天 + 文件上传
+│   └── KnowledgeController.java    # 知识库管理 API
 ├── service/
-│   └── AgentService.java         # Agent 路由，实例缓存
+│   ├── AgentService.java           # Agent 路由，实例缓存
+│   ├── SessionManagerService.java  # 会话管理
+│   └── KnowledgeService.java       # RAG 知识库
 ├── agent/
-│   ├── AgentConfig.java          # Agent 配置实体
-│   ├── AgentConfigService.java   # 配置加载服务
-│   └── AgentFactory.java         # Agent 创建工厂
+│   ├── AgentConfig.java            # Agent 配置实体
+│   ├── AgentConfigService.java     # 配置加载服务
+│   └── AgentFactory.java           # Agent 创建工厂
 ├── runtime/
-│   ├── AgentRuntime.java         # 运行时容器
-│   └── AgentRuntimeFactory.java  # 运行时工厂
+│   ├── AgentRuntime.java           # 运行时容器
+│   └── AgentRuntimeFactory.java    # 运行时工厂
 ├── hook/
-│   └── ObservabilityHook.java    # 可观测性 Hook
+│   └── ObservabilityHook.java      # 可观测性 Hook
 ├── model/
-│   ├── ChatRequest.java          # 请求模型
-│   └── ChatEvent.java            # 事件模型
+│   ├── ChatRequest.java            # 请求模型
+│   ├── ChatEvent.java              # 事件模型
+│   ├── SessionInfo.java            # 会话信息
+│   └── MultiModalMessage.java      # 多模态消息
 └── tool/
-    ├── ToolRegistry.java         # 工具注册表
-    ├── SimpleTools.java          # 演示工具集
-    ├── DocxParserTool.java       # DOCX 解析
-    ├── PdfParserTool.java        # PDF 解析
-    ├── XlsxParserTool.java       # XLSX 解析
-    └── BankInvoiceTool.java        # 银行发票生成
+    ├── ToolRegistry.java           # 工具注册表
+    ├── SimpleTools.java            # 演示工具集
+    ├── DocxParserTool.java         # DOCX 解析
+    ├── PdfParserTool.java          # PDF 解析
+    ├── XlsxParserTool.java         # XLSX 解析
+    ├── BankInvoiceTool.java        # 银行发票生成
+    └── WebSearchTool.java          # 网络搜索工具
 
 src/main/resources/
-├── skills/                       # 技能定义
+├── skills/                         # 技能定义
 │   ├── docx/SKILL.md
 │   ├── pdf/SKILL.md
 │   ├── xlsx/SKILL.md
 │   ├── docx-template/SKILL.md
 │   └── bank_invoice_java/
 │       ├── SKILL.md
-│       └── assets/               # 模板文件
+│       └── assets/                 # 模板文件
 ├── config/
-│   └── agents.yml                # Agent 配置（YAML）
+│   └── agents.yml                  # Agent 配置（YAML）
 ├── templates/
-│   └── chat.html                 # 单页聊天 UI
-└── application.yml               # 配置文件
+│   └── chat.html                   # 单页聊天 UI
+├── static/
+│   ├── scripts/                    # 前端模块化 JS
+│   │   ├── chat.js
+│   │   ├── api.js
+│   │   ├── state.js
+│   │   └── modules/
+│   │       ├── agents.js
+│   │       ├── session.js
+│   │       ├── knowledge.js
+│   │       ├── upload.js
+│   │       ├── debug.js
+│   │       ├── ui.js
+│   │       └── utils.js
+│   └── styles/                     # 模块化 CSS
+│       ├── chat.css
+│       └── modules/
+│           ├── header.css
+│           ├── sidebar.css
+│           ├── chat.css
+│           ├── debug.css
+│           ├── modal.css
+│           └── upload.css
+└── application.yml                 # 配置文件
 ```
 
 ## 配置
@@ -169,8 +219,10 @@ agentscope:
   model:
     dashscope:
       api-key: ${DASHSCOPE_API_KEY}    # 通过环境变量设置
-      model-name: qwen-plus
-      enable-thinking: true
+  session:
+    storage-path: ${user.home}/.agentscope/demo-sessions
+  knowledge:
+    dimensions: 1024                   # 向量维度
 
 spring:
   servlet:
@@ -194,54 +246,61 @@ spring:
 
 调试面板实时显示完整的 Agent 执行过程：
 
-| 事件 | 说明 |
-|------|------|
-| `agent_start` | Agent 开始处理 |
-| `llm_start` | LLM 调用开始 |
-| `thinking` | 思考过程流式输出 |
-| `llm_end` | LLM 调用结束（含 Token 统计） |
-| `tool_start` | 工具执行开始 |
-| `tool_end` | 工具执行结束（含耗时） |
-| `agent_end` | Agent 完成（含总耗时） |
-| `text` | 响应文本流式输出 |
+| 事件 | 说明 | 显示位置 |
+|------|------|----------|
+| `agent_start` | Agent 开始处理 | 调试面板 |
+| `llm_start` | LLM 调用开始 | 调试面板 |
+| `thinking` | 思考过程流式输出 | 调试面板 |
+| `llm_end` | LLM 调用结束（含 Token 统计） | 调试面板 |
+| `tool_start` | 工具执行开始 | 调试面板 |
+| `tool_end` | 工具执行结束（含耗时） | 调试面板 |
+| `agent_end` | Agent 完成（含总耗时） | 调试面板 |
+| `text` | 响应文本流式输出 | 主聊天区 |
+| `error` | 错误信息 | 警告提示 |
 
-## Agent 配置
+## 内置 Agent
 
-Agent 在 `config/agents.yml` 中定义，格式如下：
+| Agent ID | 名称 | 功能 | 模型 |
+|----------|------|------|------|
+| `chat-basic` | Basic Chat | 简单对话 | qwen-plus |
+| `tool-test-simple` | Tool Calling | 时间、计算器、天气 | qwen-plus |
+| `task-document-analysis` | Task Agent | 文档解析 | qwen-plus |
+| `task-template-docx-editor` | Template Editor | Word 模板编辑 | qwen-plus |
+| `bank-invoice` | Bank Invoice | 发票生成 | qwen-plus |
+| `rag-chat` | RAG Chat | 知识库问答 | qwen-plus |
+| `vision-analyzer` | Vision Analyzer | 图片理解和 OCR | qwen-vl-max |
+| `voice-assistant` | Voice Assistant | 语音交互 | qwen-audio-turbo |
+| `invoice-extractor` | Invoice Extractor | 发票信息提取 | qwen-vl-max |
+| `idcard-extractor` | ID Card Extractor | 身份证信息提取 | qwen-vl-max |
+| `search-assistant` | Search Assistant | 网络搜索 | qwen-plus |
+| `project-planner` | Project Planner | 项目规划 | qwen-plus |
+| `smart-router` | Smart Router | 智能路由 | qwen-plus |
+| `customer-service` | Smart Customer Service | 智能客服 | qwen-plus |
 
-```yaml
-agents:
-  - agentId: my-agent
-    name: My Agent
-    description: Agent 描述
-    systemPrompt: |
-      系统提示词
-    modelName: qwen-plus
-    streaming: true
-    enableThinking: true
-    skills: []
-    userTools: []
-    systemTools: []
-```
+## API 端点
 
-### 内置 Agent
+| 方法 | 路径 | 描述 |
+|------|------|-------------|
+| GET | `/` | Chat UI 页面 |
+| POST | `/chat/send` | 发送消息，返回 SSE 流 |
+| POST | `/chat/upload` | 上传文件（multipart） |
+| GET | `/chat/download` | 下载上传的文件 |
+| GET | `/api/agents` | 列出所有 Agent 配置 |
+| GET | `/api/agents/{agentId}` | 获取指定 Agent 配置 |
+| GET | `/api/sessions` | 列出所有会话 |
+| POST | `/api/sessions` | 创建新会话 |
+| DELETE | `/api/sessions/{sessionId}` | 删除会话 |
+| GET | `/api/knowledge/documents` | 列出知识库文档 |
+| POST | `/api/knowledge/upload` | 上传文档到知识库 |
+| DELETE | `/api/knowledge/documents/{fileName}` | 从知识库删除文档 |
 
-| Agent ID | 名称 | 功能 |
-|----------|------|------|
-| `chat-basic` | Basic Chat | 简单对话 |
-| `tool-test-simple` | Tool Calling | 时间、计算器、天气 |
-| `task-document-analysis` | Task Agent | 文档解析 |
-| `task-template-docx-editor` | Template Editor | Word 模板编辑 |
-| `bank-invoice` | Bank Invoice | 发票生成 |
+## 添加新 Agent
 
-## 添加新技能
-
-1. 创建工具类（带 `@Tool` 注解）
-2. 在 `src/main/resources/skills/` 创建 `SKILL.md`
-3. 在 `ToolRegistry` 中注册技能
-4. 在 `config/agents.yml` 中配置 Agent
-
-详见 [CLAUDE.md](./CLAUDE.md)。
+1. 在 `src/main/resources/config/agents.yml` 中添加配置
+2. 如果使用新工具类，在 `tool/` 目录创建带 `@Tool` 注解的方法
+3. 在 `ToolRegistry` 构造函数中注册工具
+4. 如果使用技能，创建 `skills/<name>/SKILL.md`
+5. 重启应用 — Agent 自动出现在 UI 中
 
 ## 开发
 

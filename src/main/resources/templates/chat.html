@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AgentScope // AI TERMINAL</title>
     <link rel="stylesheet" href="/vendor/fonts/fonts.css">
+    <link rel="stylesheet" href="/vendor/css/highlight.css">
     <link rel="stylesheet" href="/styles/chat.css">
     <script src="/vendor/js/marked.min.js"></script>
+    <script src="/vendor/js/highlight.min.js"></script>
 </head>
 <body>
     <div class="scanlines"></div>
@@ -44,7 +46,7 @@
                     <div id="fileTagArea" style="padding: 0 0 8px 0; min-height: 0;"></div>
                     <div class="chat-input-row">
                         <button class="upload-btn" id="uploadBtn" onclick="document.getElementById('fileInput').click()" title="Upload file">+</button>
-                        <input type="file" id="fileInput" accept=".docx,.pdf,.xlsx" style="display:none" onchange="handleFileSelect(this)">
+                        <input type="file" id="fileInput" accept=".docx,.pdf,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.wav,.mp3,.m4a,.mp4" style="display:none" onchange="handleFileSelect(this)">
                         <textarea class="chat-input" id="messageInput" placeholder="Enter command or message..." rows="1"></textarea>
                         <button class="send-btn" id="sendBtn" onclick="sendMessage()">SEND</button>
                     </div>
@@ -65,6 +67,6 @@
         </div>
     </div>
 
-    <script type="module" src="/scripts/chat.js"></script>
+    <script type="module" src="/scripts/chat.js?v=2.1"></script>
 </body>
 </html>

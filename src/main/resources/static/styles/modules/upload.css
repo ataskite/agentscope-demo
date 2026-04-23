@@ -27,6 +27,7 @@
 
 .file-tag-name {
     color: var(--neon-cyan);
+    text-shadow: 0 0 5px rgba(0, 240, 255, 0.4);
 }
 
 .file-tag-name.image-preview {
@@ -68,9 +69,9 @@
     background: var(--bg-card);
 }
 
-.file-icon.docx { background: var(--neon-blue); }
-.file-icon.pdf { background: var(--neon-red); }
-.file-icon.xlsx { background: var(--neon-green); }
+.file-icon.docx { background: var(--neon-blue); box-shadow: 0 0 6px rgba(0, 184, 255, 0.4); }
+.file-icon.pdf { background: var(--status-error); box-shadow: 0 0 6px rgba(255, 42, 74, 0.4); }
+.file-icon.xlsx { background: var(--neon-green); box-shadow: 0 0 6px rgba(0, 255, 136, 0.4); }
 
 .file-name {
     font-size: 12px;

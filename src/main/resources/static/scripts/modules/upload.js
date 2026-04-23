@@ -1,11 +1,16 @@
-import { uploadFile } from './api.js';
+import { uploadFile } from '../api.js';
 import { escapeHtml } from './utils.js';
 
 /* ===== FILE UPLOAD ===== */
 export async function handleFileSelect(input) {
+    console.log('[upload] handleFileSelect called', input);
     var file = input.files[0];
-    if (!file) return;
+    if (!file) {
+        console.log('[upload] No file selected');
+        return;
+    }
 
+    console.log('[upload] File selected:', file.name, file.size, file.type);
     var lowerName = file.name.toLowerCase();
 
     // Check file type
@@ -22,7 +27,9 @@ export async function handleFileSelect(input) {
     }
 
     try {
+        console.log('[upload] Starting upload for:', file.name);
         var data = await uploadFile(file);
+        console.log('[upload] Upload response:', data);
         if (data.error) {
             console.error('Upload error:', data.error);
             return;
@@ -30,6 +37,7 @@ export async function handleFileSelect(input) {
 
         // Handle based on file type
         if (isDoc) {
+            console.log('[upload] Document uploaded, switching to task-document-analysis');
             if (window.currentAgent !== 'task-document-analysis') {
                 var { selectAgent } = await import('./agents.js');
                 selectAgent('task-document-analysis');
@@ -37,6 +45,7 @@ export async function handleFileSelect(input) {
             window.uploadedFile = data;
             showFileTag(data.fileName);
         } else if (isImage) {
+            console.log('[upload] Image uploaded');
             window.uploadedImages.push(data);
             showImagePreviews();
             // Auto-switch to vision agent if available
@@ -45,6 +54,7 @@ export async function handleFileSelect(input) {
                 selectAgent('vision-analyzer');
             }
         } else if (isAudio) {
+            console.log('[upload] Audio uploaded');
             window.uploadedAudio = data;
             showAudioPreview();
             // Auto-switch to voice agent if available

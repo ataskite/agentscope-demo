@@ -38,10 +38,16 @@ public class AgentRuntime implements AutoCloseable {
     private final ObservabilityHook hook;
     private final Sinks.Many<Map<String, Object>> sink;
     private final BiConsumer<String, Map<String, Object>> hookBridge;
+    private final Runnable onClose;
 
     public AgentRuntime(ReActAgent agent, ObservabilityHook hook) {
+        this(agent, hook, null);
+    }
+
+    public AgentRuntime(ReActAgent agent, ObservabilityHook hook, Runnable onClose) {
         this.agent = agent;
         this.hook = hook;
+        this.onClose = onClose;
         this.sink = Sinks.many().multicast().onBackpressureBuffer();
 
         // Bridge Hook events to Sink
@@ -67,6 +73,7 @@ public class AgentRuntime implements AutoCloseable {
                 .build();
 
         // Hook events flux (from ObservabilityHook)
+        // Use doOnComplete to ensure hook sink is completed when stream completes
         Flux<Map<String, Object>> hookEvents = this.sink.asFlux()
                 .doOnNext(payload -> log.debug("[hook -> stream] {}", payload));
 
@@ -81,19 +88,30 @@ public class AgentRuntime implements AutoCloseable {
                             },
                             () -> {
                                 log.debug("Text stream completed for agent: {}", agent.getName());
-                                // Send done event before completing
+                                // Small delay before sending done to ensure agent_end hook event is sent first
+                                try {
+                                    Thread.sleep(100);
+                                } catch (InterruptedException e) {
+                                    Thread.currentThread().interrupt();
+                                }
+                                // Send done event
                                 sink.next(Map.of("type", "done"));
                                 sink.complete();
                             }
                     );
         });
 
-        // Merge both streams
+        // Merge both streams and ensure hook sink is completed when done
         return Flux.merge(hookEvents, textStream)
                 .doOnCancel(this::close)
-                .doOnComplete(this::close)
+                .doOnComplete(() -> {
+                    // Ensure hook sink is completed
+                    this.sink.tryEmitComplete();
+                    this.close();
+                })
                 .doOnError(e -> {
                     log.error("Stream error for agent: {}", agent.getName(), e);
+                    this.sink.tryEmitComplete();
                     this.close();
                 });
     }
@@ -103,7 +121,7 @@ public class AgentRuntime implements AutoCloseable {
             Msg msg = event.getMessage();
             if (msg != null && msg.getContent() != null) {
                 for (ContentBlock block : msg.getContent()) {
-                    if (block instanceof TextBlock tb && !event.isLast()) {
+                    if (block instanceof TextBlock tb) {
                         String text = tb.getText();
                         if (text != null && !text.isEmpty()) {
                             sink.next(Map.of("type", "text", "content", text));
@@ -131,6 +149,9 @@ public class AgentRuntime implements AutoCloseable {
         hook.removeConsumer(hookBridge);
         hook.reset();
         sink.tryEmitComplete();
+        if (onClose != null) {
+            onClose.run();
+        }
         log.debug("AgentRuntime closed for agent: {}", agent.getName());
     }
 }

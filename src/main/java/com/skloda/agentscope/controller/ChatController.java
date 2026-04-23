@@ -5,7 +5,9 @@ import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.AgentConfigService;
 import com.skloda.agentscope.model.ChatEvent;
 import com.skloda.agentscope.model.ChatRequest;
+import com.skloda.agentscope.model.SessionInfo;
 import com.skloda.agentscope.service.AgentService;
+import com.skloda.agentscope.service.SessionManagerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,8 +32,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Chat Controller with reactive SSE streaming.
- * POST /chat/send returns Flux&lt;ServerSentEvent&gt; directly — no session management needed.
+ * Chat Controller with reactive SSE streaming + session management.
  */
 @Controller
 public class ChatController {
@@ -45,6 +46,9 @@ public class ChatController {
 
     @Autowired
     private AgentConfigService agentConfigService;
+
+    @Autowired
+    private SessionManagerService sessionManagerService;
 
     @GetMapping("/")
     public String chat() {
@@ -89,29 +93,84 @@ public class ChatController {
         return Flux.just(sseError(message), sseDone());
     }
 
-    // ---- Endpoints ----
+    // ---- Chat Endpoints ----
 
     /**
      * Send message endpoint — returns SSE stream directly.
+     * Supports session-aware mode via sessionId in request body.
+     * Supports multi-modal input (images/audio).
      */
     @PostMapping(value = "/chat/send", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @ResponseBody
     public Flux<ServerSentEvent<String>> sendMessage(@RequestBody ChatRequest request) {
         String message = request.getMessage();
-        if (message == null || message.isBlank()) {
+        // Allow empty message if images or audio are provided
+        if ((message == null || message.isBlank()) &&
+            (request.getImages() == null || request.getImages().isEmpty()) &&
+            request.getAudio() == null) {
             return errorAndDone("Message cannot be empty");
         }
 
-        return agentService.createStreamFlux(request.getAgentId(), message,
-                        request.getFilePath(), request.getFileName())
+        // Inject sessionId into the first SSE event so frontend can track it
+        String sessionId = request.getSessionId();
+
+        return agentService.createStreamFlux(
+                        request.getAgentId(), message,
+                        request.getFilePath(), request.getFileName(),
+                        sessionId,
+                        request.getImages(),
+                        request.getAudio())
                 .map(this::sseEvent)
-                .concatWith(Flux.just(sseDone()))
                 .onErrorResume(e -> {
                     log.error("Agent stream error", e);
                     String errMsg = e.getMessage() != null ? e.getMessage() : "Unknown error";
                     return errorAndDone(errMsg);
                 });
     }
+
+    // ---- Session Endpoints ----
+
+    /**
+     * List all sessions.
+     */
+    @GetMapping("/api/sessions")
+    @ResponseBody
+    public List<SessionInfo> listSessions() {
+        return sessionManagerService.listSessions();
+    }
+
+    /**
+     * Create a new session for the given agent.
+     */
+    @PostMapping("/api/sessions")
+    @ResponseBody
+    public ResponseEntity<?> createSession(@RequestBody Map<String, String> body) {
+        String agentId = body.getOrDefault("agentId", "chat-basic");
+        try {
+            SessionManagerService.SessionContext ctx = sessionManagerService.createNewSession(agentId);
+            SessionInfo info = new SessionInfo();
+            info.setSessionId(ctx.getSessionId());
+            info.setAgentId(ctx.getAgentId());
+            AgentConfig cfg = agentConfigService.findAgentConfig(ctx.getAgentId()).orElse(null);
+            info.setAgentName(cfg != null ? cfg.getName() : ctx.getAgentId());
+            return ResponseEntity.ok(info);
+        } catch (Exception e) {
+            log.error("Failed to create session for agent: {}", agentId, e);
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Delete a session.
+     */
+    @DeleteMapping("/api/sessions/{sessionId}")
+    @ResponseBody
+    public ResponseEntity<?> deleteSession(@PathVariable String sessionId) {
+        sessionManagerService.deleteSession(sessionId);
+        return ResponseEntity.ok(Map.of("deleted", true));
+    }
+
+    // ---- Agent Config Endpoints ----
 
     /**
      * List all available agent configurations.
@@ -161,8 +220,11 @@ public class ChatController {
         return ResponseEntity.ok(toolInfo);
     }
 
+    // ---- File Endpoints ----
+
     /**
      * File upload endpoint.
+     * Supports documents (.docx, .pdf, .xlsx), images (.jpg, .jpeg, .png, .gif, .webp), and audio (.wav, .mp3, .m4a).
      */
     @PostMapping("/chat/upload")
     @ResponseBody
@@ -177,8 +239,16 @@ public class ChatController {
         }
 
         String lowerName = originalName.toLowerCase();
-        if (!lowerName.endsWith(".docx") && !lowerName.endsWith(".pdf") && !lowerName.endsWith(".xlsx")) {
-            return Map.of("error", "Only .docx, .pdf, and .xlsx files are supported");
+        // Supported formats
+        boolean isDocument = lowerName.endsWith(".docx") || lowerName.endsWith(".pdf") || lowerName.endsWith(".xlsx");
+        boolean isImage = lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg") ||
+                         lowerName.endsWith(".png") || lowerName.endsWith(".gif") ||
+                         lowerName.endsWith(".webp");
+        boolean isAudio = lowerName.endsWith(".wav") || lowerName.endsWith(".mp3") ||
+                         lowerName.endsWith(".m4a") || lowerName.endsWith(".mp4");
+
+        if (!isDocument && !isImage && !isAudio) {
+            return Map.of("error", "Supported formats: .docx, .pdf, .xlsx, .jpg, .jpeg, .png, .gif, .webp, .wav, .mp3, .m4a");
         }
 
         try {
@@ -195,7 +265,8 @@ public class ChatController {
             return Map.of(
                     "fileId", fileId,
                     "fileName", originalName,
-                    "filePath", filePath.toAbsolutePath().toString()
+                    "filePath", filePath.toAbsolutePath().toString(),
+                    "fileType", isImage ? "image" : isAudio ? "audio" : "document"
             );
         } catch (Exception e) {
             log.error("Failed to upload file", e);

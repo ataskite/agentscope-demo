@@ -6,39 +6,49 @@
 }
 
 :root {
-    /* Base Colors - Cyberpunk Dark Theme */
-    --bg-void: #0f0f1a;
-    --bg-void-alt: #1a1a2e;
-    --bg-card: #1e1e30;
-    --bg-card-hover: #262640;
-    --bg-card-active: #2e2e50;
-    --bg-input: #16161e;
-    --bg-debug: #141420;
+    /* Base Colors - Cyberpunk Dark Theme (Lightened) */
+    --bg-void: #12121f;
+    --bg-void-alt: #161626;
+    --bg-card: #1c1c30;
+    --bg-card-hover: #22223d;
+    --bg-card-active: #282845;
+    --bg-input: #14141f;
+    --bg-debug: #151524;
 
-    /* Neon Accents */
-    --neon-cyan: #00F5FF;
-    --neon-green: #39FF14;
-    --neon-magenta: #FF10F0;
-    --neon-blue: #4D9FFF;
-    --neon-purple: #B794F6;
-    --neon-pink: #FF6B9D;
+    /* Neon Accents - Saturated with depth */
+    --neon-cyan: #00f0ff;
+    --neon-green: #00ff88;
+    --neon-magenta: #ff00cc;
+    --neon-blue: #00b8ff;
+    --neon-purple: #c800ff;
+    --neon-pink: #ff0088;
+    --neon-yellow: #ffee00;
+    --neon-orange: #ff6600;
 
-    /* Text Colors */
-    --text-primary: #e8e4f0;
-    --text-secondary: #8886a0;
-    --text-muted: #585670;
-    --text-glow: rgba(0, 245, 255, 0.7);
+    /* Neon Glow Colors (for box-shadow / text-shadow) */
+    --glow-cyan: 0 0 7px rgba(0, 240, 255, 0.6), 0 0 20px rgba(0, 240, 255, 0.3);
+    --glow-cyan-strong: 0 0 7px rgba(0, 240, 255, 0.8), 0 0 20px rgba(0, 240, 255, 0.5), 0 0 40px rgba(0, 240, 255, 0.2);
+    --glow-magenta: 0 0 7px rgba(255, 0, 204, 0.6), 0 0 20px rgba(255, 0, 204, 0.3);
+    --glow-magenta-strong: 0 0 7px rgba(255, 0, 204, 0.8), 0 0 20px rgba(255, 0, 204, 0.5), 0 0 40px rgba(255, 0, 204, 0.2);
+    --glow-green: 0 0 7px rgba(0, 255, 136, 0.6), 0 0 20px rgba(0, 255, 136, 0.3);
+    --glow-purple: 0 0 7px rgba(200, 0, 255, 0.6), 0 0 20px rgba(200, 0, 255, 0.3);
+
+    /* Text Colors - Cyberpunk high-contrast */
+    --text-primary: #e8e8f0;
+    --text-secondary: #b8b8d0;
+    --text-muted: #6868a0;
+    --text-glow: rgba(0, 240, 255, 0.9);
 
     /* Status Colors */
     --status-thinking: var(--neon-blue);
     --status-tool: var(--neon-green);
-    --status-error: #FF4757;
+    --status-error: #ff2a4a;
     --status-user: var(--neon-cyan);
 
     /* Borders */
-    --border-dim: #2a2a40;
-    --border-accent: rgba(0, 245, 255, 0.3);
-    --border-glow: rgba(0, 245, 255, 0.5);
+    --border-dim: #1e1e35;
+    --border-accent: rgba(0, 240, 255, 0.35);
+    --border-glow: rgba(0, 240, 255, 0.6);
 
     /* Spacing */
     --space-xs: 4px;
@@ -63,26 +73,12 @@ html, body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* ===== SCANLINE OVERLAY ===== */
+/* ===== SCANLINE OVERLAY (DISABLED) ===== */
 .scanlines {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 1000;
-    background: repeating-linear-gradient(
-        0deg,
-        rgba(0, 0, 0, 0.1),
-        rgba(0, 0, 0, 0.1) 1px,
-        transparent 1px,
-        transparent 2px
-    );
-    opacity: 0.3;
+    display: none;
 }
 
-/* ===== GRID BACKGROUND ===== */
+/* ===== GRID BACKGROUND (CLEAN - NO LINES) ===== */
 .grid-bg {
     position: fixed;
     top: 0;
@@ -91,29 +87,52 @@ html, body {
     height: 100%;
     pointer-events: none;
     z-index: 0;
-    background-image:
-        linear-gradient(rgba(0, 245, 255, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 245, 255, 0.03) 1px, transparent 1px);
-    background-size: 40px 40px;
+    background: radial-gradient(ellipse at center, rgba(0, 240, 255, 0.03) 0%, transparent 70%);
+}
+
+/* ===== NEON FLICKER (subtle) ===== */
+@keyframes neonFlicker {
+    0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+    20%, 24%, 55% { opacity: 0.85; }
+}
+
+.neon-flicker {
+    animation: neonFlicker 3s infinite;
 }
 
 /* ===== MARKDOWN STYLES ===== */
 .md-render p { margin: 0.5em 0; }
-.md-render h1, .md-render h2, .md-render h3 { margin: 0.8em 0 0.4em; color: var(--neon-cyan); }
+.md-render h1 { margin: 1em 0 0.5em; font-size: 1.4em; color: var(--neon-cyan); text-shadow: 0 0 8px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.2); border-bottom: 1px solid var(--border-dim); padding-bottom: 0.3em; }
+.md-render h2 { margin: 0.8em 0 0.4em; font-size: 1.2em; color: var(--neon-cyan); text-shadow: 0 0 8px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.2); border-bottom: 1px solid var(--border-dim); padding-bottom: 0.25em; }
+.md-render h3 { margin: 0.6em 0 0.3em; font-size: 1.1em; color: var(--neon-blue); text-shadow: 0 0 8px rgba(0, 184, 255, 0.5); }
+.md-render h4, .md-render h5, .md-render h6 { margin: 0.5em 0 0.3em; font-size: 1.05em; color: var(--text-primary); }
 .md-render ul, .md-render ol { margin: 0.5em 0; padding-left: 1.5em; }
-.md-render li { margin: 0.3em 0; }
-.md-render code { background: var(--bg-input); padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
-.md-render pre { background: var(--bg-input); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 12px 0; }
-.md-render pre code { background: transparent; padding: 0; }
-.md-render blockquote { border-left: 3px solid var(--neon-cyan); padding-left: 12px; margin: 12px 0; color: var(--text-secondary); }
-.md-render a { color: var(--neon-blue); text-decoration: none; }
+.md-render li { margin: 0.2em 0; }
+.md-render li > p { margin: 0.2em 0; }
+.md-render strong { color: var(--neon-green); font-weight: 600; }
+.md-render em { color: var(--neon-yellow); font-style: italic; }
+.md-render hr { border: none; border-top: 1px solid var(--border-dim); margin: 1em 0; }
+.md-render code { background: rgba(0, 240, 255, 0.08); border: 1px solid rgba(0, 240, 255, 0.15); padding: 2px 6px; border-radius: 3px; font-size: 0.9em; color: var(--neon-cyan); text-shadow: 0 0 5px rgba(0, 240, 255, 0.3); }
+.md-render pre { background: var(--bg-input); border: 1px solid var(--border-accent); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 12px 0; box-shadow: inset 0 0 20px rgba(0, 240, 255, 0.03); }
+.md-render pre code { background: transparent; border: none; color: var(--text-primary); text-shadow: none; font-size: 0.85em; line-height: 1.5; }
+/* Let highlight.js theme colors take over when hljs is active */
+.md-render pre code.hljs { background: transparent; border: none; text-shadow: none; font-size: 0.85em; line-height: 1.5; color: inherit; padding: 0; }
+.md-render blockquote { border-left: 3px solid var(--neon-cyan); padding: 4px 12px; margin: 12px 0; color: var(--text-secondary); background: rgba(0, 240, 255, 0.03); border-radius: 0 4px 4px 0; }
+.md-render a { color: var(--neon-blue); text-decoration: none; text-shadow: 0 0 5px rgba(0, 184, 255, 0.4); }
 .md-render a:hover { text-decoration: underline; }
 .md-render table { border-collapse: collapse; width: 100%; margin: 12px 0; }
 .md-render th, .md-render td { border: 1px solid var(--border-dim); padding: 8px 12px; text-align: left; }
-.md-render th { background: var(--bg-card); color: var(--neon-cyan); }
+.md-render th { background: var(--bg-card); color: var(--neon-cyan); text-shadow: 0 0 5px rgba(0, 240, 255, 0.3); }
 
 /* ===== SCROLLBAR ===== */
-::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-void); }
-::-webkit-scrollbar-thumb { background: var(--border-dim); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--border-accent); }
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--neon-cyan), var(--neon-magenta));
+    border-radius: 3px;
+    box-shadow: 0 0 8px rgba(0, 240, 255, 0.6), 0 0 15px rgba(0, 240, 255, 0.2);
+}
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, var(--neon-magenta), var(--neon-cyan));
+    box-shadow: 0 0 10px rgba(255, 0, 204, 0.7), 0 0 20px rgba(255, 0, 204, 0.3);
+}

@@ -1,5 +1,5 @@
-import { debugRounds, debugPanel, debugToggle, scrollToBottom } from './ui.js';
-import { escapeHtml, formatDuration } from './utils.js';
+import { debugRounds, debugPanel, debugToggle } from './ui.js';
+import { escapeHtml, formatDuration, scrollToBottom } from './utils.js';
 
 /* ===== ROUND MANAGEMENT ===== */
 export function startRound(userMessage, roundNumber, currentAgent, agents) {
@@ -134,11 +134,19 @@ export function updateRoundMetricsForRound(r) {
 
 export function addTimelineRow(type, label, metrics, status) {
     if (!window.currentRound) return null;
-    var timeline = document.getElementById('round-timeline-' + window.currentRound.number);
-    if (!timeline) return null;
+    return addTimelineRowForRound(window.currentRound, type, label, metrics, status);
+}
 
-    window.currentRound.timelineStep = (window.currentRound.timelineStep || 0) + 1;
-    var stepNum = window.currentRound.timelineStep;
+export function addTimelineRowForRound(round, type, label, metrics, status) {
+    if (!round) return null;
+    var timeline = document.getElementById('round-timeline-' + round.number);
+    if (!timeline) {
+        console.warn('[addTimelineRowForRound] Timeline not found for round #' + round.number);
+        return null;
+    }
+
+    round.timelineStep = (round.timelineStep || 0) + 1;
+    var stepNum = round.timelineStep;
 
     var row = document.createElement('div');
     row.className = 'rtl-row type-' + type;

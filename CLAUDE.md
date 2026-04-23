@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Spring Boot 3.5.13 + Java 17 demo for AgentScope (v1.0.11), a Java agent framework with LLM-backed ReAct agents. Features multiple agent types: basic chat, tool-calling, document analysis, and template-based document generation (Bank Invoice).
+Spring Boot 3.5.13 + Java 17 demo for AgentScope (v1.0.11), a Java agent framework with LLM-backed ReAct agents. Features multiple agent types: basic chat, tool-calling, document analysis, multi-modal support (vision/audio), RAG knowledge base, session management, and multi-agent collaboration.
 
 ## Build & Run
 
@@ -30,7 +30,13 @@ Agents are defined in `src/main/resources/config/agents.yml` using kebab-case ID
 
 **Configuration chain:** `agents.yml` → `AgentConfigService` → `AgentFactory` → `AgentRuntimeFactory` → `AgentService` (caches instances)
 
-Each agent config includes: `agentId`, `name`, `description`, `systemPrompt`, `modelName`, `streaming`, `enableThinking`, `skills[]`, `userTools[]`, `systemTools[]`.
+Each agent config includes: `agentId`, `name`, `description`, `systemPrompt`, `modelName`, `streaming`, `enableThinking`, `modality` (text/vision/audio), `skills[]`, `userTools[]`, `systemTools[]`, `ragEnabled`, `autoContext`.
+
+**Agent types:**
+- **Single Agent**: Standard ReAct agent with tools/skills
+- **Sequential Pipeline**: Executes sub-agents in series (`type: SEQUENTIAL`)
+- **Routing**: LLM routes to appropriate sub-agent (`type: ROUTING`)
+- **Handoffs**: Intent-based agent switching (`type: HANDOFFS`)
 
 **Adding a new agent:**
 1. Add entry to `config/agents.yml`
@@ -51,9 +57,30 @@ public String parseDocx(
 
 Register directly via `toolkit.registerTool(new SimpleTools())` or bind via SkillBox.
 
+### Session Management
+
+`SessionManagerService` manages conversation persistence:
+
+- **SessionContext**: Holds `ReActAgent`, `Memory`, `SessionManager`
+- **Storage**: JSON files in `${user.home}/.agentscope/demo-sessions/`
+- **Lifecycle**: Create → Cache → Auto-save on completion
+- **API**: `/api/sessions` for list/create/delete
+
+Each session maintains its own agent instance with isolated memory.
+
+### Knowledge Service (RAG)
+
+`KnowledgeService` provides vector similarity search:
+
+- **Embedding**: DashScope text-embedding-v3 (1024 dimensions)
+- **Storage**: InMemoryStore for demo
+- **Readers**: PDF, DOCX, TXT, MD
+- **Retrieval**: Configurable limit and score threshold
+- **API**: `/api/knowledge/upload` to add documents
+
 ### Reactive Streaming Architecture
 
-`ChatController.sendMessage` returns `Flux<ServerSentEvent<String>>` directly — no session management needed. `AgentService.streamEvents` uses `AgentRuntime` which merges hook events with agent text stream:
+`ChatController.sendMessage` returns `Flux<ServerSentEvent<String>>` directly. `AgentService.streamEvents` uses `AgentRuntime` which merges hook events with agent text stream:
 
 **AgentRuntime lifecycle:**
 1. `AgentRuntimeFactory.createRuntime(agentId)` creates fresh `ObservabilityHook` + `ReActAgent`
@@ -72,6 +99,11 @@ Register directly via `toolkit.registerTool(new SimpleTools())` or bind via Skil
 | `tool_start` | Hook (PreActingEvent) | tool name, params | Debug panel |
 | `tool_end` | Hook (PostActingEvent) | tool result, duration | Debug panel |
 | `agent_end` | Hook (PostCallEvent) | total LLM/tool calls, duration | Debug panel |
+| `pipeline_start` | Multi-agent | pipeline ID, step count | Debug panel |
+| `pipeline_step_start` | Multi-agent | step index, agent ID | Debug panel |
+| `pipeline_step_end` | Multi-agent | step completion | Debug panel |
+| `routing_decision` | Multi-agent | selected agent, reasoning | Debug panel |
+| `handoff_start` | Multi-agent | from/to agent, reason | Debug panel |
 | `text` | Agent stream | incremental response text | Main chat area |
 | `error` | Hook/ErrorEvent | error message | Alert |
 
@@ -83,15 +115,34 @@ Register directly via `toolkit.registerTool(new SimpleTools())` or bind via Skil
 - **Metrics collection**: token counts (input/output/total), LLM time, tool durations
 - **Tool call details**: name, parameters, result preview, success status
 - **Skill identification**: recognizes `load_skill_through_path` and extracts skill names
+- **Multi-agent events**: pipeline, routing, and handoff tracking
 
 ### File Upload Flow
 
 1. Frontend sends file to `POST /chat/upload` (MultipartFile)
 2. Saved to `{java.io.tmpdir}/agentscope-uploads/{uuid}{ext}`
-3. Response: `{fileId, fileName, filePath}`
-4. Frontend stores in `uploadedFile`, shows tag, auto-switches to task agent
-5. On send, `filePath` + `fileName` included in `/chat/send` body
-6. `AgentService.streamEvents` prepends file info to message (e.g., `[用户上传了文件: x.docx, 路径: /tmp/...]`)
+3. Response: `{fileId, fileName, filePath, fileType}`
+4. Frontend stores in `uploadedFile`/`uploadedImages`/`uploadedAudio`, shows tag
+5. Auto-switches agent based on file type (doc→task-agent, image→vision, audio→voice)
+6. On send, file info included in `/chat/send` body as `filePath`/`fileName` or `images[]`/`audio`
+7. `AgentService.streamEvents` prepends file info to message
+
+**Supported formats:**
+- Documents: .docx, .pdf, .xlsx
+- Images: .jpg, .jpeg, .png, .gif, .webp
+- Audio: .wav, .mp3, .m4a, .mp4
+
+### Multi-Modal Support
+
+**Vision agents** (`modality: vision`):
+- Model: qwen-vl-max
+- Input: Images via `images[]` array in ChatRequest
+- Use cases: OCR, chart analysis, scene understanding
+
+**Audio agents** (`modality: audio`):
+- Model: qwen-audio-turbo
+- Input: Audio via `audio` object in ChatRequest
+- Use cases: Speech-to-text, voice interaction
 
 ### Bank Invoice Generator
 
@@ -102,22 +153,52 @@ Specialized agent (`bank-invoice`) that generates Excel and Word documents from 
 - **Features**: Automatic name desensitization in filenames (张三丰 → 张某某), auto-submission date in Word doc
 - **Output**: Two files saved to `{java.io.tmpdir}/agentscope-uploads/`
 
+### Frontend Architecture
+
+Modular vanilla JavaScript with ES6 imports:
+
+```
+scripts/
+├── chat.js              # Main entry point, event handlers
+├── api.js               # API wrappers (fetch, SSE parsing)
+├── state.js             # Global state with getters/setters
+└── modules/
+    ├── agents.js        # Agent list, selection, config modal
+    ├── session.js       # Session list, create, delete, switch
+    ├── knowledge.js     # Knowledge doc list, upload, remove
+    ├── upload.js        # File upload handling
+    ├── debug.js         # Debug panel, timeline, metrics
+    ├── ui.js            # Message rendering, modals, typing indicator
+    └── utils.js         # Utilities (markdown, escapeHtml, formatting)
+```
+
+**Key patterns:**
+- State management via `state.js` with Object.defineProperty getters/setters
+- Module imports (no bundler, native ES6)
+- SSE streaming via `createSSEParser()`
+- Global functions exposed via `window.functionName = functionName`
+
 ## Project Structure
 
 ```
-src/main/java/com/msxf/agentscope/
+src/main/java/com/skloda/agentscope/
 ├── AgentScopeDemoApplication.java    # Spring Boot entry point
 ├── agent/
 │   ├── AgentConfig.java              # Agent config entity
 │   ├── AgentConfigService.java       # Config loading and query service
 │   └── AgentFactory.java             # Agent creation from config
 ├── controller/
-│   └── ChatController.java           # Reactive SSE chat + file upload
+│   ├── ChatController.java           # Reactive SSE chat + file upload
+│   └── KnowledgeController.java      # Knowledge base management API
 ├── service/
-│   └── AgentService.java             # Agent routing with instance cache
+│   ├── AgentService.java             # Agent routing with instance cache
+│   ├── SessionManagerService.java    # Session lifecycle management
+│   └── KnowledgeService.java         # RAG knowledge base
 ├── model/
 │   ├── ChatRequest.java              # Request payload (agentId, message, file info)
-│   └── ChatEvent.java                # SSE event wrapper (type, content)
+│   ├── ChatEvent.java                # SSE event wrapper (type, content)
+│   ├── SessionInfo.java              # Session metadata
+│   └── MultiModalMessage.java        # Multi-modal message wrapper
 ├── hook/
 │   └── ObservabilityHook.java        # Hook for agent lifecycle events
 ├── runtime/
@@ -129,7 +210,8 @@ src/main/java/com/msxf/agentscope/
     ├── DocxParserTool.java           # DOCX parsing via Apache POI
     ├── PdfParserTool.java            # PDF parsing via Apache PDFBox
     ├── XlsxParserTool.java           # XLSX parsing via Apache POI
-    └── BankInvoiceTool.java          # Bank invoice generation
+    ├── BankInvoiceTool.java          # Bank invoice generation
+    └── WebSearchTool.java            # Web search integration
 
 src/main/resources/
 ├── application.yml                   # Config (api-key, multipart limits, logging)
@@ -145,6 +227,32 @@ src/main/resources/
 │       └── assets/                   # Template files
 │           ├── bank_template.xlsx
 │           └── bank_template.docx
+├── static/
+│   ├── scripts/                      # Frontend JavaScript modules
+│   │   ├── chat.js                   # Main entry point
+│   │   ├── api.js                    # API wrappers
+│   │   ├── state.js                  # State management
+│   │   └── modules/                  # Feature modules
+│   │       ├── agents.js
+│   │       ├── session.js
+│   │       ├── knowledge.js
+│   │       ├── upload.js
+│   │       ├── debug.js
+│   │       ├── ui.js
+│   │       └── utils.js
+│   ├── styles/                       # Modular CSS
+│   │   ├── chat.css
+│   │   └── modules/
+│   │       ├── header.css
+│   │       ├── sidebar.css
+│   │       ├── chat.css
+│   │       ├── debug.css
+│   │       ├── modal.css
+│   │       └── upload.css
+│   └── vendor/                       # Third-party libraries
+│       └── js/
+│           ├── marked.min.js         # Markdown parser
+│           └── highlight.min.js      # Syntax highlighting
 └── templates/
     └── chat.html                     # Single-page chat UI (vanilla JS + SSE)
 ```
@@ -163,9 +271,19 @@ src/main/resources/
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/` | Chat UI page |
-| POST | `/chat/send` | Send message, returns `Flux<ServerSentEvent<String>>` (body: `{agentId, message, filePath?, fileName?}`) |
-| POST | `/chat/upload` | Upload file (multipart), returns `{fileId, fileName, filePath}` |
+| POST | `/chat/send` | Send message, returns `Flux<ServerSentEvent<String>>` (body: `{agentId, message, sessionId?, filePath?, fileName?, images[]?, audio?}`) |
+| POST | `/chat/upload` | Upload file (multipart), returns `{fileId, fileName, filePath, fileType}` |
 | GET | `/chat/download?fileId=` | Download file |
+| GET | `/api/agents` | List all agent configurations |
+| GET | `/api/agents/{agentId}` | Get specific agent configuration |
+| GET | `/api/skills/{skillName}` | Get skill documentation |
+| GET | `/api/tools/{toolName}` | Get tool documentation |
+| GET | `/api/sessions` | List all sessions |
+| POST | `/api/sessions` | Create new session (body: `{agentId}`) |
+| DELETE | `/api/sessions/{sessionId}` | Delete session |
+| GET | `/api/knowledge/documents` | List knowledge base documents |
+| POST | `/api/knowledge/upload` | Upload document to knowledge base (multipart) |
+| DELETE | `/api/knowledge/documents/{fileName}` | Remove document from knowledge base |
 
 ## Dependencies
 
@@ -180,5 +298,24 @@ src/main/resources/
 
 Key config in `application.yml`:
 - `agentscope.model.dashscope.api-key`: Set via `DASHSCOPE_API_KEY` env var
+- `agentscope.session.storage-path`: Default `${user.home}/.agentscope/demo-sessions`
+- `agentscope.knowledge.dimensions`: Vector embedding dimensions (default 1024)
 - `spring.servlet.multipart.max-file-size`: 50MB (file upload limit)
 - `logging.level.io.agentscope: DEBUG` for AgentScope logs
+
+## Debugging
+
+**Frontend debugging:**
+- Open browser DevTools Console
+- Look for `[upload]`, `[api]`, `[SSE]` prefixed logs
+- Check Network tab for SSE stream and upload requests
+
+**Backend debugging:**
+- Check logs for `Session {} saved` messages
+- Enable `DEBUG` logging for `io.agentscope`
+- Monitor AgentScope hook events in console
+
+**Common issues:**
+- File upload not working: Check browser console for CORS or network errors
+- Agent not appearing: Verify `agents.yml` syntax and tool registration
+- Session not persisting: Check file permissions for session directory

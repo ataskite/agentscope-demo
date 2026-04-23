@@ -1,6 +1,7 @@
-import { fetchAgents, fetchSkillInfo, fetchToolInfo } from './api.js';
+import { fetchAgents, fetchSkillInfo, fetchToolInfo } from '../api.js';
 import { escapeHtml } from './utils.js';
 import { setStreamingState } from './ui.js';
+import { agents } from '../state.js';
 
 /* ===== LOAD AGENTS ===== */
 export async function loadAgents() {
@@ -11,11 +12,13 @@ export async function loadAgents() {
         agentListEl.innerHTML = '';
 
         agentList.forEach(function(agent) {
-            window.agents[agent.agentId] = {
+            agents[agent.agentId] = {
                 name: agent.name,
                 desc: agent.description,
                 config: agent
             };
+            // Also expose to window for compatibility
+            window.agents = agents;
 
             var card = document.createElement('div');
             card.className = 'agent-card';
@@ -37,8 +40,11 @@ export async function loadAgents() {
         if (agentList.length > 0) {
             selectAgent(agentList[0].agentId);
         }
+
+        // Sync with window
+        window.agents = agents;
     } catch (err) {
-        // Agent loading error
+        console.error('Failed to load agents:', err);
     }
 }
 
@@ -77,22 +83,25 @@ export async function selectAgent(agentId) {
         window.currentRound = null;
         window.roundNumber = 0;
     }
-    if (!window.agents[agentId]) return;
+    if (!agents[agentId]) return;
     window.currentAgent = agentId;
+    currentAgent = agentId;
 
     document.querySelectorAll('.agent-card').forEach(function(card) {
         card.classList.toggle('active', card.dataset.agentId === agentId);
     });
 
-    document.getElementById('chatHeaderName').textContent = window.agents[agentId].name;
-    document.getElementById('chatHeaderDesc').textContent = window.agents[agentId].desc;
+    document.getElementById('chatHeaderName').textContent = agents[agentId].name;
+    document.getElementById('chatHeaderDesc').textContent = agents[agentId].desc;
 
+    // Clear messages and restore empty state
+    var chatEmpty = document.getElementById('chatEmpty');
     document.getElementById('chatMessages').innerHTML = '';
     window.messageCount = 0;
-    document.getElementById('chatMessages').appendChild(document.getElementById('chatEmpty'));
-    document.getElementById('chatEmpty').style.display = 'flex';
-
-    document.getElementById('messageInput').focus();
+    if (chatEmpty) {
+        document.getElementById('chatMessages').appendChild(chatEmpty);
+        chatEmpty.style.display = 'flex';
+    }
 
     // Reset agent message state
     window.currentThinkingBox = null;
@@ -108,11 +117,16 @@ export async function selectAgent(agentId) {
     } catch (err) {
         console.error('Failed to create session:', err);
     }
+
+    // Focus input AFTER session creation to ensure DOM is stable
+    setTimeout(function() {
+        document.getElementById('messageInput').focus();
+    }, 100);
 }
 
 /* ===== CONFIG VIEWER ===== */
 export function showAgentConfig(agentId) {
-    var agent = window.agents[agentId];
+    var agent = agents[agentId];
     if (!agent || !agent.config) return;
 
     var config = agent.config;
@@ -120,7 +134,7 @@ export function showAgentConfig(agentId) {
     var skillsHtml;
     if (config.skills && config.skills.length > 0) {
         skillsHtml = '<div class="config-field-value tags">' +
-            config.skills.map(function(s) { return '<span class="config-tag" onclick="showSkillInfo(\'' + String(s).replace(/'/g, "\\'").replace(/"/g, '\\"') + '\')">' + escapeHtml(s) + '</span>'; }).join('') +
+            config.skills.map(function(s) { return '<span class="config-tag skill" onclick="showSkillInfo(\'' + String(s).replace(/'/g, "\\'").replace(/"/g, '\\"') + '\')">' + escapeHtml(s) + '</span>'; }).join('') +
             '</div>';
     } else {
         skillsHtml = '<div class="config-field-value tags"><span class="config-tag none">None</span></div>';
@@ -207,7 +221,8 @@ export function showAgentConfig(agentId) {
     document.body.appendChild(overlay);
 }
 
-// Global function for onclick
+// Global functions for onclick
+window.showAgentConfig = showAgentConfig;
 window.closeConfigModal = function() {
     var modal = document.getElementById('configModal');
     if (modal) modal.remove();
@@ -346,41 +361,10 @@ function showImagePreviews() {
     area.innerHTML = html;
 }
 
-// Global functions for onclick
-window.removeImage = function(index) {
-    window.uploadedImages.splice(index, 1);
-    showImagePreviews();
-};
-
-window.removeAudio = function() {
-    window.uploadedAudio = null;
-    showImagePreviews();
-};
-
-window.showImageModal = function(index) {
-    var img = window.uploadedImages[index];
-    if (!img) return;
-
-    var overlay = document.createElement('div');
-    overlay.className = 'image-modal-overlay';
-    overlay.id = 'imageModal';
-    overlay.onclick = function(e) {
-        if (e.target === overlay) window.closeImageModal();
-    };
-
-    overlay.innerHTML =
-        '<div class="image-modal-content">' +
-            '<button class="image-modal-close" onclick="window.closeImageModal()">×</button>' +
-            '<img src="/chat/download?fileId=' + img.fileId + '" alt="' + escapeHtml(img.fileName) + '">' +
-            '<div class="image-modal-filename">' + escapeHtml(img.fileName) + '</div>' +
-        '</div>';
-
-    document.body.appendChild(overlay);
-};
-
-window.closeImageModal = function() {
-    var modal = document.getElementById('imageModal');
-    if (modal) {
-        modal.remove();
-    }
-};
+// Export functions for global access (needed for inline onclick handlers)
+// These must be set after module load
+// Note: removeFile, removeImage, removeAudio, showImageModal, closeImageModal
+// are defined in upload.js to avoid duplication
+window.showAgentConfig = showAgentConfig;
+window.showSkillInfo = showSkillInfo;
+window.showToolInfo = showToolInfo;
