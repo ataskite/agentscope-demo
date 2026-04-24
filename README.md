@@ -41,6 +41,24 @@
 - 工具执行状态和耗时
 - 思考过程可视化
 
+## 界面展示
+
+### 🎨 赛博朋克风格 UI
+
+系统采用赛博朋克风格的深色主题界面，提供沉浸式的 AI 交互体验。
+
+![AgentScope Demo UI](https://cdn.jsdelivr.net/gh/ataskite/pic-bed/images/20260424_84edd414636ef045a729330fbd2dc321.png)
+
+**核心功能区域：**
+- **左侧边栏**：Agent 选择器、会话管理、知识库管理
+- **中间聊天区**：流式对话、Markdown 渲染、代码高亮
+- **右侧调试面板**：实时显示 Agent 运行时信息
+  - 🔍 **Timeline**: Agent 执行时间线
+  - 📊 **Metrics**: Token 统计、调用耗时
+  - 🧠 **Thinking**: AI 思考过程可视化
+  - 🛠️ **Tools**: 工具调用详情和结果
+  - 🤖 **Multi-Agent**: 多智能体协作事件
+
 ## 快速开始
 
 ### 环境要求

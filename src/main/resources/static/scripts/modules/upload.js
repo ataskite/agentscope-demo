@@ -1,8 +1,25 @@
 import { uploadFile } from '../api.js';
 import { escapeHtml } from './utils.js';
 
+/* ===== INIT: bind upload events programmatically ===== */
+export function initUpload() {
+    var uploadBtn = document.getElementById('uploadBtn');
+    var fileInput = document.getElementById('fileInput');
+    if (!uploadBtn || !fileInput) {
+        console.error('[upload] uploadBtn or fileInput not found');
+        return;
+    }
+    uploadBtn.addEventListener('click', function() {
+        fileInput.click();
+    });
+    fileInput.addEventListener('change', function() {
+        handleFileSelect(fileInput);
+    });
+    console.log('[upload] events bound');
+}
+
 /* ===== FILE UPLOAD ===== */
-export async function handleFileSelect(input) {
+async function handleFileSelect(input) {
     console.log('[upload] handleFileSelect called', input);
     var file = input.files[0];
     if (!file) {
@@ -31,43 +48,50 @@ export async function handleFileSelect(input) {
         var data = await uploadFile(file);
         console.log('[upload] Upload response:', data);
         if (data.error) {
-            console.error('Upload error:', data.error);
+            console.error('[upload] Server error:', data.error);
             return;
         }
 
-        // Handle based on file type
+        // Handle based on file type — set data FIRST, then switch agent
         if (isDoc) {
-            console.log('[upload] Document uploaded, switching to task-document-analysis');
-            if (window.currentAgent !== 'task-document-analysis') {
-                var { selectAgent } = await import('./agents.js');
-                selectAgent('task-document-analysis');
-            }
+            console.log('[upload] Document uploaded:', data.fileName);
             window.uploadedFile = data;
             showFileTag(data.fileName);
+            if (window.currentAgent !== 'task-document-analysis') {
+                var { selectAgent } = await import('./agents.js');
+                await selectAgent('task-document-analysis');
+                // selectAgent clears uploadedFile via removeFile(), restore it after
+                window.uploadedFile = data;
+                showFileTag(data.fileName);
+            }
         } else if (isImage) {
-            console.log('[upload] Image uploaded');
+            console.log('[upload] Image uploaded:', data.fileName);
             window.uploadedImages.push(data);
             showImagePreviews();
-            // Auto-switch to vision agent if available
             if (window.agents['vision-analyzer']) {
                 var { selectAgent } = await import('./agents.js');
-                selectAgent('vision-analyzer');
+                await selectAgent('vision-analyzer');
+                // Restore image data after agent switch
+                window.uploadedImages.push(data);
+                showImagePreviews();
             }
         } else if (isAudio) {
-            console.log('[upload] Audio uploaded');
+            console.log('[upload] Audio uploaded:', data.fileName);
             window.uploadedAudio = data;
             showAudioPreview();
-            // Auto-switch to voice agent if available
             if (window.agents['voice-assistant']) {
                 var { selectAgent } = await import('./agents.js');
-                selectAgent('voice-assistant');
+                await selectAgent('voice-assistant');
+                // Restore audio data after agent switch
+                window.uploadedAudio = data;
+                showAudioPreview();
             }
         }
     } catch (err) {
-        console.error('Upload error:', err);
+        console.error('[upload] Error:', err);
+    } finally {
+        input.value = '';
     }
-
-    input.value = '';
 }
 
 function showFileTag(fileName) {

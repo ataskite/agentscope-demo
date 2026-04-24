@@ -6,7 +6,7 @@ import { startRound, endRound, addTimelineRow, addTimelineRowForRound, clearDebu
 import { loadAgents, selectAgent, showAgentConfig, showSkillInfo, showToolInfo } from './modules/agents.js';
 import { loadSessions, createNewSession, selectSession, deleteSession, clearSession as clearSessionFn } from './modules/session.js';
 import { loadKnowledgeDocs, uploadToKnowledge, removeKnowledgeDoc } from './modules/knowledge.js';
-import { handleFileSelect } from './modules/upload.js';
+import { initUpload } from './modules/upload.js';
 
 /* ===== INPUT HANDLING ===== */
 messageInput.addEventListener('keydown', function(e) {
@@ -391,9 +391,9 @@ window.sendMessage = sendMessage;
 window.clearSession = clearSessionFn;
 window.toggleDebug = toggleDebug;
 window.clearDebug = clearDebug;
-window.handleFileSelect = handleFileSelect;
 
 /* ===== INIT ===== */
+initUpload();
 loadAgents();
 loadSessions();
 loadKnowledgeDocs();
