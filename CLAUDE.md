@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Spring Boot 3.5.13 + Java 17 demo for AgentScope (v1.0.11), a Java agent framework with LLM-backed ReAct agents. Features multiple agent types: basic chat, tool-calling, document analysis, multi-modal support (vision/audio), RAG knowledge base, session management, and multi-agent collaboration.
+Spring Boot 3.5.13 + Java 17 demo for AgentScope (v1.0.11), a Java agent framework with LLM-backed ReAct agents. Features multiple agent types: basic chat, tool-calling, document analysis, multi-modal support (vision/audio), RAG knowledge base, session management, web search, and multi-agent collaboration (sequential pipelines, routing, handoffs).
 
 ## Build & Run
 
@@ -33,10 +33,11 @@ Agents are defined in `src/main/resources/config/agents.yml` using kebab-case ID
 Each agent config includes: `agentId`, `name`, `description`, `systemPrompt`, `modelName`, `streaming`, `enableThinking`, `modality` (text/vision/audio), `skills[]`, `userTools[]`, `systemTools[]`, `ragEnabled`, `autoContext`.
 
 **Agent types:**
-- **Single Agent**: Standard ReAct agent with tools/skills
-- **Sequential Pipeline**: Executes sub-agents in series (`type: SEQUENTIAL`)
-- **Routing**: LLM routes to appropriate sub-agent (`type: ROUTING`)
-- **Handoffs**: Intent-based agent switching (`type: HANDOFFS`)
+- **SINGLE**: Standard ReAct agent with tools/skills
+- **SEQUENTIAL**: Executes sub-agents in series (output of one feeds into next)
+- **PARALLEL**: Fanout pipeline where all sub-agents receive same message concurrently
+- **ROUTING**: LLM intelligently routes to appropriate sub-agent based on request content
+- **HANDOFFS**: Intent-based agent switching with explicit trigger rules (keywords/intent/explicit)
 
 **Adding a new agent:**
 1. Add entry to `config/agents.yml`
@@ -137,12 +138,59 @@ Each session maintains its own agent instance with isolated memory.
 **Vision agents** (`modality: vision`):
 - Model: qwen-vl-max
 - Input: Images via `images[]` array in ChatRequest
-- Use cases: OCR, chart analysis, scene understanding
+- Use cases: OCR, chart analysis, scene understanding, invoice/ID card extraction
 
 **Audio agents** (`modality: audio`):
 - Model: qwen-audio-turbo
 - Input: Audio via `audio` object in ChatRequest
 - Use cases: Speech-to-text, voice interaction
+
+### Multi-Agent Collaboration
+
+`CompositeAgentFactory` creates multi-agent compositions:
+
+**Sequential Pipeline** (`type: SEQUENTIAL`):
+- Sub-agents execute in series
+- Output of one agent feeds into the next
+- Example: `doc-analysis-pipeline` → doc-expert → search-expert
+
+**Parallel Pipeline** (`type: PARALLEL`):
+- All sub-agents receive the same message
+- Execute concurrently (configurable via `parallel` flag)
+- Results are aggregated
+
+**Routing Agent** (`type: ROUTING`):
+- LLM intelligently selects which sub-agent to handle the request
+- Sub-agents registered as `SubAgentTool` instances
+- System prompt includes sub-agent descriptions for routing decisions
+- Example: `smart-router` routes to doc-expert/search-expert/vision-expert/sales-expert
+
+**Handoffs Agent** (`type: HANDOFFS`):
+- Intent-based agent switching with explicit trigger rules
+- Trigger types: `INTENT` (keywords match), `EXPLICIT` (user requests)
+- Example: `customer-service` handoffs to sales-agent on "价格/购买" keywords
+
+**Configuration format:**
+```yaml
+agentId: smart-router
+type: ROUTING
+subAgents:
+  - agentId: doc-expert
+    description: 文档分析专家
+  - agentId: search-expert
+    description: 搜索专家
+
+# OR for handoffs
+agentId: customer-service
+type: HANDOFFS
+subAgents:
+  - agentId: sales-agent
+    description: 销售顾问
+handoffTriggers:
+  - type: INTENT
+    keywords: ["购买", "价格"]
+    target: sales-agent
+```
 
 ### Bank Invoice Generator
 
@@ -186,7 +234,13 @@ src/main/java/com/skloda/agentscope/
 ├── agent/
 │   ├── AgentConfig.java              # Agent config entity
 │   ├── AgentConfigService.java       # Config loading and query service
-│   └── AgentFactory.java             # Agent creation from config
+│   ├── AgentFactory.java             # Single agent creation from config
+│   ├── AgentType.java                # Enum: SINGLE, SEQUENTIAL, PARALLEL, ROUTING, HANDOFFS
+│   ├── TriggerType.java              # Enum: INTENT, EXPLICIT (for handoff triggers)
+│   ├── SubAgentConfig.java           # Sub-agent configuration with description
+│   └── HandoffTrigger.java           # Handoff trigger rules (type, keywords, target)
+├── composite/
+│   └── CompositeAgentFactory.java    # Multi-agent composition factory (pipelines, routing, handoffs)
 ├── controller/
 │   ├── ChatController.java           # Reactive SSE chat + file upload
 │   └── KnowledgeController.java      # Knowledge base management API
@@ -203,7 +257,12 @@ src/main/java/com/skloda/agentscope/
 │   └── ObservabilityHook.java        # Hook for agent lifecycle events
 ├── runtime/
 │   ├── AgentRuntime.java             # Runtime container (Agent + Hook + Sink)
-│   └── AgentRuntimeFactory.java      # Factory for AgentRuntime instances
+│   ├── AgentRuntimeFactory.java      # Factory for AgentRuntime instances
+│   └── PipelineAgentRuntime.java     # Runtime for sequential/parallel pipelines
+├── config/
+│   ├── CorrectSkillDiagnostic.java  # Skill loading diagnostic utility
+│   ├── JarEnvironmentDiagnostic.java # JAR environment diagnostic
+│   └── SkillFileSystemHelperDiagnosticRunner.java # Skill file system diagnostic
 └── tool/
     ├── ToolRegistry.java             # Tool/skill name-to-instance mapping
     ├── SimpleTools.java              # Demo tools (@Tool annotated methods)
@@ -211,7 +270,13 @@ src/main/java/com/skloda/agentscope/
     ├── PdfParserTool.java            # PDF parsing via Apache PDFBox
     ├── XlsxParserTool.java           # XLSX parsing via Apache POI
     ├── BankInvoiceTool.java          # Bank invoice generation
-    └── WebSearchTool.java            # Web search integration
+    └── WebSearchTool.java            # Web search (Tavily API: news, weather, stock, general search)
+
+**WebSearchTool tools:**
+- `web_search(query)`: General web search with Tavily API
+- `get_current_weather(location)`: Get weather for a location
+- `get_stock_price(symbol)`: Get stock price
+- `get_news(category)`: Get latest news by category (Tavily API)
 
 src/main/resources/
 ├── application.yml                   # Config (api-key, multipart limits, logging)
@@ -222,11 +287,13 @@ src/main/resources/
 │   ├── pdf/SKILL.md                  # PDF skill definition
 │   ├── xlsx/SKILL.md                 # XLSX skill definition
 │   ├── docx-template/SKILL.md        # DOCX template skill definition
-│   └── bank_invoice_java/            # Bank invoice skill
-│       ├── SKILL.md                  # Skill documentation
-│       └── assets/                   # Template files
-│           ├── bank_template.xlsx
-│           └── bank_template.docx
+│   ├── bank_invoice_java/            # Bank invoice skill
+│   │   ├── SKILL.md                  # Skill documentation
+│   │   └── assets/                   # Template files
+│   │       ├── bank_template.xlsx
+│   │       └── bank_template.docx
+│   └── bank_invoice/                 # Bank invoice skill (alternate version)
+│       └── SKILL.md
 ├── static/
 │   ├── scripts/                      # Frontend JavaScript modules
 │   │   ├── chat.js                   # Main entry point
@@ -257,14 +324,52 @@ src/main/resources/
     └── chat.html                     # Single-page chat UI (vanilla JS + SSE)
 ```
 
+## Available Agent Types
+
+### Single Agents
+- **chat-basic**: Simple conversational AI with thinking enabled
+- **tool-test-simple**: Time, calculator, and weather tools
+- **task-document-analysis**: Document analysis (.docx, .pdf, .xlsx)
+- **task-template-docx-editor**: Word template variable replacement
+- **bank-invoice**: Bank invoice generator (Excel + Word)
+- **rag-chat**: RAG-based knowledge base Q&A
+- **vision-analyzer**: Image understanding (OCR, charts, scenes)
+- **voice-assistant**: Speech-to-text voice assistant
+- **invoice-extractor**: Invoice information extraction from images
+- **idcard-extractor**: ID card information extraction from images
+- **search-assistant**: Web search assistant (news, weather, stocks)
+- **project-planner**: Project planning and task breakdown
+
+### Expert Agents (for multi-agent compositions)
+- **doc-expert**: Document parsing and analysis
+- **search-expert**: Real-time web information retrieval
+- **vision-expert**: Image understanding and OCR
+- **sales-expert**: Product consultation and pricing
+- **support-agent**: General customer service
+- **sales-agent**: Sales consultation
+- **complaint-agent**: Complaint handling
+
+### Multi-Agent Compositions
+- **doc-analysis-pipeline** (SEQUENTIAL): Document parsing → info search
+- **smart-router** (ROUTING): Intelligently routes to doc/search/vision/sales experts
+- **customer-service** (HANDOFFS): Intent-based handoffs to support/sales/complaint agents
+
 ## Adding a New Agent
 
+### Single Agent
 1. Add entry to `src/main/resources/config/agents.yml`
 2. If using a new tool class, create it in `tool/` with `@Tool` methods
 3. Register the tool in `ToolRegistry` constructor: `registry.put("toolName", ToolClass::new)`
 4. If using skills, create `skills/<name>/SKILL.md` with YAML frontmatter
 5. Register the skill-to-tool mapping in `ToolRegistry` constructor
 6. Restart — agent appears in the UI automatically
+
+### Multi-Agent Composition
+1. Create expert agents first (as single agents)
+2. Add composition agent with `type: SEQUENTIAL|PARALLEL|ROUTING|HANDOFFS`
+3. Define `subAgents` list with `agentId` and `description`
+4. For HANDOFFS type, add `handoffTriggers` with `type`, `keywords`, and `target`
+5. Restart — composition agent appears in UI with sub-agent dispatch logic
 
 ## API Endpoints
 
@@ -319,3 +424,11 @@ Key config in `application.yml`:
 - File upload not working: Check browser console for CORS or network errors
 - Agent not appearing: Verify `agents.yml` syntax and tool registration
 - Session not persisting: Check file permissions for session directory
+
+## Auxiliary Directories
+
+### `agent-harness/`
+Experimental agent harness implementations (not part of main Spring Boot app).
+
+### `skills/`
+Python-based skill development environment for AgentScope skills (separate from Java resources under `src/main/resources/skills/`).

@@ -215,7 +215,7 @@ agents:
       提取后以结构化格式返回，然后简要说明发票的主要信息。
     modelName: qwen-vl-max
     streaming: true
-    enableThinking: true
+    enableThinking: false
     modality: vision
     skills: []
     userTools: []
@@ -239,7 +239,7 @@ agents:
       提取后以结构化格式返回，然后简要说明身份信息。
     modelName: qwen-vl-max
     streaming: true
-    enableThinking: true
+    enableThinking: false
     modality: vision
     skills: []
     userTools: []

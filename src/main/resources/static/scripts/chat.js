@@ -1,7 +1,7 @@
 import './state.js';
 import { createSSEParser, uploadFile, fetchAgents, fetchSessions, createSession as createSessionApi, deleteSession as deleteSessionApi, fetchKnowledgeDocs, uploadKnowledgeDoc, removeKnowledgeDoc as removeKnowledgeDocApi, fetchSkillInfo, fetchToolInfo } from './api.js';
 import { renderMarkdown, escapeHtml, getTimestamp, formatDuration, scrollToBottom, createFileList } from './modules/utils.js';
-import { chatMessages, messageInput, sendBtn, chatEmpty, chatHeaderName, chatHeaderDesc, debugPanel, debugRounds, debugToggle, appendMessage, createThinkingBox, updateThinkingBox, collapseThinkingBox, completeThinkingBox, addAgentBubble, removeTypingIndicator, setStreamingState, showTypingIndicator } from './modules/ui.js';
+import { chatMessages, messageInput, sendBtn, chatEmpty, chatHeaderName, chatHeaderDesc, debugPanel, debugRounds, debugToggle, appendMessage, createThinkingBox, updateThinkingBox, collapseThinkingBox, completeThinkingBox, addAgentBubble, removeTypingIndicator, setStreamingState, showTypingIndicator, createAgentMessageWrapper } from './modules/ui.js';
 import { startRound, endRound, addTimelineRow, addTimelineRowForRound, clearDebug, toggleDebug, handlePipelineStart, handlePipelineStepStart, handlePipelineStepEnd, handleRoutingDecision, handleHandoffStart, updateRoundMetrics, updateRoundMetricsForRound } from './modules/debug.js';
 import { loadAgents, selectAgent, showAgentConfig, showSkillInfo, showToolInfo } from './modules/agents.js';
 import { loadSessions, createNewSession, selectSession, deleteSession, clearSession as clearSessionFn } from './modules/session.js';
@@ -66,9 +66,10 @@ async function sendMessage() {
     currentFileInfo = null;
     currentFileInfo = fileInfo;
 
+    var enableThinking = !!(window.agents[currentAgent] && window.agents[currentAgent].config && window.agents[currentAgent].config.enableThinking);
     var agentBubble = null;
 
-    if (fileInfo) {
+    if (fileInfo && enableThinking) {
         createThinkingBox(fileInfo);
     }
 
@@ -206,17 +207,21 @@ async function sendMessage() {
                             break;
 
                         case 'thinking':
-                            if (currentRound && !currentRound.thinkingCycleStart) {
-                                currentRound.thinkingCycleStart = Date.now();
+                            if (enableThinking) {
+                                if (currentRound && !currentRound.thinkingCycleStart) {
+                                    currentRound.thinkingCycleStart = Date.now();
+                                }
+                                var thinkingText = payload.content || 'Processing...';
+                                updateThinkingBox(thinkingText, fileInfo);
                             }
-                            var thinkingText = payload.content || 'Processing...';
-                            updateThinkingBox(thinkingText, fileInfo);
                             break;
 
                         case 'reasoning_text':
-                            var rText = payload.content || '';
-                            if (rText) {
-                                updateThinkingBox(rText, fileInfo);
+                            if (enableThinking) {
+                                var rText = payload.content || '';
+                                if (rText) {
+                                    updateThinkingBox(rText, fileInfo);
+                                }
                             }
                             break;
 
@@ -231,10 +236,12 @@ async function sendMessage() {
                             var isSkill = payload.isSkill === true;
                             var tSkillName = payload.displayName || '';
 
-                            if (isSkill) {
-                                updateThinkingBox('📖 Loading skill: ' + (tSkillName || '...'), fileInfo);
-                            } else {
-                                updateThinkingBox('⚡ ' + tName + '(' + tParamsPreview + ')', fileInfo);
+                            if (enableThinking) {
+                                if (isSkill) {
+                                    updateThinkingBox('📖 Loading skill: ' + (tSkillName || '...'), fileInfo);
+                                } else {
+                                    updateThinkingBox('⚡ ' + tName + '(' + tParamsPreview + ')', fileInfo);
+                                }
                             }
 
                             if (currentRound) {
@@ -295,7 +302,9 @@ async function sendMessage() {
                                 currentRound.thinkingTime += Date.now() - currentRound.thinkingCycleStart;
                                 currentRound.thinkingCycleStart = null;
                             }
-                            collapseThinkingBox();
+                            if (enableThinking) {
+                                collapseThinkingBox();
+                            }
                             if (!agentBubble) {
                                 agentBubble = addAgentBubble();
                                 agentRawMarkdown = '';

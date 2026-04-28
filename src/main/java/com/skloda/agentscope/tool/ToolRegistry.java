@@ -4,6 +4,7 @@ import io.agentscope.core.tool.Tool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
@@ -23,6 +24,24 @@ import java.util.stream.Collectors;
 public class ToolRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(ToolRegistry.class);
+
+    private final ApplicationContext applicationContext;
+
+    public ToolRegistry(ApplicationContext applicationContext) {
+        this.applicationContext = applicationContext;
+
+        // Phase A: Auto-discover user tool classes via @Tool annotation scanning
+        autoScanToolClasses("com.skloda.agentscope.tool");
+
+        // Phase B: Register AgentScope built-in system tools
+        registerSystemTools();
+
+        // Phase C: Dynamic skill-to-tool mappings from SKILL.md frontmatter
+        registerSkillMappings();
+
+        log.info("ToolRegistry initialized with {} tool functions from {} classes, {} skills",
+                toolToClass.size(), classSuppliers.size(), skillMetadataMap.size());
+    }
 
     /**
      * Skill metadata parsed from SKILL.md frontmatter.
@@ -48,20 +67,6 @@ public class ToolRegistry {
      * Skill metadata discovered from SKILL.md files.
      */
     private final Map<String, SkillMetadata> skillMetadataMap = new ConcurrentHashMap<>();
-
-    public ToolRegistry() {
-        // Phase A: Auto-discover user tool classes via @Tool annotation scanning
-        autoScanToolClasses("com.skloda.agentscope.tool");
-
-        // Phase B: Register AgentScope built-in system tools
-        registerSystemTools();
-
-        // Phase C: Dynamic skill-to-tool mappings from SKILL.md frontmatter
-        registerSkillMappings();
-
-        log.info("ToolRegistry initialized with {} tool functions from {} classes, {} skills",
-                toolToClass.size(), classSuppliers.size(), skillMetadataMap.size());
-    }
 
     // ===== Phase A: Auto-scan @Tool annotations =====
 
@@ -101,8 +106,14 @@ public class ToolRegistry {
         return toolNames;
     }
 
-    private static Object newInstance(Class<?> clazz) {
+    private Object newInstance(Class<?> clazz) {
         try {
+            // Try getting from Spring context first (enables @Value, @Autowired etc.)
+            try {
+                return applicationContext.getBean(clazz);
+            } catch (Exception ignored) {
+                // Not a Spring bean or not available yet, fall back to reflection
+            }
             return clazz.getDeclaredConstructor().newInstance();
         } catch (Exception e) {
             throw new RuntimeException("Failed to instantiate tool class: " + clazz.getName(), e);

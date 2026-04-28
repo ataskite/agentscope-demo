@@ -4,6 +4,15 @@ target/
 !**/src/test/**/target/
 .kotlin
 
+### Python ###
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.venv*/
+*.egg-info/
+dist/
+
 ### IntelliJ IDEA ###
 .idea/
 *.iws
