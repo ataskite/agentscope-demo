@@ -2,8 +2,8 @@ package com.skloda.agentscope.service;
 
 import com.skloda.agentscope.model.ChatRequest;
 import com.skloda.agentscope.model.MultiModalMessage;
-import com.skloda.agentscope.runtime.AgentRuntime;
 import com.skloda.agentscope.runtime.AgentRuntimeFactory;
+import com.skloda.agentscope.runtime.StreamingAgentRuntime;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
@@ -58,7 +58,7 @@ public class AgentService {
         }
 
         // Stateless mode: fresh agent per request
-        AgentRuntime runtime = runtimeFactory.createRuntime(agentId);
+        StreamingAgentRuntime runtime = runtimeFactory.createRuntime(agentId);
         return runtime.stream(userMsg);
     }
 
@@ -71,7 +71,7 @@ public class AgentService {
         String effectiveSessionId = ctx.getSessionId();
 
         // Create runtime with shared memory — new agent per request, memory persists
-        AgentRuntime runtime = runtimeFactory.createRuntimeWithMemory(agentId, ctx.getMemory());
+        StreamingAgentRuntime runtime = runtimeFactory.createRuntimeWithMemory(agentId, ctx.getMemory());
 
         return runtime.stream(userMsg)
                 .doFinally(signal -> {

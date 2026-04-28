@@ -38,7 +38,7 @@ public class AgentRuntimeFactory {
     /**
      * Create a new runtime for stateless agent interaction.
      */
-    public AgentRuntime createRuntime(String agentId) {
+    public StreamingAgentRuntime createRuntime(String agentId) {
         log.debug("Creating AgentRuntime for agent: {}", agentId);
 
         AgentConfig config = configService.getAgentConfig(agentId);
@@ -46,17 +46,17 @@ public class AgentRuntimeFactory {
 
         return switch (type) {
             case SINGLE -> createSingleRuntime(agentId);
-            case SEQUENTIAL -> throw createPipelineException(type);
-            case PARALLEL -> throw createPipelineException(type);
-            case ROUTING -> throw createPipelineException(type);
-            case HANDOFFS -> throw createPipelineException(type);
+            case SEQUENTIAL -> createSequentialRuntime(agentId);
+            case PARALLEL -> createParallelRuntime(agentId);
+            case ROUTING -> createRoutingRuntime(agentId);
+            case HANDOFFS -> createHandoffsRuntime(agentId);
         };
     }
 
     /**
      * Create runtime with shared memory (session mode).
      */
-    public AgentRuntime createRuntimeWithMemory(String agentId, Memory memory) {
+    public StreamingAgentRuntime createRuntimeWithMemory(String agentId, Memory memory) {
         log.debug("Creating AgentRuntime with shared memory for agent: {}", agentId);
 
         AgentConfig config = configService.getAgentConfig(agentId);
@@ -64,10 +64,10 @@ public class AgentRuntimeFactory {
 
         return switch (type) {
             case SINGLE -> createSingleRuntimeWithMemory(agentId, memory);
-            case SEQUENTIAL -> throw createPipelineException(type);
-            case PARALLEL -> throw createPipelineException(type);
-            case ROUTING -> throw createPipelineException(type);
-            case HANDOFFS -> throw createPipelineException(type);
+            case SEQUENTIAL -> createSequentialRuntimeWithMemory(agentId, memory);
+            case PARALLEL -> createParallelRuntimeWithMemory(agentId, memory);
+            case ROUTING -> createRoutingRuntimeWithMemory(agentId, memory);
+            case HANDOFFS -> createHandoffsRuntimeWithMemory(agentId, memory);
         };
     }
 
@@ -196,10 +196,5 @@ public class AgentRuntimeFactory {
         ObservabilityHook hook = new ObservabilityHook();
         ReActAgent agent = compositeFactory.createSingleAgentForSession(agentId, memory, hook);
         return new AgentRuntime(agent, hook);
-    }
-
-    private UnsupportedOperationException createPipelineException(AgentType type) {
-        return new UnsupportedOperationException(
-                "Agent type " + type + " requires createPipelineRuntime(). Use the appropriate factory method.");
     }
 }

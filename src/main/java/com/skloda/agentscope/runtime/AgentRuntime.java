@@ -20,7 +20,7 @@ import java.util.function.BiConsumer;
  * Runtime container for a single Agent interaction session.
  * Encapsulates Agent + Hook + Sink, providing a clean Flux interface.
  */
-public class AgentRuntime implements AutoCloseable {
+public class AgentRuntime implements StreamingAgentRuntime {
 
     private static final Logger log = LoggerFactory.getLogger(AgentRuntime.class);
 
@@ -63,6 +63,7 @@ public class AgentRuntime implements AutoCloseable {
      * Stream agent response as Flux.
      * Merges hook events (timeline/metrics) with agent text stream.
      */
+    @Override
     public Flux<Map<String, Object>> stream(Msg userMsg) {
         log.debug("Starting stream for agent: {}", agent.getName());
 

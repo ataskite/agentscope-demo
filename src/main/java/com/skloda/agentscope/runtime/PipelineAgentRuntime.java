@@ -25,7 +25,7 @@ import java.util.function.BiConsumer;
  * Provides the same Flux<Map<String, Object>> interface as AgentRuntime,
  * but wraps a Pipeline instead of a ReActAgent.
  */
-public class PipelineAgentRuntime implements AutoCloseable {
+public class PipelineAgentRuntime implements StreamingAgentRuntime {
 
     private static final Logger log = LoggerFactory.getLogger(PipelineAgentRuntime.class);
 
@@ -54,6 +54,7 @@ public class PipelineAgentRuntime implements AutoCloseable {
      * For SequentialPipeline: executes and extracts text from the final Msg.
      * For FanoutPipeline: executes and collects text from all agent responses.
      */
+    @Override
     public Flux<Map<String, Object>> stream(Msg userMsg) {
         log.debug("Starting pipeline stream: {}", pipelineName);
 
