@@ -1,12 +1,15 @@
 package com.skloda.agentscope;
 
+import com.skloda.agentscope.service.KnowledgeProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 /**
  * AgentScope Demo Application.
  */
 @SpringBootApplication
+@EnableConfigurationProperties(KnowledgeProperties.class)
 public class AgentScopeDemoApplication {
 
     public static void main(String[] args) {

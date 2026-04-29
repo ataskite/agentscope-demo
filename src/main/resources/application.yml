@@ -47,8 +47,13 @@ agentscope:
   # Knowledge Configuration
   knowledge:
     enabled: true
+    path: knowledge
     embedding-model: text-embedding-v3
     dimensions: 1024
+    chunk-size: 512
+    overlap-size: 50
+    split-strategy: PARAGRAPH
+    auto-index-on-startup: true
 
 # Logging Configuration
 logging:
