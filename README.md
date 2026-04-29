@@ -8,7 +8,6 @@
 - **Basic Chat**: 纯对话 AI 助手
 - **Tool Calling**: 带工具调用的 AI 助手（时间、计算器、天气）
 - **Task Agent**: 支持文档解析的智能助手（.docx/.pdf/.xlsx）
-- **Template Editor**: Word 模板变量替换
 - **Bank Invoice**: 银行发票自动生成
 - **Vision Analyzer**: 图片理解和 OCR 文字识别
 - **Voice Assistant**: 语音交互助手
@@ -299,12 +298,13 @@ spring:
 
 ## 内置 Agent
 
+### 单功能 Agent
+
 | Agent ID | 名称 | 功能 | 模型 |
 |----------|------|------|------|
 | `chat-basic` | Basic Chat | 简单对话 | qwen-plus |
 | `tool-test-simple` | Tool Calling | 时间、计算器、天气 | qwen-plus |
 | `task-document-analysis` | Task Agent | 文档解析 | qwen-plus |
-| `task-template-docx-editor` | Template Editor | Word 模板编辑 | qwen-plus |
 | `bank-invoice` | Bank Invoice | 发票生成 | qwen-plus |
 | `rag-chat` | RAG Chat | 知识库问答 | qwen-plus |
 | `vision-analyzer` | Vision Analyzer | 图片理解和 OCR | qwen-vl-max |
@@ -313,8 +313,26 @@ spring:
 | `idcard-extractor` | ID Card Extractor | 身份证信息提取 | qwen-vl-max |
 | `search-assistant` | Search Assistant | 网络搜索 | qwen-plus |
 | `project-planner` | Project Planner | 项目规划 | qwen-plus |
-| `smart-router` | Smart Router | 智能路由 | qwen-plus |
-| `customer-service` | Smart Customer Service | 智能客服 | qwen-plus |
+
+### 专家 Agent（用于多智能体协作）
+
+| Agent ID | 名称 | 功能 | 模型 |
+|----------|------|------|------|
+| `doc-expert` | 文档专家 | 文档解析分析 | qwen-plus |
+| `search-expert` | 搜索专家 | 实时网络信息 | qwen-plus |
+| `vision-expert` | 视觉专家 | 图片理解和 OCR | qwen-vl-max |
+| `sales-expert` | 销售专家 | 产品咨询报价 | qwen-plus |
+| `support-agent` | 客服专员 | 一般客服咨询 | qwen-plus |
+| `sales-agent` | 销售顾问 | 销售咨询 | qwen-plus |
+| `complaint-agent` | 投诉处理 | 客户投诉处理 | qwen-plus |
+
+### 多智能体协作
+
+| Agent ID | 类型 | 功能 | 模型 |
+|----------|------|------|------|
+| `doc-analysis-pipeline` | SEQUENTIAL | 文档分析流水线（文档→搜索） | qwen-plus |
+| `smart-router` | ROUTING | 智能路由到专家 Agent | qwen-plus |
+| `customer-service` | HANDOFFS | 智能客服（支持交接） | qwen-plus |
 
 ## API 端点
 
