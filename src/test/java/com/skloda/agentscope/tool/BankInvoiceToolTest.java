@@ -48,9 +48,12 @@ class BankInvoiceToolTest {
         JsonNode json = MAPPER.readTree(result);
 
         assertTrue(json.get("success").asBoolean(), result);
-        assertTrue(Files.exists(Path.of(json.get("excelPath").asText())));
-        assertTrue(Files.exists(Path.of(json.get("wordPath").asText())));
-        assertTrue(json.get("excelFileName").asText().contains("张某某"));
-        assertTrue(json.get("wordFileName").asText().contains("张某某"));
+        String excelFileName = json.get("excelFileName").asText();
+        String wordFileName = json.get("wordFileName").asText();
+        Path uploadDir = Path.of(System.getProperty("java.io.tmpdir"), "agentscope-uploads");
+        assertTrue(Files.exists(uploadDir.resolve(excelFileName)), "Excel file not found: " + excelFileName);
+        assertTrue(Files.exists(uploadDir.resolve(wordFileName)), "Word file not found: " + wordFileName);
+        assertTrue(excelFileName.contains("张某某"));
+        assertTrue(wordFileName.contains("张某某"));
     }
 }
