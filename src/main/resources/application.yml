@@ -47,7 +47,7 @@ agentscope:
   # Knowledge Configuration
   knowledge:
     enabled: true
-    path: knowledge
+    path: src/main/resources/knowledge
     embedding-model: text-embedding-v3
     dimensions: 1024
     chunk-size: 512
