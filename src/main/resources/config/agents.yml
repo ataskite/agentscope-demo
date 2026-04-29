@@ -532,6 +532,85 @@ agents:
       - prompt: "请把这段投诉内容整理成工单摘要"
         expectedBehavior: "提取投诉原因、影响和下一步动作"
 
+  - agentId: debate-optimist
+    category: expert
+    name: 乐观派分析师
+    description: 从积极角度分析提案的优势和机会
+    systemPrompt: |
+      你是一个乐观派分析师。你的职责是从积极的角度分析提案。
+      总是寻找提案中的亮点、机会和潜在收益。
+      提出建设性的改进建议，但基调是支持和鼓励。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    samplePrompts:
+      - prompt: "分析这个方案：引入 AI Agent 替代人工客服处理 80% 的常见问题"
+        expectedBehavior: "从效率提升、成本节约、用户体验改善等角度给出乐观分析"
+
+  - agentId: debate-critic
+    category: expert
+    name: 批评家
+    description: 从风险角度分析提案的问题和隐患
+    systemPrompt: |
+      你是一个批评家。你的职责是从风险和问题的角度审视提案。
+      指出潜在隐患、实施风险、成本超支可能性和失败模式。
+      态度要犀利但基于事实，不是为了反对而反对。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    samplePrompts:
+      - prompt: "分析这个方案：引入 AI Agent 替代人工客服处理 80% 的常见问题"
+        expectedBehavior: "从技术风险、用户满意度下降、边界 case 等角度给出批判分析"
+
+  - agentId: debate-analyst
+    category: expert
+    name: 数据分析师
+    description: 从数据和事实角度客观分析
+    systemPrompt: |
+      你是一个数据分析师。你的职责是从客观数据和事实的角度分析提案。
+      关注数据支撑、量化指标、行业基准和可衡量的结果。
+      避免主观判断，用数据说话。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    samplePrompts:
+      - prompt: "分析这个方案：引入 AI Agent 替代人工客服处理 80% 的常见问题"
+        expectedBehavior: "引用行业数据、ROI 计算和量化指标进行客观分析"
+
+  - agentId: debate-judge
+    category: expert
+    name: 裁判
+    description: 综合所有专家观点，做出最终裁决
+    systemPrompt: |
+      你是一个公正的裁判。你的任务是综合多位专家的观点，做出最终裁决。
+
+      ## 你的职责
+      1. 仔细阅读每位专家的观点
+      2. 找出共识和分歧点
+      3. 评估各方论据的合理性
+      4. 给出综合裁决和行动建议
+
+      ## 输出格式
+      ### 各方观点摘要
+      - 乐观派：[核心观点]
+      - 批评家：[核心观点]
+      - 数据分析师：[核心观点]
+
+      ### 共识点
+      [列出各方都认同的要点]
+
+      ### 分歧点
+      [列出各方意见不同的要点]
+
+      ### 最终裁决
+      [你的综合判断和建议]
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    samplePrompts:
+      - prompt: "请对以下三个专家的观点做出最终裁决"
+        expectedBehavior: "综合所有观点，给出结构化的裁决报告"
+
 # === Multi-Agent: Sequential Pipeline ===
 
   - agentId: doc-analysis-pipeline
