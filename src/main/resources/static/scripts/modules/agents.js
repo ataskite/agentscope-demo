@@ -5,9 +5,9 @@ import { agents } from '../state.js';
 
 /* ===== CATEGORY DEFINITIONS ===== */
 const CATEGORIES = [
-    { key: 'single',        label: '单Agent',       icon: '⚡', color: 'cyan'    },
-    { key: 'expert',        label: '专家Agent',      icon: '🎯', color: 'green'   },
-    { key: 'collaboration', label: '多智能体协作',   icon: '🔗', color: 'magenta' },
+    { key: 'single',        label: '单体Agent',      icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>', color: 'cyan'    },
+    { key: 'expert',        label: '专家Agent',      icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg>', color: 'green'   },
+    { key: 'collaboration', label: '多智能体协作',   icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="12" y1="8" x2="5" y2="16"/><line x1="12" y1="8" x2="19" y2="16"/><line x1="5" y1="19" x2="19" y2="19"/></svg>', color: 'magenta' },
 ];
 
 /* ===== LOAD AGENTS ===== */
@@ -47,7 +47,7 @@ export async function loadAgents() {
 
             // Group header
             var header = document.createElement('div');
-            header.className = 'agent-group-header' + (isExpanded ? '' : ' collapsed');
+            header.className = 'agent-group-header color-' + category.color + (isExpanded ? '' : ' collapsed');
             header.dataset.category = category.key;
             header.innerHTML =
                 '<span class="agent-group-arrow">▼</span>' +

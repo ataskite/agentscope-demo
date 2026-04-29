@@ -69,6 +69,7 @@ html, body {
     font-size: 13px;
     color: var(--text-primary);
     background: var(--bg-void);
+    /* Grid background removed */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
@@ -78,7 +79,7 @@ html, body {
     display: none;
 }
 
-/* ===== GRID BACKGROUND (CLEAN - NO LINES) ===== */
+/* ===== GRID BACKGROUND ===== */
 .grid-bg {
     position: fixed;
     top: 0;
@@ -87,7 +88,10 @@ html, body {
     height: 100%;
     pointer-events: none;
     z-index: 0;
-    background: radial-gradient(ellipse at center, rgba(0, 240, 255, 0.03) 0%, transparent 70%);
+    background:
+        radial-gradient(ellipse at 50% 0%, rgba(0, 240, 255, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 0% 50%, rgba(255, 0, 204, 0.03) 0%, transparent 40%),
+        radial-gradient(ellipse at 100% 50%, rgba(0, 184, 255, 0.03) 0%, transparent 40%);
 }
 
 /* ===== NEON FLICKER (subtle) ===== */

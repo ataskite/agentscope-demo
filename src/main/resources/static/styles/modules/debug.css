@@ -113,17 +113,53 @@
 }
 
 /* ===== ROUND CARDS ===== */
+@keyframes roundPulse {
+    0%, 100% {
+        box-shadow: 0 0 12px rgba(0, 240, 255, 0.25), 0 0 25px rgba(0, 240, 255, 0.08);
+        border-color: rgba(0, 240, 255, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 18px rgba(0, 240, 255, 0.4), 0 0 35px rgba(0, 240, 255, 0.15), inset 0 0 15px rgba(0, 240, 255, 0.05);
+        border-color: rgba(0, 240, 255, 0.8);
+    }
+}
+
+@keyframes roundSweep {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(300%); }
+}
+
+@keyframes dotBlink {
+    0%, 20% { opacity: 0; }
+    50% { opacity: 1; }
+    80%, 100% { opacity: 0; }
+}
+
 .round-card {
     background: var(--bg-card);
     border: 1px solid var(--border-dim);
     border-radius: 8px;
     margin-bottom: var(--space-sm);
     overflow: hidden;
+    position: relative;
 }
 
 .round-card.running {
     border-color: var(--neon-cyan);
-    box-shadow: 0 0 12px rgba(0, 240, 255, 0.25), 0 0 25px rgba(0, 240, 255, 0.08);
+    animation: roundPulse 2s ease-in-out infinite;
+}
+
+.round-card.running::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 30%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.1), transparent);
+    animation: roundSweep 2.5s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 1;
 }
 
 .round-card.success {
@@ -245,6 +281,30 @@
 .rtl-row.status-running .rtl-status {
     color: var(--neon-cyan);
     text-shadow: 0 0 8px rgba(0, 240, 255, 0.7), 0 0 15px rgba(0, 240, 255, 0.3);
+}
+
+.rtl-row.status-running .rtl-status .stream-dots {
+    display: inline-flex;
+    gap: 2px;
+    margin-left: 4px;
+}
+
+.rtl-row.status-running .rtl-status .stream-dots span {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--neon-cyan);
+    display: inline-block;
+    animation: dotBlink 1.4s ease-in-out infinite;
+    box-shadow: 0 0 4px rgba(0, 240, 255, 0.8);
+}
+
+.rtl-row.status-running .rtl-status .stream-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.rtl-row.status-running .rtl-status .stream-dots span:nth-child(3) {
+    animation-delay: 0.4s;
 }
 
 .rtl-row.status-ok .rtl-status {

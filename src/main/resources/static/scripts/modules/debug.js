@@ -188,7 +188,7 @@ function getStatusText(status) {
     switch (status) {
         case 'ok': return '✓';
         case 'fail': return '✗';
-        case 'running': return '◎';
+        case 'running': return '◎ <span class="stream-dots"><span></span><span></span><span></span></span>';
         default: return '';
     }
 }
