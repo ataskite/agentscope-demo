@@ -1,5 +1,6 @@
 package com.skloda.agentscope.controller;
 
+import com.skloda.agentscope.model.KnowledgeIndexStatus;
 import com.skloda.agentscope.service.KnowledgeService;
 import io.agentscope.core.rag.model.Document;
 import org.slf4j.Logger;
@@ -77,6 +78,14 @@ public class KnowledgeController {
     @GetMapping("/documents")
     public List<String> listDocuments() {
         return knowledgeService.getIndexedDocuments();
+    }
+
+    /**
+     * Get current knowledge indexing status.
+     */
+    @GetMapping("/status")
+    public KnowledgeIndexStatus status() {
+        return knowledgeService.getIndexStatus();
     }
 
     /**
