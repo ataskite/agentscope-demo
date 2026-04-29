@@ -138,6 +138,19 @@ export async function selectAgent(agentId) {
         card.classList.toggle('active', card.dataset.agentId === agentId);
     });
 
+    // Auto-expand the group containing the selected agent
+    var activeCard = document.querySelector('.agent-card.active');
+    if (activeCard) {
+        var groupBody = activeCard.closest('.agent-group-body');
+        if (groupBody && groupBody.classList.contains('collapsed')) {
+            groupBody.classList.remove('collapsed');
+            var groupHeader = groupBody.previousElementSibling;
+            if (groupHeader && groupHeader.classList.contains('agent-group-header')) {
+                groupHeader.classList.remove('collapsed');
+            }
+        }
+    }
+
     document.getElementById('chatHeaderName').textContent = agents[agentId].name;
     document.getElementById('chatHeaderDesc').textContent = agents[agentId].desc;
 
