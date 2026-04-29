@@ -179,9 +179,34 @@ public class CompositeAgentFactory {
         List<ReActAgent> subAgents = new ArrayList<>();
 
         for (SubAgentConfig subConfig : config.getSubAgents()) {
-            ReActAgent subAgent = (memory != null)
-                    ? singleAgentFactory.createAgentForSession(subConfig.getAgentId(), memory)
-                    : singleAgentFactory.createAgent(subConfig.getAgentId());
+            // For ROUTING agents, create sub-agents without tools to avoid tool call conflicts
+            AgentConfig subAgentConfig = configService.getAgentConfig(subConfig.getAgentId());
+
+            // Build a modified system prompt that instructs the sub-agent to respond directly
+            // without calling tools, since it's being invoked as a sub-agent tool
+            String originalPrompt = subAgentConfig != null ? subAgentConfig.getSystemPrompt() : "";
+            String modifiedPrompt = "你是一个子代理，正在通过工具调用被主代理调用。\n" +
+                    "请直接回答用户的问题，不要调用任何工具。\n" +
+                    "专注于你作为" + subConfig.getAgentId() + "的专业领域。\n\n" +
+                    "你的原始角色描述:\n" + originalPrompt;
+
+            DashScopeChatModel subModel = DashScopeChatModel.builder()
+                    .apiKey(apiKey)
+                    .modelName(subAgentConfig != null ? subAgentConfig.getModelName() : config.getModelName())
+                    .stream(config.isStreaming())
+                    .enableThinking(config.isEnableThinking())
+                    .formatter(new DashScopeChatFormatter())
+                    .build();
+
+            // Create sub-agent with modified prompt and no toolkit
+            ReActAgent subAgent = ReActAgent.builder()
+                    .name(subConfig.getAgentId())
+                    .sysPrompt(modifiedPrompt)
+                    .model(subModel)
+                    .memory(effectiveMemory)
+                    .toolkit(new Toolkit()) // Empty toolkit - no tools for sub-agents in ROUTING
+                    .build();
+
             subAgents.add(subAgent);
 
             // Create SubAgentProvider for this sub-agent
@@ -205,7 +230,7 @@ public class CompositeAgentFactory {
 
             SubAgentTool subAgentTool = new SubAgentTool(provider, frameworkSubConfig);
             toolkit.registerTool(subAgentTool);
-            log.info("  Registered SubAgentTool: {} for routing agent: {}",
+            log.info("  Registered SubAgentTool: {} for routing agent: {} (no-tool mode)",
                     subConfig.getAgentId(), config.getAgentId());
         }
 
@@ -292,9 +317,33 @@ public class CompositeAgentFactory {
         Toolkit toolkit = new Toolkit();
 
         for (SubAgentConfig subConfig : config.getSubAgents()) {
-            ReActAgent subAgent = (memory != null)
-                    ? singleAgentFactory.createAgentForSession(subConfig.getAgentId(), memory)
-                    : singleAgentFactory.createAgent(subConfig.getAgentId());
+            // For HANDOFFS agents, create sub-agents without tools to avoid tool call conflicts
+            AgentConfig subAgentConfig = configService.getAgentConfig(subConfig.getAgentId());
+
+            // Build a modified system prompt that instructs the sub-agent to respond directly
+            // without calling tools, since it's being invoked as a sub-agent tool
+            String originalPrompt = subAgentConfig != null ? subAgentConfig.getSystemPrompt() : "";
+            String modifiedPrompt = "你是一个子代理，正在通过工具调用被主代理调用。\n" +
+                    "请直接回答用户的问题，不要调用任何工具。\n" +
+                    "专注于你作为" + subConfig.getAgentId() + "的专业领域。\n\n" +
+                    "你的原始角色描述:\n" + originalPrompt;
+
+            DashScopeChatModel subModel = DashScopeChatModel.builder()
+                    .apiKey(apiKey)
+                    .modelName(subAgentConfig != null ? subAgentConfig.getModelName() : config.getModelName())
+                    .stream(config.isStreaming())
+                    .enableThinking(config.isEnableThinking())
+                    .formatter(new DashScopeChatFormatter())
+                    .build();
+
+            // Create sub-agent with modified prompt and no toolkit
+            ReActAgent subAgent = ReActAgent.builder()
+                    .name(subConfig.getAgentId())
+                    .sysPrompt(modifiedPrompt)
+                    .model(subModel)
+                    .memory(effectiveMemory)
+                    .toolkit(new Toolkit()) // Empty toolkit - no tools for sub-agents in HANDOFFS
+                    .build();
 
             SubAgentProvider<ReActAgent> provider = () -> subAgent;
 
@@ -315,7 +364,7 @@ public class CompositeAgentFactory {
 
             SubAgentTool subAgentTool = new SubAgentTool(provider, frameworkSubConfig);
             toolkit.registerTool(subAgentTool);
-            log.info("  Registered SubAgentTool: {} for handoffs agent: {}",
+            log.info("  Registered SubAgentTool: {} for handoffs agent: {} (no-tool mode)",
                     subConfig.getAgentId(), config.getAgentId());
         }
 

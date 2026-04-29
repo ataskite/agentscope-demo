@@ -70,7 +70,7 @@ public class AgentRuntime implements StreamingAgentRuntime {
         StreamOptions streamOptions = StreamOptions.builder()
                 .eventTypes(EventType.REASONING, EventType.TOOL_RESULT)
                 .incremental(true)
-                .includeReasoningResult(true)
+                .includeReasoningResult(false)
                 .build();
 
         // Hook events flux (from ObservabilityHook)

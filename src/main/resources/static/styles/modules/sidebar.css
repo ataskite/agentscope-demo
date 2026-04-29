@@ -23,13 +23,10 @@
     text-shadow: 0 0 8px rgba(255, 0, 204, 0.7), 0 0 20px rgba(255, 0, 204, 0.3);
 }
 
-.sidebar-header-dot {
-    width: 8px;
-    height: 8px;
-    background: var(--neon-cyan);
-    border-radius: 50%;
-    box-shadow: 0 0 8px var(--neon-cyan), 0 0 15px rgba(0, 240, 255, 0.4);
-    animation: pulse 2s infinite;
+.sidebar-header-icon {
+    color: var(--neon-cyan);
+    filter: drop-shadow(0 0 4px rgba(0, 240, 255, 0.6));
+    flex-shrink: 0;
 }
 
 @keyframes pulse {

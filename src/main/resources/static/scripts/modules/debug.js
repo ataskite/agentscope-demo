@@ -220,7 +220,23 @@ export function toggleDebug() {
 
 /* ===== MULTI-AGENT EVENT HANDLERS ===== */
 export function handlePipelineStart(data) {
-    if (!debugRounds) return;
+    console.log('[handlePipelineStart] data:', data);
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) {
+        console.warn('[handlePipelineStart] No round available');
+        return;
+    }
+
+    var timeline = document.getElementById('round-timeline-' + targetRound.number);
+    if (!timeline) {
+        console.warn('[handlePipelineStart] Timeline not found for round #' + targetRound.number);
+        return;
+    }
+
+    // Add pipeline start to timeline
+    addTimelineRowForRound(targetRound, 'phase', 'Pipeline Start', escapeHtml(data.pipelineId || ''), 'running');
+
+    // Also add a dedicated pipeline card for detailed step tracking
     var pipelineDiv = document.createElement('div');
     pipelineDiv.className = 'debug-pipeline';
     pipelineDiv.id = 'pipeline-' + Date.now();
@@ -229,12 +245,38 @@ export function handlePipelineStart(data) {
         '<span class="debug-pipeline-steps">' + (data.subAgents ? data.subAgents.length : 0) + ' steps</span>' +
         '</div>' +
         '<div class="debug-pipeline-steps-container" id="' + pipelineDiv.id + '-steps"></div>';
-    debugRounds.appendChild(pipelineDiv);
+
+    // Insert after the round card
+    var roundCard = document.getElementById('round-' + targetRound.number);
+    if (roundCard && roundCard.parentNode) {
+        roundCard.parentNode.insertBefore(pipelineDiv, roundCard.nextSibling);
+    }
+
+    targetRound._currentPipelineDiv = pipelineDiv;
+    scrollToBottom(debugRounds);
 }
 
 export function handlePipelineStepStart(data) {
-    var container = document.querySelector('.debug-pipeline-steps-container:last-child');
-    if (!container) return;
+    console.log('[handlePipelineStepStart] data:', data);
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) {
+        console.warn('[handlePipelineStepStart] No round available');
+        return;
+    }
+
+    // Add step start to timeline
+    addTimelineRowForRound(targetRound, 'phase', 'Step ' + (data.stepIndex + 1), escapeHtml(data.agentId || ''), 'running');
+
+    // Find the pipeline container
+    var container = targetRound._currentPipelineDiv ?
+        targetRound._currentPipelineDiv.querySelector('.debug-pipeline-steps-container') :
+        document.querySelector('.debug-pipeline-steps-container:last-child');
+
+    if (!container) {
+        console.warn('[handlePipelineStepStart] No pipeline container found');
+        return;
+    }
+
     var stepDiv = document.createElement('div');
     stepDiv.className = 'debug-pipeline-step active';
     stepDiv.id = 'step-' + data.stepIndex;
@@ -242,39 +284,120 @@ export function handlePipelineStepStart(data) {
         '<span class="debug-step-agent">' + escapeHtml(data.agentId || '') + '</span>' +
         '<span class="debug-step-status">Running...</span>';
     container.appendChild(stepDiv);
+    targetRound._currentStepDiv = stepDiv;
 }
 
 export function handlePipelineStepEnd(data) {
-    var stepDiv = document.getElementById('step-' + data.stepIndex);
-    if (stepDiv) {
-        stepDiv.classList.remove('active');
-        stepDiv.classList.add('complete');
-        var statusSpan = stepDiv.querySelector('.debug-step-status');
-        if (statusSpan) statusSpan.textContent = 'Done (' + (data.duration_ms || 0) + 'ms)';
+    console.log('[handlePipelineStepEnd] data:', data);
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) {
+        console.warn('[handlePipelineStepEnd] No round available');
+        return;
     }
+
+    // Update step in timeline
+    var stepTimelineRow = targetRound._currentStepDiv;
+    if (stepTimelineRow) {
+        stepTimelineRow.classList.remove('active');
+        stepTimelineRow.classList.add('complete');
+        var statusSpan = stepTimelineRow.querySelector('.debug-step-status');
+        if (statusSpan) statusSpan.textContent = 'Done (' + (data.duration_ms || 0) + 'ms)';
+        targetRound._currentStepDiv = null;
+    }
+
+    // Add step completion to timeline
+    addTimelineRowForRound(targetRound, 'phase', 'Step ' + (data.stepIndex + 1) + ' End', formatDuration(data.duration_ms || 0), 'ok');
 }
 
 export function handleRoutingDecision(data) {
-    if (!debugRounds) return;
+    console.log('[handleRoutingDecision] data:', data);
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) {
+        console.warn('[handleRoutingDecision] No round available');
+        return;
+    }
+
+    var timeline = document.getElementById('round-timeline-' + targetRound.number);
+    if (!timeline) {
+        console.warn('[handleRoutingDecision] Timeline not found for round #' + targetRound.number);
+        return;
+    }
+
+    // Add routing decision to timeline
+    addTimelineRowForRound(targetRound, 'phase', 'Routing', '\u2192 ' + escapeHtml(data.selectedAgent || ''), 'ok');
+
+    // Add detailed routing card
     var routingDiv = document.createElement('div');
     routingDiv.className = 'debug-routing';
     routingDiv.innerHTML = '<div class="debug-routing-header">' +
         '<span class="debug-routing-title">Routing Decision</span></div>' +
         '<div class="debug-routing-content">' +
         '<div class="debug-routing-selected"><span class="debug-routing-label">Selected:</span> ' +
-        '<span class="debug-routing-agent">' + escapeHtml(data.selectedAgent || '') + '</span></div>' +
-        '<div class="debug-routing-reasoning"><span class="debug-routing-label">Reasoning:</span> ' +
-        '<span class="debug-routing-text">' + escapeHtml(data.reasoning || '') + '</span></div></div>';
-    debugRounds.appendChild(routingDiv);
+        '<span class="debug-routing-agent">' + escapeHtml(data.selectedAgent || '') + '</span></div>';
+
+    if (data.reasoning) {
+        routingDiv.querySelector('.debug-routing-content').innerHTML +=
+            '<div class="debug-routing-reasoning"><span class="debug-routing-label">Reasoning:</span> ' +
+            '<span class="debug-routing-text">' + escapeHtml(data.reasoning) + '</span></div>';
+    }
+    routingDiv.querySelector('.debug-routing-content').innerHTML += '</div>';
+
+    // Insert after the round card
+    var roundCard = document.getElementById('round-' + targetRound.number);
+    if (roundCard && roundCard.parentNode) {
+        // Find the next sibling that is not already a multi-agent card
+        var nextSibling = roundCard.nextSibling;
+        while (nextSibling && (nextSibling.classList.contains('debug-pipeline') ||
+                               nextSibling.classList.contains('debug-routing') ||
+                               nextSibling.classList.contains('debug-handoff'))) {
+            nextSibling = nextSibling.nextSibling;
+        }
+        roundCard.parentNode.insertBefore(routingDiv, nextSibling);
+    }
+
+    scrollToBottom(debugRounds);
 }
 
 export function handleHandoffStart(data) {
-    if (!debugRounds) return;
+    console.log('[handleHandoffStart] data:', data);
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) {
+        console.warn('[handleHandoffStart] No round available');
+        return;
+    }
+
+    var timeline = document.getElementById('round-timeline-' + targetRound.number);
+    if (!timeline) {
+        console.warn('[handleHandoffStart] Timeline not found for round #' + targetRound.number);
+        return;
+    }
+
+    // Add handoff to timeline
+    addTimelineRowForRound(targetRound, 'phase', 'Handoff', escapeHtml(data.fromAgent || '') + ' \u2192 ' + escapeHtml(data.toAgent || ''), 'ok');
+
+    // Add detailed handoff card
     var handoffDiv = document.createElement('div');
     handoffDiv.className = 'debug-handoff';
     handoffDiv.innerHTML = '<div class="debug-handoff-header">' +
         '<span class="debug-handoff-icon">\u2192</span>' +
-        '<span class="debug-handoff-text">Handoff: <strong>' + escapeHtml(data.fromAgent || '') + '</strong> \u2192 <strong>' + escapeHtml(data.toAgent || '') + '</strong></span></div>' +
-        '<div class="debug-handoff-reason">Reason: ' + escapeHtml(data.reason || '') + '</div>';
-    debugRounds.appendChild(handoffDiv);
+        '<span class="debug-handoff-text">Handoff: <strong>' + escapeHtml(data.fromAgent || '') + '</strong> \u2192 <strong>' + escapeHtml(data.toAgent || '') + '</strong></span></div>';
+
+    if (data.reason) {
+        handoffDiv.innerHTML += '<div class="debug-handoff-reason">Reason: ' + escapeHtml(data.reason) + '</div>';
+    }
+
+    // Insert after the round card
+    var roundCard = document.getElementById('round-' + targetRound.number);
+    if (roundCard && roundCard.parentNode) {
+        // Find the next sibling that is not already a multi-agent card
+        var nextSibling = roundCard.nextSibling;
+        while (nextSibling && (nextSibling.classList.contains('debug-pipeline') ||
+                               nextSibling.classList.contains('debug-routing') ||
+                               nextSibling.classList.contains('debug-handoff'))) {
+            nextSibling = nextSibling.nextSibling;
+        }
+        roundCard.parentNode.insertBefore(handoffDiv, nextSibling);
+    }
+
+    scrollToBottom(debugRounds);
 }

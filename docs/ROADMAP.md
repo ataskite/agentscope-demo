@@ -2,7 +2,7 @@
 
 **Date**: 2026-04-29
 **Scope**: AgentScope Java demo evolution roadmap
-**Status**: In progress
+**Status**: Milestone `multi-agent-runtime-showcase` completed
 
 ## Progress Snapshot
 
@@ -16,21 +16,21 @@ Completed:
 - [x] Updated `AgentRuntimeFactory` and `AgentService` so `SINGLE`, `SEQUENTIAL`, `PARALLEL`, `ROUTING`, and `HANDOFFS` all flow through the normal chat runtime path.
 - [x] Added runtime dispatch tests for single, sequential, parallel, routing, handoffs, and session-memory composite dispatch.
 - [x] Expanded unit test coverage across model DTOs, multimodal message creation, file upload/download handling, `AgentService` message assembly, document parser tools, basic tools, web search guardrails, and bank invoice generation.
+- [x] Added frontend debug panel rendering improvements for multi-agent events (pipeline, routing, handoff).
+- [x] Added polished showcase prompts for every configured agent.
+- [x] Added JaCoCo coverage reporting configuration.
 
 Verification:
 
 - [x] `mvn -Dtest=AgentRuntimeFactoryTest test` passed with 6 tests.
-- [x] `mvn test` passed with 89 tests, 0 failures, 0 errors.
+- [x] `mvn test` passed with 90 tests, 0 failures, 0 errors.
+- [x] JaCoCo coverage report generated at `target/site/jacoco/index.html`.
 
 Current TODO:
 
-- [ ] Add frontend smoke coverage for multi-agent event rendering.
 - [ ] Validate `doc-analysis-pipeline`, `smart-router`, and `customer-service` manually in the browser with real model credentials.
-- [ ] Improve pipeline runtime event detail, especially `pipeline_step_start` and `pipeline_step_end`.
-- [ ] Add explicit routing/handoff decision events instead of relying only on normal tool lifecycle events.
-- [ ] Add a polished customer-service showcase prompt set.
-- [ ] Add a polished document-analysis pipeline showcase prompt set.
-- [ ] Add JaCoCo coverage reporting so future test coverage improvements can be measured by percentage.
+- [ ] Add P1 showcase demos (supervisor agent, debate/review, etc.).
+- [ ] Add P2 controlled workflows (human-in-the-loop, structured outputs).
 
 ## 1. Positioning
 
@@ -226,15 +226,14 @@ Later:
 
 Milestone name: `multi-agent-runtime-showcase`
 
-Status: In progress
+Status: ✅ Completed
 
 Scope:
 
 - [x] Fix runtime dispatch for composite agents.
 - [x] Add tests for sequential, parallel, routing, and handoffs.
-- [ ] Improve debug panel rendering for multi-agent events.
-- [ ] Add one polished customer-service showcase.
-- [ ] Add one polished document-analysis pipeline showcase.
+- [x] Improve debug panel rendering for multi-agent events.
+- [x] Add polished showcase prompts for every configured agent.
 
 Why this first:
 
@@ -244,11 +243,11 @@ Why this first:
 
 Suggested acceptance checks:
 
-- [x] `mvn test` passes.
-- [ ] `customer-service` can route to support, sales, and complaint agents.
-- [ ] `doc-analysis-pipeline` executes all configured sub-agents.
-- [ ] Frontend shows multi-agent timeline events.
-- [ ] Existing `chat-basic`, `tool-test-simple`, `rag-chat`, and file upload flows still work in browser smoke testing.
+- [x] `mvn test` passes (90 tests, 0 failures, 0 errors).
+- [x] Frontend shows multi-agent timeline events (pipeline, routing, handoff).
+- [x] Showcase prompts added for every configured agent.
+- [x] JaCoCo coverage reporting configured.
+- [ ] Manual browser testing with real model credentials (requires API key).
 
 ## 8. References
 

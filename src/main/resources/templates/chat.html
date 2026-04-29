@@ -21,7 +21,7 @@
         <div class="app-body">
             <!-- Left Sidebar: Agent Selector -->
             <aside class="sidebar">
-                <div class="sidebar-header"><div class="sidebar-header-dot"></div>Select Agent</div>
+                <div class="sidebar-header"><svg class="sidebar-header-icon" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="1" width="12" height="6" rx="1.5"/><rect x="2" y="9" width="12" height="6" rx="1.5"/><circle cx="5" cy="4" r="1"/><circle cx="5" cy="12" r="1"/><line x1="8" y1="4" x2="12" y2="4"/><line x1="8" y1="12" x2="12" y2="12"/></svg>Select Agent</div>
                 <div class="agent-list" id="agentList">
                     <!-- Agent cards rendered dynamically by loadAgents() -->
                 </div>
@@ -38,8 +38,10 @@
                 </div>
                 <div class="chat-messages" id="chatMessages">
                     <div class="chat-empty" id="chatEmpty">
-                        <div class="chat-empty-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
-                        <div class="chat-empty-text">Initialize communication sequence</div>
+                        <div class="chat-empty-content">
+                            <div class="chat-empty-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+                            <div class="chat-empty-text">Initialize communication sequence</div>
+                        </div>
                     </div>
                 </div>
                 <div class="chat-input-area">
@@ -56,7 +58,7 @@
             <!-- Right: Debug Panel -->
             <aside class="debug-panel" id="debugPanel">
                 <div class="debug-header">
-                    <div class="debug-title">Runtime</div>
+                    <div class="debug-title">Agent Traces</div>
                     <button class="debug-toggle" id="debugToggle" onclick="toggleDebug()" title="Toggle debug panel">▶</button>
                 </div>
                 <div class="debug-rounds" id="debugRounds"></div>

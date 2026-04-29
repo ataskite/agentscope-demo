@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -21,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class CompositeAgentFactoryTest {
 
     @Mock
@@ -251,14 +254,25 @@ class CompositeAgentFactoryTest {
                 SubAgentConfig.builder().agentId("sub-2").description("Handles chat").build()
         ));
 
-        when(singleAgentFactory.createAgent("sub-1")).thenReturn(mockAgent);
-        when(singleAgentFactory.createAgent("sub-2")).thenReturn(mockAgent);
+        // Mock configService to return sub-agent configs
+        AgentConfig subConfig1 = new AgentConfig();
+        subConfig1.setAgentId("sub-1");
+        subConfig1.setSystemPrompt("You are a document expert");
+        subConfig1.setModelName("qwen-plus");
+
+        AgentConfig subConfig2 = new AgentConfig();
+        subConfig2.setAgentId("sub-2");
+        subConfig2.setSystemPrompt("You are a chat expert");
+        subConfig2.setModelName("qwen-plus");
+
+        when(configService.getAgentConfig("sub-1")).thenReturn(subConfig1);
+        when(configService.getAgentConfig("sub-2")).thenReturn(subConfig2);
 
         ReActAgent router = factory.createRoutingAgent(config, null);
 
         assertNotNull(router);
-        verify(singleAgentFactory).createAgent("sub-1");
-        verify(singleAgentFactory).createAgent("sub-2");
+        verify(configService).getAgentConfig("sub-1");
+        verify(configService).getAgentConfig("sub-2");
     }
 
     @Test
@@ -269,12 +283,18 @@ class CompositeAgentFactoryTest {
                 SubAgentConfig.builder().agentId("sub-1").build()
         ));
 
-        when(singleAgentFactory.createAgentForSession("sub-1", mockMemory)).thenReturn(mockAgent);
+        // Mock configService to return sub-agent config
+        AgentConfig subConfig = new AgentConfig();
+        subConfig.setAgentId("sub-1");
+        subConfig.setSystemPrompt("You are a sub-agent");
+        subConfig.setModelName("qwen-plus");
+
+        when(configService.getAgentConfig("sub-1")).thenReturn(subConfig);
 
         ReActAgent router = factory.createRoutingAgent(config, mockMemory);
 
         assertNotNull(router);
-        verify(singleAgentFactory).createAgentForSession("sub-1", mockMemory);
+        verify(configService).getAgentConfig("sub-1");
     }
 
     @Test
@@ -285,8 +305,15 @@ class CompositeAgentFactoryTest {
                 SubAgentConfig.builder().agentId("sub-1").build()
         ));
 
+        // Mock configService to return sub-agent config
+        AgentConfig subConfig = new AgentConfig();
+        subConfig.setAgentId("sub-1");
+        subConfig.setSystemPrompt("You are a sub-agent");
+        subConfig.setModelName("qwen-plus");
+
+        when(configService.getAgentConfig("sub-1")).thenReturn(subConfig);
+
         Hook hook = new ObservabilityHook();
-        when(singleAgentFactory.createAgent("sub-1")).thenReturn(mockAgent);
 
         ReActAgent router = factory.createRoutingAgent(config, null, hook);
 
@@ -323,14 +350,25 @@ class CompositeAgentFactoryTest {
                         .target("sub-2").build()
         ));
 
-        when(singleAgentFactory.createAgent("sub-1")).thenReturn(mockAgent);
-        when(singleAgentFactory.createAgent("sub-2")).thenReturn(mockAgent);
+        // Mock configService to return sub-agent configs
+        AgentConfig subConfig1 = new AgentConfig();
+        subConfig1.setAgentId("sub-1");
+        subConfig1.setSystemPrompt("You are a document expert");
+        subConfig1.setModelName("qwen-plus");
+
+        AgentConfig subConfig2 = new AgentConfig();
+        subConfig2.setAgentId("sub-2");
+        subConfig2.setSystemPrompt("You are a chat expert");
+        subConfig2.setModelName("qwen-plus");
+
+        when(configService.getAgentConfig("sub-1")).thenReturn(subConfig1);
+        when(configService.getAgentConfig("sub-2")).thenReturn(subConfig2);
 
         ReActAgent handoffAgent = factory.createHandoffsAgent(config, null);
 
         assertNotNull(handoffAgent);
-        verify(singleAgentFactory).createAgent("sub-1");
-        verify(singleAgentFactory).createAgent("sub-2");
+        verify(configService).getAgentConfig("sub-1");
+        verify(configService).getAgentConfig("sub-2");
     }
 
     @Test
@@ -341,12 +379,18 @@ class CompositeAgentFactoryTest {
                 SubAgentConfig.builder().agentId("sub-1").build()
         ));
 
-        when(singleAgentFactory.createAgentForSession("sub-1", mockMemory)).thenReturn(mockAgent);
+        // Mock configService to return sub-agent config
+        AgentConfig subConfig = new AgentConfig();
+        subConfig.setAgentId("sub-1");
+        subConfig.setSystemPrompt("You are a sub-agent");
+        subConfig.setModelName("qwen-plus");
+
+        when(configService.getAgentConfig("sub-1")).thenReturn(subConfig);
 
         ReActAgent handoffAgent = factory.createHandoffsAgent(config, mockMemory);
 
         assertNotNull(handoffAgent);
-        verify(singleAgentFactory).createAgentForSession("sub-1", mockMemory);
+        verify(configService).getAgentConfig("sub-1");
     }
 
     @Test
@@ -357,8 +401,15 @@ class CompositeAgentFactoryTest {
                 SubAgentConfig.builder().agentId("sub-1").build()
         ));
 
+        // Mock configService to return sub-agent config
+        AgentConfig subConfig = new AgentConfig();
+        subConfig.setAgentId("sub-1");
+        subConfig.setSystemPrompt("You are a sub-agent");
+        subConfig.setModelName("qwen-plus");
+
+        when(configService.getAgentConfig("sub-1")).thenReturn(subConfig);
+
         Hook hook = new ObservabilityHook();
-        when(singleAgentFactory.createAgent("sub-1")).thenReturn(mockAgent);
 
         ReActAgent handoffAgent = factory.createHandoffsAgent(config, null, hook);
 
@@ -374,7 +425,13 @@ class CompositeAgentFactoryTest {
         ));
         // No handoff triggers - should still work (falls back to LLM routing)
 
-        when(singleAgentFactory.createAgent("sub-1")).thenReturn(mockAgent);
+        // Mock configService to return sub-agent config
+        AgentConfig subConfig = new AgentConfig();
+        subConfig.setAgentId("sub-1");
+        subConfig.setSystemPrompt("You are a sub-agent");
+        subConfig.setModelName("qwen-plus");
+
+        when(configService.getAgentConfig("sub-1")).thenReturn(subConfig);
 
         ReActAgent handoffAgent = factory.createHandoffsAgent(config, null);
 

@@ -238,10 +238,10 @@ public class BankInvoiceTool {
             // 使用 ObjectMapper 进行 JSON 序列化
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("success", true);
-            result.put("excelPath", excelPath);
-            result.put("wordPath", wordPath);
             result.put("excelFileName", excelFileName);
             result.put("wordFileName", wordFileName);
+            result.put("excelDownloadUrl", "/chat/download?fileId=" + java.net.URLEncoder.encode(excelFileName, "UTF-8"));
+            result.put("wordDownloadUrl", "/chat/download?fileId=" + java.net.URLEncoder.encode(wordFileName, "UTF-8"));
 
             String jsonResult;
             try {

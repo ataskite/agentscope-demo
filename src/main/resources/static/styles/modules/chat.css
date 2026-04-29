@@ -354,3 +354,84 @@
     color: var(--text-secondary);
     font-size: 12px;
 }
+
+/* ===== SAMPLE PROMPTS ===== */
+.sample-prompts {
+    margin-top: var(--space-lg);
+    max-width: 600px;
+    width: 100%;
+}
+
+.sample-prompts-title {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: var(--space-md);
+    text-shadow: 0 0 8px rgba(104, 104, 160, 0.4);
+}
+
+.sample-prompts-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.sample-prompt-item {
+    padding: var(--space-md);
+    background: var(--bg-card);
+    border: 1px solid var(--border-dim);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.sample-prompt-item:hover {
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.2), 0 0 30px rgba(0, 240, 255, 0.08);
+    transform: translateY(-2px);
+}
+
+.sample-prompt-text {
+    font-size: 13px;
+    color: var(--text-primary);
+    margin-bottom: var(--space-xs);
+}
+
+.sample-prompt-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* ===== DOWNLOAD LINKS ===== */
+.md-render a[href*="/chat/download"] {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 240, 255, 0.1));
+    border: 1px solid var(--neon-green);
+    border-radius: 6px;
+    color: var(--neon-green);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    margin: 4px 2px;
+    text-shadow: 0 0 6px rgba(0, 255, 136, 0.4);
+    box-shadow: 0 0 8px rgba(0, 255, 136, 0.15);
+}
+
+.md-render a[href*="/chat/download"]:hover {
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 240, 255, 0.2));
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.3), 0 0 30px rgba(0, 240, 255, 0.1);
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+    transform: translateY(-1px);
+}
+
+.md-render a[href*="/chat/download"]:active {
+    transform: translateY(0);
+}
