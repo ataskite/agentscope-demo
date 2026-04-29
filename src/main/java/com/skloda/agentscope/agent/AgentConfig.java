@@ -36,6 +36,9 @@ public class AgentConfig {
     // Modality settings
     private String modality = "text"; // text, vision, audio
 
+    // Agent category for UI grouping
+    private String category = "single"; // single, expert, collaboration
+
     // === Multi-agent fields ===
     private AgentType type = AgentType.SINGLE;
     private List<SubAgentConfig> subAgents = new ArrayList<>();
