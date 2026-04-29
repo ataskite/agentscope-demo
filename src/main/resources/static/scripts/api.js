@@ -1,19 +1,19 @@
 /* ===== SSE PARSER ===== */
 export function createSSEParser() {
     var buffer = '';
+    var currentEvent = {};
     return {
         parse: function(chunk, onEvent) {
             buffer += chunk;
             var lines = buffer.split('\n');
             buffer = lines.pop();
-            var currentEvent = {};
             for (var i = 0; i < lines.length; i++) {
                 var line = lines[i];
                 if (line.startsWith('data:')) {
                     currentEvent.data = line.slice(5).trim();
                 } else if (line.startsWith('event:')) {
                     currentEvent.event = line.slice(6).trim();
-                } else if (line === '') {
+                } else if (line === '' || line === '\r') {
                     if (currentEvent.data) {
                         onEvent(currentEvent);
                     }
@@ -83,6 +83,11 @@ export async function uploadKnowledgeDoc(file) {
 
 export async function removeKnowledgeDoc(fileName) {
     return await fetch('/api/knowledge/documents/' + encodeURIComponent(fileName), { method: 'DELETE' });
+}
+
+export async function fetchKnowledgeStatus() {
+    var response = await fetch('/api/knowledge/status');
+    return await response.json();
 }
 
 /* ===== SKILL/TOOL INFO API ===== */

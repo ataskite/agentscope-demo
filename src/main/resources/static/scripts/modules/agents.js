@@ -1,4 +1,4 @@
-import { fetchAgents, fetchSkillInfo, fetchToolInfo } from '../api.js';
+import { fetchAgents, fetchSkillInfo, fetchToolInfo, fetchKnowledgeStatus } from '../api.js';
 import { escapeHtml } from './utils.js';
 import { setStreamingState } from './ui.js';
 import { agents } from '../state.js';
@@ -94,6 +94,9 @@ export async function selectAgent(agentId) {
     document.getElementById('chatHeaderName').textContent = agents[agentId].name;
     document.getElementById('chatHeaderDesc').textContent = agents[agentId].desc;
 
+    // Show sample prompts if available
+    showSamplePrompts(agentId);
+
     // Clear messages and restore empty state
     var chatEmpty = document.getElementById('chatEmpty');
     document.getElementById('chatMessages').innerHTML = '';
@@ -123,6 +126,53 @@ export async function selectAgent(agentId) {
         document.getElementById('messageInput').focus();
     }, 100);
 }
+
+/* ===== SAMPLE PROMPTS ===== */
+function showSamplePrompts(agentId) {
+    var agent = agents[agentId];
+    if (!agent || !agent.config || !agent.config.samplePrompts || agent.config.samplePrompts.length === 0) {
+        return;
+    }
+
+    var chatEmpty = document.getElementById('chatEmpty');
+    if (!chatEmpty) return;
+
+    var promptsHtml = '<div class="sample-prompts">' +
+        '<div class="sample-prompts-title">示例提示</div>' +
+        '<div class="sample-prompts-list">';
+
+    agent.config.samplePrompts.forEach(function(sample) {
+        promptsHtml += '<div class="sample-prompt-item" onclick="useSamplePrompt(\'' +
+            sample.prompt.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n') +
+            '\')">' +
+            '<div class="sample-prompt-text">' + escapeHtml(sample.prompt) + '</div>' +
+            '<div class="sample-prompt-hint">' + escapeHtml(sample.expectedBehavior) + '</div>' +
+            '</div>';
+    });
+
+    promptsHtml += '</div></div>';
+
+    // Insert sample prompts after the welcome content
+    var existingPrompts = chatEmpty.querySelector('.sample-prompts');
+    if (existingPrompts) {
+        existingPrompts.remove();
+    }
+
+    var welcomeContent = chatEmpty.querySelector('.chat-empty-content');
+    if (welcomeContent) {
+        welcomeContent.insertAdjacentHTML('afterend', promptsHtml);
+    }
+}
+
+window.useSamplePrompt = function(prompt) {
+    var input = document.getElementById('messageInput');
+    if (input) {
+        input.value = prompt;
+        input.focus();
+        // Trigger auto-resize
+        input.dispatchEvent(new Event('input'));
+    }
+};
 
 /* ===== CONFIG VIEWER ===== */
 export function showAgentConfig(agentId) {
@@ -156,6 +206,16 @@ export function showAgentConfig(agentId) {
             '</div>';
     } else {
         systemToolsHtml = '<div class="config-field-value tags"><span class="config-tag none">None</span></div>';
+    }
+
+    var knowledgeHtml = '';
+    if (config.ragEnabled) {
+        knowledgeHtml =
+            '<hr class="config-divider">' +
+            '<div class="config-field knowledge-status-field">' +
+                '<div class="config-field-label">Knowledge</div>' +
+                '<div class="knowledge-status" id="knowledgeStatus">Loading...</div>' +
+            '</div>';
     }
 
     var overlay = document.createElement('div');
@@ -210,6 +270,7 @@ export function showAgentConfig(agentId) {
                     '<div class="config-field-label">System Tools</div>' +
                     systemToolsHtml +
                 '</div>' +
+                knowledgeHtml +
                 '<hr class="config-divider">' +
                 '<div class="config-field">' +
                     '<div class="config-field-label">System Prompt</div>' +
@@ -219,11 +280,75 @@ export function showAgentConfig(agentId) {
         '</div>';
 
     document.body.appendChild(overlay);
+
+    if (config.ragEnabled) {
+        startKnowledgeStatusPolling();
+    }
 }
 
 // Global functions for onclick
 window.showAgentConfig = showAgentConfig;
+
+var knowledgeStatusTimer = null;
+
+async function startKnowledgeStatusPolling() {
+    stopKnowledgeStatusPolling();
+    await refreshKnowledgeStatus();
+    knowledgeStatusTimer = setInterval(refreshKnowledgeStatus, 2500);
+}
+
+function stopKnowledgeStatusPolling() {
+    if (knowledgeStatusTimer) {
+        clearInterval(knowledgeStatusTimer);
+        knowledgeStatusTimer = null;
+    }
+}
+
+async function refreshKnowledgeStatus() {
+    var target = document.getElementById('knowledgeStatus');
+    if (!target) {
+        stopKnowledgeStatusPolling();
+        return;
+    }
+    try {
+        var status = await fetchKnowledgeStatus();
+        target.innerHTML = renderKnowledgeStatus(status);
+        if (['READY', 'READY_WITH_ERRORS', 'EMPTY', 'FAILED'].indexOf(status.state) >= 0) {
+            stopKnowledgeStatusPolling();
+        }
+    } catch (err) {
+        target.innerHTML = '<div class="knowledge-status-error">Failed to load knowledge status</div>';
+        stopKnowledgeStatusPolling();
+    }
+}
+
+function renderKnowledgeStatus(status) {
+    var documents = status.documents || [];
+    var rows = documents.map(function(doc) {
+        return '<div class="knowledge-status-row">' +
+            '<span class="knowledge-status-file">' + escapeHtml(doc.relativePath || doc.fileName || '') + '</span>' +
+            '<span class="knowledge-status-badge ' + escapeHtml(String(doc.status || '').toLowerCase()) + '">' +
+                escapeHtml(doc.status || 'UNKNOWN') +
+            '</span>' +
+            '<span class="knowledge-status-chunks">' + Number(doc.chunkCount || 0) + ' chunks</span>' +
+            (doc.message ? '<span class="knowledge-status-message">' + escapeHtml(doc.message) + '</span>' : '') +
+            '</div>';
+    }).join('');
+    if (rows === '') {
+        rows = '<div class="knowledge-status-empty">No knowledge files indexed</div>';
+    }
+    return '<div class="knowledge-status-summary">' +
+            '<span class="knowledge-status-state">' + escapeHtml(status.state || 'UNKNOWN') + '</span>' +
+            '<span>' + Number(status.indexedFiles || 0) + ' indexed</span>' +
+            '<span>' + Number(status.skippedFiles || 0) + ' skipped</span>' +
+            '<span>' + Number(status.failedFiles || 0) + ' failed</span>' +
+        '</div>' +
+        '<div class="knowledge-status-path">' + escapeHtml(status.knowledgePath || '') + '</div>' +
+        '<div class="knowledge-status-list">' + rows + '</div>';
+}
+
 window.closeConfigModal = function() {
+    stopKnowledgeStatusPolling();
     var modal = document.getElementById('configModal');
     if (modal) modal.remove();
 };
