@@ -37,7 +37,9 @@ import java.util.stream.Stream;
 public class KnowledgeService {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeService.class);
-    private static final String UPLOADS_PREFIX = "__upload__/";
+    private static final String LOCAL_KEY_PREFIX = "local" + '\0';
+    private static final String UPLOAD_KEY_PREFIX = "upload" + '\0';
+    private static final String UPLOAD_DISPLAY_PREFIX = "<uploaded>/";
     private static final String STALE_VECTOR_MESSAGE =
             "previously indexed; InMemoryStore deletion is out of scope, stale vectors may remain";
 
@@ -73,13 +75,14 @@ public class KnowledgeService {
         Path path = Path.of(filePath);
         String extension = extensionOf(fileName);
         String statusKey = uploadStatusKey(fileName);
+        String displayPath = uploadDisplayPath(fileName);
         startedAt = OffsetDateTime.now();
         finishedAt = null;
         state = KnowledgeIndexStatus.State.INDEXING;
 
-        KnowledgeFileStatus indexingStatus = buildStatus(fileName, statusKey, path, extension,
+        KnowledgeFileStatus indexingStatus = buildStatus(fileName, displayPath, path, extension,
                 KnowledgeFileStatus.Status.INDEXING, 0, null);
-        upsertStatus(indexingStatus);
+        upsertStatus(statusKey, indexingStatus);
         try {
             if (!isSupportedExtension(extension)) {
                 throw new IllegalArgumentException("Unsupported file type: " + fileName);
@@ -90,12 +93,12 @@ public class KnowledgeService {
             if (docs != null && !docs.isEmpty()) {
                 knowledge.addDocuments(docs).block();
             }
-            upsertStatus(buildStatus(fileName, statusKey, path, extension,
+            upsertStatus(statusKey, buildStatus(fileName, displayPath, path, extension,
                     KnowledgeFileStatus.Status.INDEXED, chunkCount, null));
             state = determineCompletedState();
             log.info("Indexed {} chunks from: {}", chunkCount, fileName);
         } catch (Exception e) {
-            upsertStatus(buildStatus(fileName, statusKey, path, extension,
+            upsertStatus(statusKey, buildStatus(fileName, displayPath, path, extension,
                     KnowledgeFileStatus.Status.FAILED, 0, e.getMessage()));
             state = determineCompletedState();
             log.error("Failed to index document: {}", fileName, e);
@@ -203,33 +206,34 @@ public class KnowledgeService {
         String fileName = file.getFileName().toString();
         String relativePath = relativePath(root, file);
         String extension = extensionOf(fileName);
+        String statusKey = localStatusKey(relativePath);
 
         if (isImageExtension(extension)) {
-            upsertStatus(buildStatus(fileName, relativePath, file, extension, KnowledgeFileStatus.Status.SKIPPED,
-                    0, "image indexing requires OCR or multimodal embedding"));
+            upsertStatus(statusKey, buildStatus(fileName, relativePath, file, extension,
+                    KnowledgeFileStatus.Status.SKIPPED, 0, "image indexing requires OCR or multimodal embedding"));
             return;
         }
 
         if (!isSupportedExtension(extension)) {
-            upsertStatus(buildStatus(fileName, relativePath, file, extension, KnowledgeFileStatus.Status.SKIPPED,
-                    0, "unsupported file type: " + extension));
+            upsertStatus(statusKey, buildStatus(fileName, relativePath, file, extension,
+                    KnowledgeFileStatus.Status.SKIPPED, 0, "unsupported file type: " + extension));
             return;
         }
 
-        upsertStatus(buildStatus(fileName, relativePath, file, extension, KnowledgeFileStatus.Status.INDEXING,
-                0, null));
+        upsertStatus(statusKey, buildStatus(fileName, relativePath, file, extension,
+                KnowledgeFileStatus.Status.INDEXING, 0, null));
         try {
             List<Document> docs = readDocuments(file, extension);
             int chunkCount = docs == null ? 0 : docs.size();
             if (docs != null && !docs.isEmpty()) {
                 knowledge.addDocuments(docs).block();
             }
-            upsertStatus(buildStatus(fileName, relativePath, file, extension, KnowledgeFileStatus.Status.INDEXED,
-                    chunkCount, null));
+            upsertStatus(statusKey, buildStatus(fileName, relativePath, file, extension,
+                    KnowledgeFileStatus.Status.INDEXED, chunkCount, null));
             log.info("Indexed {} chunks from local knowledge file: {}", chunkCount, relativePath);
         } catch (Exception e) {
-            upsertStatus(buildStatus(fileName, relativePath, file, extension, KnowledgeFileStatus.Status.FAILED,
-                    0, e.getMessage()));
+            upsertStatus(statusKey, buildStatus(fileName, relativePath, file, extension,
+                    KnowledgeFileStatus.Status.FAILED, 0, e.getMessage()));
             log.error("Failed to index local knowledge file: {}", file, e);
         }
     }
@@ -284,11 +288,23 @@ public class KnowledgeService {
     }
 
     private String uploadStatusKey(String fileName) {
-        return UPLOADS_PREFIX + fileName;
+        return UPLOAD_KEY_PREFIX + fileName;
     }
 
-    private boolean isUploadStatus(KnowledgeFileStatus status) {
-        return status.getRelativePath() != null && status.getRelativePath().startsWith(UPLOADS_PREFIX);
+    private String uploadDisplayPath(String fileName) {
+        return UPLOAD_DISPLAY_PREFIX + fileName;
+    }
+
+    private String localStatusKey(String relativePath) {
+        return LOCAL_KEY_PREFIX + relativePath;
+    }
+
+    private boolean isUploadStatusKey(String statusKey) {
+        return statusKey.startsWith(UPLOAD_KEY_PREFIX);
+    }
+
+    private boolean isLocalStatusKey(String statusKey) {
+        return statusKey.startsWith(LOCAL_KEY_PREFIX);
     }
 
     private boolean isSupportedExtension(String extension) {
@@ -319,21 +335,20 @@ public class KnowledgeService {
                 .build();
     }
 
-    private void upsertStatus(KnowledgeFileStatus status) {
-        fileStatuses.put(status.getRelativePath(), status);
+    private void upsertStatus(String statusKey, KnowledgeFileStatus status) {
+        fileStatuses.put(statusKey, status);
     }
 
     private void removeTransientLocalStatuses() {
-        List<KnowledgeFileStatus> staleIndexedLocalStatuses = fileStatuses.values().stream()
-                .filter(status -> !isUploadStatus(status))
-                .filter(status -> status.getStatus() == KnowledgeFileStatus.Status.INDEXED)
-                .map(status -> status.toBuilder()
+        Map<String, KnowledgeFileStatus> staleIndexedLocalStatuses = fileStatuses.entrySet().stream()
+                .filter(entry -> isLocalStatusKey(entry.getKey()))
+                .filter(entry -> entry.getValue().getStatus() == KnowledgeFileStatus.Status.INDEXED)
+                .collect(LinkedHashMap::new, (map, entry) -> map.put(entry.getKey(), entry.getValue().toBuilder()
                         .message(STALE_VECTOR_MESSAGE)
                         .updatedAt(OffsetDateTime.now())
-                        .build())
-                .toList();
+                        .build()), Map::putAll);
 
-        fileStatuses.entrySet().removeIf(entry -> !isUploadStatus(entry.getValue()));
+        fileStatuses.entrySet().removeIf(entry -> !isUploadStatusKey(entry.getKey()));
         staleIndexedLocalStatuses.forEach(this::upsertStatus);
     }
 }
