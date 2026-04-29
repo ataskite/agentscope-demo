@@ -3,6 +3,13 @@ import { escapeHtml } from './utils.js';
 import { setStreamingState } from './ui.js';
 import { agents } from '../state.js';
 
+/* ===== CATEGORY DEFINITIONS ===== */
+const CATEGORIES = [
+    { key: 'single',        label: '单Agent',       icon: '⚡', color: 'cyan'    },
+    { key: 'expert',        label: '专家Agent',      icon: '🎯', color: 'green'   },
+    { key: 'collaboration', label: '多智能体协作',   icon: '🔗', color: 'magenta' },
+];
+
 /* ===== LOAD AGENTS ===== */
 export async function loadAgents() {
     try {
@@ -11,37 +18,77 @@ export async function loadAgents() {
         const agentListEl = document.getElementById('agentList');
         agentListEl.innerHTML = '';
 
+        // Group agents by category
+        var grouped = {};
         agentList.forEach(function(agent) {
             agents[agent.agentId] = {
                 name: agent.name,
                 desc: agent.description,
                 config: agent
             };
-            // Also expose to window for compatibility
-            window.agents = agents;
 
-            var card = document.createElement('div');
-            card.className = 'agent-card';
-            card.dataset.agentId = agent.agentId;
-            card.onclick = function() { selectAgent(agent.agentId); };
-
-            var namespace = agent.agentId.split('.')[0].toUpperCase();
-            card.innerHTML =
-                '<button class="agent-card-info-btn" onclick="event.stopPropagation(); showAgentConfig(\'' + agent.agentId + '\')" title="View config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>' +
-                '<div class="agent-card-icon">' + namespace.substring(0, 2) + '</div>' +
-                '<div class="agent-card-info">' +
-                    '<div class="agent-card-name">' + escapeHtml(agent.name) + '</div>' +
-                    '<div class="agent-card-desc">' + escapeHtml(agent.description) + '</div>' +
-                '</div>';
-
-            agentListEl.appendChild(card);
+            var cat = agent.category || 'single';
+            if (!grouped[cat]) {
+                grouped[cat] = [];
+            }
+            grouped[cat].push(agent);
         });
 
+        window.agents = agents;
+
+        // Render each category group
+        CATEGORIES.forEach(function(category, index) {
+            var agentsInGroup = grouped[category.key] || [];
+            if (agentsInGroup.length === 0) return;
+
+            var isExpanded = (index === 0);
+
+            // Group header
+            var header = document.createElement('div');
+            header.className = 'agent-group-header' + (isExpanded ? '' : ' collapsed');
+            header.dataset.category = category.key;
+            header.innerHTML =
+                '<span class="agent-group-arrow">▼</span>' +
+                '<span class="agent-group-icon color-' + category.color + '">' + category.icon + '</span>' +
+                '<span class="agent-group-label">' + category.label + '</span>' +
+                '<span class="agent-group-count">' + agentsInGroup.length + '</span>';
+
+            header.onclick = function() {
+                header.classList.toggle('collapsed');
+                body.classList.toggle('collapsed');
+            };
+
+            // Group body
+            var body = document.createElement('div');
+            body.className = 'agent-group-body' + (isExpanded ? '' : ' collapsed');
+
+            agentsInGroup.forEach(function(agent) {
+                var card = document.createElement('div');
+                card.className = 'agent-card';
+                card.dataset.agentId = agent.agentId;
+                card.onclick = function() { selectAgent(agent.agentId); };
+
+                var namespace = agent.agentId.split('.')[0].toUpperCase();
+                card.innerHTML =
+                    '<button class="agent-card-info-btn" onclick="event.stopPropagation(); showAgentConfig(\'' + agent.agentId + '\')" title="View config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>' +
+                    '<div class="agent-card-icon">' + namespace.substring(0, 2) + '</div>' +
+                    '<div class="agent-card-info">' +
+                        '<div class="agent-card-name">' + escapeHtml(agent.name) + '</div>' +
+                        '<div class="agent-card-desc">' + escapeHtml(agent.description) + '</div>' +
+                    '</div>';
+
+                body.appendChild(card);
+            });
+
+            agentListEl.appendChild(header);
+            agentListEl.appendChild(body);
+        });
+
+        // Auto-select first agent
         if (agentList.length > 0) {
             selectAgent(agentList[0].agentId);
         }
 
-        // Sync with window
         window.agents = agents;
     } catch (err) {
         console.error('Failed to load agents:', err);
