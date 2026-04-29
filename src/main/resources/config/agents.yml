@@ -701,3 +701,78 @@ agents:
         expectedBehavior: "由一般客服回答常见问题"
       - prompt: "转人工客服"
         expectedBehavior: "显式切换到人工客服"
+
+# === Multi-Agent: Supervisor ===
+
+  - agentId: super-supervisor
+    category: collaboration
+    type: ROUTING
+    name: 超级主管
+    description: 综合调度多个专家，协同完成复杂任务
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    systemPrompt: |
+      你是一个超级主管 Agent，负责协调多个专家子 Agent 共同完成复杂任务。
+
+      ## 核心能力
+      你可以按需调用以下专家 Agent，一个任务中可以连续调用多个专家：
+      - doc-expert：文档解析和分析
+      - search-expert：实时网络搜索
+      - vision-expert：图片理解和 OCR
+      - sales-expert：产品咨询和报价
+
+      ## 工作原则
+      1. 分析用户请求，判断需要哪些专家协助
+      2. 按顺序调用合适的专家（一次调用一个）
+      3. 每次调用后，根据专家返回的结果决定是否需要继续调用其他专家
+      4. 所有专家完成后，综合所有结果给出完整回答
+      5. 回答中要说明调用了哪些专家以及各自的贡献
+
+      ## 示例场景
+      - "分析这份文档并搜索行业动态" → 调用 doc-expert → 调用 search-expert → 综合回答
+      - "识别图片中的文字并翻译" → 调用 vision-expert → 综合回答
+      - "查一下竞品定价并给出销售建议" → 调用 search-expert → 调用 sales-expert → 综合回答
+    subAgents:
+      - agentId: doc-expert
+        description: 文档解析和分析专家，处理文档解析、内容提取和结构化分析
+      - agentId: search-expert
+        description: 搜索专家，获取实时网络信息、新闻、天气等
+      - agentId: vision-expert
+        description: 视觉专家，处理图片理解、OCR 文字识别、图表分析
+      - agentId: sales-expert
+        description: 销售专家，处理产品咨询、报价和购买建议
+    samplePrompts:
+      - prompt: "请帮我分析这份合同的风险点，并搜索相关法律法规作为参考"
+        expectedBehavior: "先调用文档专家解析合同，再调用搜索专家查找法规，最后综合给出风险评估"
+      - prompt: "识别这张发票图片的信息，然后搜索该供应商的最新动态"
+        expectedBehavior: "调用视觉专家提取发票信息，调用搜索专家查询供应商，综合回答"
+      - prompt: "帮我调研一下 AI Agent 市场的主要玩家，并给出销售建议"
+        expectedBehavior: "调用搜索专家获取市场信息，调用销售专家给出建议"
+
+# === Multi-Agent: Debate ===
+
+  - agentId: debate-review
+    category: collaboration
+    type: DEBATE
+    name: 专家辩论评审
+    description: 多专家并行辩论，Judge 综合裁决
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    subAgents:
+      - agentId: debate-optimist
+        description: 从积极角度分析提案
+      - agentId: debate-critic
+        description: 从风险角度审视提案
+      - agentId: debate-analyst
+        description: 从数据角度客观分析
+      - agentId: debate-judge
+        description: 综合所有观点做出裁决
+    samplePrompts:
+      - prompt: "评估方案：公司全面采用远程办公模式"
+        expectedBehavior: "三位专家并行分析，裁判综合裁决"
+      - prompt: "分析提案：投入 200 万开发内部 AI 助手，预期 6 个月回本"
+        expectedBehavior: "乐观/批评/数据三角度分析，裁判给出 ROI 判断"
+      - prompt: "评估策略：放弃现有客户管理系统，迁移到新平台"
+        expectedBehavior: "多角度风险收益分析，裁判给出迁移建议"
