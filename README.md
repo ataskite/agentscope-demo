@@ -20,10 +20,12 @@
 - **图片**: OCR 文字识别、图表分析、场景理解
 - **语音**: 语音转文字、语音交互
 
-### 🔍 RAG 知识库
-- 上传文档（PDF、DOCX、TXT、MD）
-- 向量相似度搜索
-- 智能问答
+### 🔍 RAG 知识库（Generic 模式）
+- **本地自动索引**: 启动时自动扫描 `src/main/resources/knowledge/` 目录
+- **上传文档**: 支持 PDF、DOCX、TXT、MD 格式
+- **向量相似度搜索**: 基于 DashScope text-embedding-v3
+- **智能问答**: Generic RAG 模式，高效检索增强
+- **状态追踪**: Agent 配置面板实时显示索引状态
 
 ### 🗂️ 会话管理
 - 持久化会话历史
@@ -127,6 +129,15 @@ ToolAgent：[调用 get_current_time] [调用 calculate_sum]
 
 ### RAG Chat - 知识库问答
 
+**方式一：本地目录自动索引**
+```
+1. 将文档放入 src/main/resources/knowledge/ 目录
+2. 重启应用（或等待后台索引完成）
+3. 切换到 "RAG Chat" 智能体
+4. 提问与文档相关的问题
+```
+
+**方式二：上传文档**
 ```
 1. 点击知识库图标
 2. 上传文档（PDF、DOCX、TXT）
@@ -166,7 +177,8 @@ src/main/java/com/skloda/agentscope/
 ├── service/
 │   ├── AgentService.java           # Agent 路由，实例缓存
 │   ├── SessionManagerService.java  # 会话管理
-│   └── KnowledgeService.java       # RAG 知识库
+│   ├── KnowledgeService.java       # RAG 知识库（含本地索引）
+│   └── KnowledgeProperties.java    # 知识库配置属性
 ├── agent/
 │   ├── AgentConfig.java            # Agent 配置实体
 │   ├── AgentConfigService.java     # 配置加载服务
@@ -180,7 +192,9 @@ src/main/java/com/skloda/agentscope/
 │   ├── ChatRequest.java            # 请求模型
 │   ├── ChatEvent.java              # 事件模型
 │   ├── SessionInfo.java            # 会话信息
-│   └── MultiModalMessage.java      # 多模态消息
+│   ├── MultiModalMessage.java      # 多模态消息
+│   ├── KnowledgeFileStatus.java    # 知识文件状态
+│   └── KnowledgeIndexStatus.java   # 知识索引状态
 └── tool/
     ├── ToolRegistry.java           # 工具注册表
     ├── SimpleTools.java            # 演示工具集
@@ -240,7 +254,14 @@ agentscope:
   session:
     storage-path: ${user.home}/.agentscope/demo-sessions
   knowledge:
+    enabled: true                      # 启用知识库
+    path: src/main/resources/knowledge # 本地知识目录
+    embedding-model: text-embedding-v3 # 嵌入模型
     dimensions: 1024                   # 向量维度
+    chunk-size: 512                    # 分块大小
+    overlap-size: 50                   # 重叠大小
+    split-strategy: PARAGRAPH          # 分块策略
+    auto-index-on-startup: true        # 启动时自动索引
 
 spring:
   servlet:
@@ -311,6 +332,7 @@ spring:
 | GET | `/api/knowledge/documents` | 列出知识库文档 |
 | POST | `/api/knowledge/upload` | 上传文档到知识库 |
 | DELETE | `/api/knowledge/documents/{fileName}` | 从知识库删除文档 |
+| GET | `/api/knowledge/status` | 获取知识库索引状态 |
 
 ## 添加新 Agent
 
