@@ -25,4 +25,17 @@ class AgentConfigTest {
         assertEquals(1, config.getSubAgents().size());
         assertFalse(config.getParallel());
     }
+
+    @Test
+    void testDefaultRagModeIsGeneric() {
+        AgentConfig config = new AgentConfig();
+        assertEquals("generic", config.getRagMode());
+    }
+
+    @Test
+    void testRagModeCanBeSet() {
+        AgentConfig config = new AgentConfig();
+        config.setRagMode("agentic");
+        assertEquals("agentic", config.getRagMode());
+    }
 }

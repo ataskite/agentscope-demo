@@ -18,6 +18,13 @@ agents:
     ragEnabled: true
     ragRetrieveLimit: 3
     ragScoreThreshold: 0.5
+    samplePrompts:
+      - prompt: "用三句话解释一下 AgentScope 是什么，并给一个适合初学者的例子"
+        expectedBehavior: "展示基础对话、概念解释和简洁表达能力"
+      - prompt: "帮我把这段话改得更专业：这个功能挺好用的，用户应该会喜欢"
+        expectedBehavior: "展示文本润色和语气转换能力"
+      - prompt: "给我一个学习 Java Agent 开发的一周计划"
+        expectedBehavior: "生成结构化学习建议，适合演示普通问答和规划"
 
   - agentId: tool-test-simple
     name: Tool Calling
@@ -42,6 +49,13 @@ agents:
       - view_text_file
       - write_text_file
       - execute_shell_command
+    samplePrompts:
+      - prompt: "现在几点？请使用工具获取当前时间"
+        expectedBehavior: "调用时间工具，并把结果解释给用户"
+      - prompt: "帮我计算 128 + 256 + 512 的结果"
+        expectedBehavior: "调用计算工具，展示工具调用链路和结果"
+      - prompt: "查询一下上海今天的天气"
+        expectedBehavior: "调用天气工具，返回天气信息"
 
   - agentId: task-document-analysis
     name: Task Agent
@@ -64,27 +78,13 @@ agents:
       - parse_xlsx
     systemTools:
       - view_text_file
-
-  - agentId: task-template-docx-editor
-    name: Template Editor
-    description: Word模板变量替换
-    systemPrompt: |
-      你是一个Word文档模板编辑助手。
-      当用户上传.docx模板时，帮助用户填充模板中的变量。
-      首先解析文档，识别模板中的占位符，
-      然后询问用户需要填入的值，
-      最后使用 edit_docx 工具完成变量替换。
-    modelName: qwen-plus
-    streaming: true
-    enableThinking: true
-    skills:
-      - docx-template
-    userTools:
-      - parse_docx
-      - edit_docx
-    systemTools:
-      - view_text_file
-      - write_text_file
+    samplePrompts:
+      - prompt: "请解析我上传的文档，并提取里面的关键结论、风险点和待办事项"
+        expectedBehavior: "根据上传文件类型调用解析工具，输出结构化分析"
+      - prompt: "请读取我上传的 Excel，按表格内容总结主要数据趋势"
+        expectedBehavior: "调用 xlsx 解析能力，展示表格理解和归纳"
+      - prompt: "我需要生成银行发票，请告诉我还缺哪些信息"
+        expectedBehavior: "识别发票生成任务，并引导收集 12 个必要字段"
 
   - agentId: bank-invoice
     name: Bank Invoice
@@ -114,13 +114,24 @@ agents:
 
       1. 如果用户没有提供完整信息，礼貌地询问缺失的参数
       2. 收集到所有12个参数后，使用 `generate_bank_invoice` 工具生成文档
-      3. 告知用户生成的文件名和保存位置
+      3. 工具返回结果包含 `excelDownloadUrl` 和 `wordDownloadUrl` 字段
+      4. 使用 Markdown 链接格式展示下载链接，让用户可以点击下载
+
+      ## 输出格式
+
+      生成成功后，必须按以下 Markdown 格式输出下载链接：
+
+      **发票文件已生成：**
+      - [📊 Excel 发票](下载URL)
+      - [📄 Word 发票](下载URL)
+
+      其中 URL 直接使用工具返回的 excelDownloadUrl 和 wordDownloadUrl 值。
 
       ## 注意事项
 
       - 生成的文件名会自动对客户姓名进行脱敏处理（如：张三丰 → 张某某）
-      - 文件保存在系统的临时目录中
       - Word 文档会自动添加当前日期作为提交日期
+      - 必须使用 Markdown 链接格式展示下载地址，确保用户可以直接点击下载
     modelName: qwen-plus
     streaming: true
     enableThinking: true
@@ -135,6 +146,13 @@ agents:
     systemTools:
       - view_text_file
       - write_text_file
+    samplePrompts:
+      - prompt: "为张三丰生成银行发票：身份证 110101199001011234，手机 13800138000，邮箱 zsf@example.com，合同号 HT20240410001，借据号 JD20240410001，放款日期 2024-04-10，贷款总额 100000，银行放款金额 80000，费用类型 服务费，发票金额 5000，流水号 001"
+        expectedBehavior: "收集完整参数后调用 generate_bank_invoice，生成 Excel 和 Word 文件"
+      - prompt: "我想生成一份银行发票，但目前只有姓名、手机号和合同号"
+        expectedBehavior: "识别缺失字段，逐项询问剩余必要信息"
+      - prompt: "帮我检查生成银行发票需要哪些字段，并给一个填写示例"
+        expectedBehavior: "展示发票生成能力说明和字段模板"
 
   - agentId: rag-chat
     name: RAG Chat
@@ -152,11 +170,19 @@ agents:
     autoContextLastKeep: 10
     autoContextTokenRatio: 0.3
     ragEnabled: true
+    ragMode: generic
     ragRetrieveLimit: 5
     ragScoreThreshold: 0.3
     skills: []
     userTools: []
     systemTools: []
+    samplePrompts:
+      - prompt: "根据知识库回答：AgentScope 支持哪些类型的 Agent？请引用检索到的内容"
+        expectedBehavior: "优先检索知识库，基于命中文档回答并引用依据"
+      - prompt: "知识库里有没有关于银行发票生成流程的说明？请整理成步骤"
+        expectedBehavior: "展示 RAG 检索、归纳和引用能力"
+      - prompt: "如果知识库没有相关内容，请明确告诉我，不要编造答案"
+        expectedBehavior: "展示无命中时的边界意识和可信回答"
 
   - agentId: vision-analyzer
     name: Vision Analyzer
@@ -182,6 +208,13 @@ agents:
     skills: []
     userTools: []
     systemTools: []
+    samplePrompts:
+      - prompt: "请分析我上传的图片，先描述整体内容，再提取其中的文字"
+        expectedBehavior: "上传图片后展示场景理解和 OCR 能力"
+      - prompt: "请阅读我上传的图表，说明图表类型、核心趋势和异常点"
+        expectedBehavior: "上传图表后提取视觉数据和趋势"
+      - prompt: "这张图片里有哪些关键物体？请按重要性排序"
+        expectedBehavior: "上传图片后展示物体识别和结构化输出"
 
   - agentId: voice-assistant
     name: Voice Assistant
@@ -197,6 +230,13 @@ agents:
     skills: []
     userTools: []
     systemTools: []
+    samplePrompts:
+      - prompt: "请把我上传的语音转成文字，并总结说话人的主要诉求"
+        expectedBehavior: "上传音频后完成语音理解和摘要"
+      - prompt: "请听这段录音，提取待办事项和时间信息"
+        expectedBehavior: "展示音频内容理解、要点提取和任务整理"
+      - prompt: "请用自然、简短的方式回答我刚才语音里的问题"
+        expectedBehavior: "展示语音问答场景下的简洁回复"
 
   - agentId: invoice-extractor
     name: Invoice Extractor
@@ -220,6 +260,13 @@ agents:
     skills: []
     userTools: []
     systemTools: []
+    samplePrompts:
+      - prompt: "请识别我上传的发票图片，提取发票号码、日期、金额、销售方和购买方信息"
+        expectedBehavior: "上传发票图片后输出结构化字段"
+      - prompt: "请检查这张发票的关键字段是否完整，并指出缺失项"
+        expectedBehavior: "展示票据字段校验和异常提示"
+      - prompt: "把这张发票的信息整理成 JSON，并附上一段中文摘要"
+        expectedBehavior: "展示结构化提取和自然语言摘要"
 
   - agentId: idcard-extractor
     name: ID Card Extractor
@@ -244,6 +291,13 @@ agents:
     skills: []
     userTools: []
     systemTools: []
+    samplePrompts:
+      - prompt: "请识别我上传的身份证图片，提取姓名、身份证号、地址和有效期"
+        expectedBehavior: "上传身份证图片后输出结构化身份字段"
+      - prompt: "请检查这张身份证信息是否清晰完整，并说明缺失或模糊字段"
+        expectedBehavior: "展示证件 OCR、质量判断和字段校验"
+      - prompt: "把身份证信息转成表格格式，并提醒我哪些敏感字段需要脱敏"
+        expectedBehavior: "展示结构化整理和隐私保护意识"
 
   - agentId: search-assistant
     name: Search Assistant
@@ -280,6 +334,13 @@ agents:
       - get_stock_price
       - get_news
     systemTools: []
+    samplePrompts:
+      - prompt: "搜索 AgentScope Java 最新资料，并总结它适合做什么"
+        expectedBehavior: "调用 web_search，基于搜索结果回答实时信息问题"
+      - prompt: "查询杭州今天的天气，并给出出门建议"
+        expectedBehavior: "调用天气工具，展示实时查询和建议生成"
+      - prompt: "帮我查一下阿里巴巴最近的相关新闻，并按重要性排序"
+        expectedBehavior: "调用新闻搜索工具，整理最新信息"
 
   - agentId: project-planner
     name: Project Planner
@@ -315,6 +376,13 @@ agents:
     userTools: []
     systemTools:
       - plan_notebook
+    samplePrompts:
+      - prompt: "帮我规划一个两周内上线文档分析 Agent Demo 的项目计划"
+        expectedBehavior: "输出阶段拆解、优先级、时间估算和风险"
+      - prompt: "把“搭建知识库问答系统”拆成可以执行的任务清单"
+        expectedBehavior: "展示任务分解、依赖识别和执行建议"
+      - prompt: "评估一下下周交付这个 Demo 的主要风险，并给出应对方案"
+        expectedBehavior: "展示项目风险分析和行动计划"
 
 # ============================================================
 # Phase 3: Multi-Agent Collaboration Configurations
@@ -334,6 +402,13 @@ agents:
     enableThinking: true
     skills: [docx, pdf, xlsx]
     userTools: [parse_docx, parse_pdf, parse_xlsx]
+    samplePrompts:
+      - prompt: "请解析我上传的 PDF，并提取摘要、关键数据和风险点"
+        expectedBehavior: "调用文档解析工具，输出专业文档分析"
+      - prompt: "请从我上传的 Excel 中找出最重要的三条业务洞察"
+        expectedBehavior: "展示表格解析和分析能力"
+      - prompt: "请比较我上传文档中的目标、现状和下一步行动"
+        expectedBehavior: "展示跨段落信息抽取和结构化归纳"
 
   - agentId: search-expert
     name: 搜索专家
@@ -345,6 +420,13 @@ agents:
     streaming: true
     enableThinking: true
     userTools: [web_search, get_current_weather, get_news]
+    samplePrompts:
+      - prompt: "搜索今天 AI Agent 领域的重要新闻，并给我三条摘要"
+        expectedBehavior: "调用搜索工具，返回实时新闻摘要"
+      - prompt: "查一下北京今天的天气，并说明是否适合户外活动"
+        expectedBehavior: "调用天气工具并给出简短建议"
+      - prompt: "帮我找 AgentScope Java 的相关资料，并列出来源"
+        expectedBehavior: "展示搜索、筛选和引用来源能力"
 
   - agentId: vision-expert
     name: 视觉专家
@@ -356,6 +438,13 @@ agents:
     streaming: true
     enableThinking: false
     modality: vision
+    samplePrompts:
+      - prompt: "请分析我上传的截图，提取文字并说明页面在做什么"
+        expectedBehavior: "上传图片后展示 OCR 和界面理解"
+      - prompt: "请识别这张图片中的主要对象，并输出结构化列表"
+        expectedBehavior: "展示视觉识别和结构化表达"
+      - prompt: "请分析这张图表的趋势和异常点"
+        expectedBehavior: "展示图表理解和数据洞察"
 
   - agentId: sales-expert
     name: 销售专家
@@ -366,6 +455,13 @@ agents:
     modelName: qwen-plus
     streaming: true
     enableThinking: true
+    samplePrompts:
+      - prompt: "我想购买企业版，请介绍核心功能和适合的使用场景"
+        expectedBehavior: "展示产品咨询、需求匹配和价值说明"
+      - prompt: "请根据 20 人团队的需求给一个报价沟通话术"
+        expectedBehavior: "展示销售报价建议和沟通策略"
+      - prompt: "客户担心接入成本太高，你会怎么回应？"
+        expectedBehavior: "展示异议处理和购买建议"
 
   - agentId: support-agent
     name: 客服专员
@@ -376,6 +472,13 @@ agents:
     modelName: qwen-plus
     streaming: true
     enableThinking: true
+    samplePrompts:
+      - prompt: "我第一次使用这个系统，应该先体验哪个 Agent？"
+        expectedBehavior: "展示一般客服引导和常见问题回答"
+      - prompt: "上传文件后没有反应，我该怎么排查？"
+        expectedBehavior: "提供清晰的故障排查步骤"
+      - prompt: "请说明这个 Demo 支持哪些文件类型"
+        expectedBehavior: "回答产品使用类问题"
 
   - agentId: sales-agent
     name: 销售顾问
@@ -386,6 +489,13 @@ agents:
     modelName: qwen-plus
     streaming: true
     enableThinking: true
+    samplePrompts:
+      - prompt: "我想了解产品价格和购买方案"
+        expectedBehavior: "展示销售咨询和方案推荐"
+      - prompt: "如果我是小团队，应该选择什么套餐？"
+        expectedBehavior: "根据场景给出购买建议"
+      - prompt: "帮我准备一段面向客户的产品介绍"
+        expectedBehavior: "生成销售话术和产品亮点"
 
   - agentId: complaint-agent
     name: 投诉处理
@@ -396,6 +506,13 @@ agents:
     modelName: qwen-plus
     streaming: true
     enableThinking: true
+    samplePrompts:
+      - prompt: "我对服务响应速度很不满意，请给我一个解决方案"
+        expectedBehavior: "展示投诉安抚、问题确认和处理建议"
+      - prompt: "客户要求升级处理投诉，你会怎么回复？"
+        expectedBehavior: "展示升级处理和专业客服话术"
+      - prompt: "请把这段投诉内容整理成工单摘要"
+        expectedBehavior: "提取投诉原因、影响和下一步动作"
 
 # === Multi-Agent: Sequential Pipeline ===
 
@@ -412,6 +529,13 @@ agents:
       - agentId: search-expert
         description: 搜索补充信息
     parallel: false
+    samplePrompts:
+      - prompt: "请分析这个文档，并搜索相关的最新信息"
+        expectedBehavior: "文档专家先解析文档，然后搜索专家补充实时信息"
+      - prompt: "帮我总结这份报告的主要内容，并查找相关行业动态"
+        expectedBehavior: "先提取文档摘要，再搜索行业最新动态"
+      - prompt: "分析这个合同，并查找相关法律法规"
+        expectedBehavior: "解析合同内容，然后搜索相关法律条文"
 
 # === Multi-Agent: Routing ===
 
@@ -432,6 +556,15 @@ agents:
       - agentId: sales-expert
         description: 销售专家，处理产品咨询和报价
     parallel: false
+    samplePrompts:
+      - prompt: "请分析我上传的合同，提取关键条款和风险点"
+        expectedBehavior: "自动路由到文档专家处理文档分析问题"
+      - prompt: "帮我搜索今天 AgentScope 相关的最新资讯"
+        expectedBehavior: "自动路由到搜索专家获取实时信息"
+      - prompt: "我想咨询企业版价格和购买建议"
+        expectedBehavior: "自动路由到销售专家处理产品咨询"
+      - prompt: "请识别我上传图片中的文字和主要内容"
+        expectedBehavior: "自动路由到视觉专家处理图片理解"
 
 # === Multi-Agent: Handoffs ===
 
@@ -459,3 +592,12 @@ agents:
       - type: EXPLICIT
         keywords: ["转人工", "客服"]
         target: support-agent
+    samplePrompts:
+      - prompt: "你好，我想咨询一下产品价格"
+        expectedBehavior: "自动切换到销售顾问，提供产品报价信息"
+      - prompt: "我对你们的服务很不满意，要投诉"
+        expectedBehavior: "自动切换到投诉处理专员，提供解决方案"
+      - prompt: "请问你们的营业时间是什么时候？"
+        expectedBehavior: "由一般客服回答常见问题"
+      - prompt: "转人工客服"
+        expectedBehavior: "显式切换到人工客服"

@@ -111,14 +111,15 @@ public class AgentFactory {
 
         // Register RAG knowledge if enabled
         if (config.isRagEnabled()) {
+            RAGMode ragMode = parseRagMode(config.getRagMode());
             builder.knowledge(knowledgeService.getKnowledge())
-                    .ragMode(RAGMode.AGENTIC)
+                    .ragMode(ragMode)
                     .retrieveConfig(RetrieveConfig.builder()
                             .limit(config.getRagRetrieveLimit())
                             .scoreThreshold(config.getRagScoreThreshold())
                             .build());
-            log.info("  Enabled RAG for agent: {} (limit={}, threshold={})",
-                    agentId, config.getRagRetrieveLimit(), config.getRagScoreThreshold());
+            log.info("  Enabled RAG for agent: {} (mode={}, limit={}, threshold={})",
+                    agentId, ragMode, config.getRagRetrieveLimit(), config.getRagScoreThreshold());
         }
 
         // Register hooks if provided
@@ -166,5 +167,20 @@ public class AgentFactory {
         } else {
             builder.toolkit(toolkit);
         }
+    }
+
+    private RAGMode parseRagMode(String value) {
+        if (value == null || value.isBlank()) {
+            return RAGMode.GENERIC;
+        }
+        return switch (value.trim().toLowerCase()) {
+            case "generic" -> RAGMode.GENERIC;
+            case "agentic" -> RAGMode.AGENTIC;
+            case "none" -> RAGMode.NONE;
+            default -> {
+                log.warn("Unknown RAG mode '{}', falling back to GENERIC", value);
+                yield RAGMode.GENERIC;
+            }
+        };
     }
 }

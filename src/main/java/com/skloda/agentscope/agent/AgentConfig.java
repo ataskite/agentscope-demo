@@ -31,6 +31,7 @@ public class AgentConfig {
     private boolean ragEnabled = false;
     private int ragRetrieveLimit = 3;
     private double ragScoreThreshold = 0.5;
+    private String ragMode = "generic";
 
     // Modality settings
     private String modality = "text"; // text, vision, audio
@@ -40,5 +41,8 @@ public class AgentConfig {
     private List<SubAgentConfig> subAgents = new ArrayList<>();
     private Boolean parallel = false;
     private List<HandoffTrigger> handoffTriggers = new ArrayList<>();
+
+    // === Showcase fields ===
+    private List<SamplePrompt> samplePrompts = new ArrayList<>();
 
 }
