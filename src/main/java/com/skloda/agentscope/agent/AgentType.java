@@ -5,7 +5,8 @@ public enum AgentType {
     SEQUENTIAL(false),
     PARALLEL(false),
     ROUTING(false),
-    HANDOFFS(false);
+    HANDOFFS(false),
+    DEBATE(false);
 
     private final boolean isDefault;
 

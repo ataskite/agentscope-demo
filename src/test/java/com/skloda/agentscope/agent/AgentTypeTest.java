@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class AgentTypeTest {
     @Test
     void testEnumValues() {
-        assertEquals(5, AgentType.values().length);
+        assertEquals(6, AgentType.values().length);
     }
 
     @Test
