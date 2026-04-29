@@ -34,14 +34,16 @@ export async function loadAgents() {
             grouped[cat].push(agent);
         });
 
-        window.agents = agents;
-
         // Render each category group
         CATEGORIES.forEach(function(category, index) {
             var agentsInGroup = grouped[category.key] || [];
             if (agentsInGroup.length === 0) return;
 
             var isExpanded = (index === 0);
+
+            // Group body
+            var body = document.createElement('div');
+            body.className = 'agent-group-body' + (isExpanded ? '' : ' collapsed');
 
             // Group header
             var header = document.createElement('div');
@@ -57,10 +59,6 @@ export async function loadAgents() {
                 header.classList.toggle('collapsed');
                 body.classList.toggle('collapsed');
             };
-
-            // Group body
-            var body = document.createElement('div');
-            body.className = 'agent-group-body' + (isExpanded ? '' : ' collapsed');
 
             agentsInGroup.forEach(function(agent) {
                 var card = document.createElement('div');
