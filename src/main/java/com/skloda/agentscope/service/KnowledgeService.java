@@ -37,7 +37,7 @@ import java.util.stream.Stream;
 public class KnowledgeService {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeService.class);
-    private static final String UPLOADS_PREFIX = "uploads/";
+    private static final String UPLOADS_PREFIX = "__upload__/";
     private static final String STALE_VECTOR_MESSAGE =
             "previously indexed; InMemoryStore deletion is out of scope, stale vectors may remain";
 

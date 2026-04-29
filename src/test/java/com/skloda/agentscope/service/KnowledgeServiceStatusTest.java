@@ -79,7 +79,7 @@ class KnowledgeServiceStatusTest {
         assertEquals(1, status.getTotalFiles());
         assertEquals(1, status.getFailedFiles());
         KnowledgeFileStatus fileStatus = status.getDocuments().get(0);
-        assertEquals("uploads/unsupported.csv", fileStatus.getRelativePath());
+        assertEquals("__upload__/unsupported.csv", fileStatus.getRelativePath());
         assertEquals(KnowledgeFileStatus.Status.FAILED, fileStatus.getStatus());
     }
 
@@ -102,8 +102,33 @@ class KnowledgeServiceStatusTest {
         assertEquals(2, status.getTotalFiles());
         assertEquals(1, status.getFailedFiles());
         assertEquals(1, status.getSkippedFiles());
-        assertEquals("same.csv", status.getDocuments().get(0).getRelativePath());
+        assertEquals("__upload__/same.csv", status.getDocuments().get(0).getRelativePath());
+        assertEquals("same.csv", status.getDocuments().get(1).getRelativePath());
+    }
+
+    @Test
+    void uploadStatusDoesNotHideLocalUploadsDirectoryFile() throws Exception {
+        Path knowledgePath = tempDir.resolve("knowledge");
+        Path localUploadsPath = knowledgePath.resolve("uploads");
+        Files.createDirectories(localUploadsPath);
+        Files.write(localUploadsPath.resolve("same.csv"), "local".getBytes());
+
+        KnowledgeProperties properties = new KnowledgeProperties();
+        properties.setPath(knowledgePath.toString());
+        KnowledgeService service = new KnowledgeService("test-api-key", properties);
+
+        assertThrows(RuntimeException.class, () ->
+                service.addDocument(tempDir.resolve("same.csv").toString(), "same.csv"));
+        service.indexLocalKnowledge();
+
+        KnowledgeIndexStatus status = service.getIndexStatus();
+        assertEquals(KnowledgeIndexStatus.State.READY_WITH_ERRORS, status.getState());
+        assertEquals(2, status.getTotalFiles());
+        assertEquals(1, status.getFailedFiles());
+        assertEquals(1, status.getSkippedFiles());
+        assertEquals("__upload__/same.csv", status.getDocuments().get(0).getRelativePath());
         assertEquals("uploads/same.csv", status.getDocuments().get(1).getRelativePath());
+        assertEquals(KnowledgeFileStatus.Status.SKIPPED, status.getDocuments().get(1).getStatus());
     }
 
     @Test
@@ -119,6 +144,6 @@ class KnowledgeServiceStatusTest {
         KnowledgeIndexStatus status = service.getIndexStatus();
         assertEquals(KnowledgeIndexStatus.State.READY_WITH_ERRORS, status.getState());
         assertEquals(1, status.getTotalFiles());
-        assertEquals("uploads/failed.csv", status.getDocuments().get(0).getRelativePath());
+        assertEquals("__upload__/failed.csv", status.getDocuments().get(0).getRelativePath());
     }
 }
