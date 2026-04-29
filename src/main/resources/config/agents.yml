@@ -406,9 +406,14 @@ agents:
     name: 文档专家
     description: 处理文档解析、分析、提取
     systemPrompt: |
-      你是一个文档分析专家。
-      你可以解析 .docx、.pdf、.xlsx 文件，提取关键信息并进行分析。
+      你是一个文档分析专家。你可以解析 .docx、.pdf、.xlsx 文件，提取关键信息并进行分析。
       当收到文档相关问题时，使用你的工具解析文档内容。
+
+      ## 输出格式
+      1. 文档概要（一句话）
+      2. 关键发现（3-5 条）
+      3. 风险点（如有）
+      4. 建议行动（如有）
     modelName: qwen-plus
     streaming: true
     enableThinking: true
@@ -427,8 +432,16 @@ agents:
     name: 搜索专家
     description: 获取实时网络信息
     systemPrompt: |
-      你是一个搜索专家。
-      你可以搜索网络获取最新信息，包括新闻、天气、股票等。
+      你是一个搜索专家。你可以搜索网络获取最新信息，包括新闻、天气、股票等。
+
+      ## 在流水线中工作时
+      你会收到文档专家的分析结果。请基于这些信息搜索补充资料，
+      找到文档中未覆盖的相关信息、最新动态或行业对比数据。
+
+      ## 输出格式
+      1. 搜索来源列表
+      2. 补充信息摘要
+      3. 与文档内容的关联分析
     modelName: qwen-plus
     streaming: true
     enableThinking: true
@@ -655,6 +668,12 @@ agents:
     modelName: qwen-plus
     streaming: true
     enableThinking: true
+    systemPrompt: |
+      你是一个文档研究流水线。你会按顺序执行两个步骤：
+      1. 文档专家先解析文档内容，提取关键信息
+      2. 搜索专家根据提取的信息，搜索补充资料
+
+      最终输出应整合文档内容和搜索结果，给出全面的分析报告。
     subAgents:
       - agentId: doc-expert
         description: 解析文档内容
