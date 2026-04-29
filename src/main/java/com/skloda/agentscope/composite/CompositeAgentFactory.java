@@ -149,6 +149,48 @@ public class CompositeAgentFactory {
     }
 
     /**
+     * Create a debate pipeline where multiple debaters argue in parallel,
+     * then a judge agent synthesizes their viewpoints into a final decision.
+     *
+     * The last sub-agent in the list is treated as the judge.
+     * All preceding sub-agents are the debaters.
+     */
+    public DebatePipeline createDebateAgent(AgentConfig config, Memory memory) {
+        if (config.getSubAgents() == null || config.getSubAgents().size() < 3) {
+            throw new IllegalArgumentException(
+                    "DEBATE agent requires at least 3 sub-agents (2 debaters + 1 judge): " + config.getAgentId());
+        }
+
+        log.info("Creating DEBATE pipeline for: {} with {} sub-agents",
+                config.getAgentId(), config.getSubAgents().size());
+
+        // Split sub-agents: all except last are debaters, last is judge
+        List<SubAgentConfig> subAgentConfigs = config.getSubAgents();
+        List<SubAgentConfig> debaterConfigs = subAgentConfigs.subList(0, subAgentConfigs.size() - 1);
+        SubAgentConfig judgeConfig = subAgentConfigs.get(subAgentConfigs.size() - 1);
+
+        // Create debater agents
+        List<AgentBase> debaters = debaterConfigs.stream()
+                .map(sub -> {
+                    log.info("  Creating debater sub-agent: {}", sub.getAgentId());
+                    return memory != null
+                            ? singleAgentFactory.createAgentForSession(sub.getAgentId(), memory)
+                            : singleAgentFactory.createAgent(sub.getAgentId());
+                })
+                .map(ReActAgent.class::cast)
+                .map(AgentBase.class::cast)
+                .toList();
+
+        // Create judge agent
+        log.info("  Creating judge sub-agent: {}", judgeConfig.getAgentId());
+        AgentBase judge = memory != null
+                ? singleAgentFactory.createAgentForSession(judgeConfig.getAgentId(), memory)
+                : singleAgentFactory.createAgent(judgeConfig.getAgentId());
+
+        return new DebatePipeline(debaters, judge);
+    }
+
+    /**
      * Create a routing agent that uses LLM to decide which sub-agent to dispatch to.
      * Each sub-agent is registered as a SubAgentTool, and the router's system prompt
      * describes each sub-agent's capabilities for intelligent routing.

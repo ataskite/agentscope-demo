@@ -50,6 +50,7 @@ public class AgentRuntimeFactory {
             case PARALLEL -> createParallelRuntime(agentId);
             case ROUTING -> createRoutingRuntime(agentId);
             case HANDOFFS -> createHandoffsRuntime(agentId);
+            case DEBATE -> createDebateRuntime(agentId);
         };
     }
 
@@ -68,6 +69,7 @@ public class AgentRuntimeFactory {
             case PARALLEL -> createParallelRuntimeWithMemory(agentId, memory);
             case ROUTING -> createRoutingRuntimeWithMemory(agentId, memory);
             case HANDOFFS -> createHandoffsRuntimeWithMemory(agentId, memory);
+            case DEBATE -> createDebateRuntimeWithMemory(agentId, memory);
         };
     }
 
@@ -176,6 +178,34 @@ public class AgentRuntimeFactory {
                 configService.getAgentConfig(agentId), memory, hook);
 
         return new AgentRuntime(agent, hook);
+    }
+
+    /**
+     * Create a pipeline runtime for debate agents (stateless mode).
+     */
+    public PipelineAgentRuntime createDebateRuntime(String agentId) {
+        log.debug("Creating DebateRuntime for agent: {}", agentId);
+
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        io.agentscope.core.pipeline.Pipeline<io.agentscope.core.message.Msg> pipeline =
+                compositeFactory.createDebateAgent(config, null);
+
+        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
+    }
+
+    /**
+     * Create a pipeline runtime for debate agents (session mode with shared memory).
+     */
+    public PipelineAgentRuntime createDebateRuntimeWithMemory(String agentId, Memory memory) {
+        log.debug("Creating DebateRuntime with shared memory for agent: {}", agentId);
+
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        io.agentscope.core.pipeline.Pipeline<io.agentscope.core.message.Msg> pipeline =
+                compositeFactory.createDebateAgent(config, memory);
+
+        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
     }
 
     public CompositeAgentFactory getCompositeFactory() {
