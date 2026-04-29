@@ -21,10 +21,11 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Map;
 import java.time.OffsetDateTime;
 import java.util.stream.Stream;
 
@@ -36,10 +37,13 @@ import java.util.stream.Stream;
 public class KnowledgeService {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeService.class);
+    private static final String UPLOADS_PREFIX = "uploads/";
+    private static final String STALE_VECTOR_MESSAGE =
+            "previously indexed; InMemoryStore deletion is out of scope, stale vectors may remain";
 
     private final Knowledge knowledge;
     private final KnowledgeProperties properties;
-    private final CopyOnWriteArrayList<KnowledgeFileStatus> fileStatuses = new CopyOnWriteArrayList<>();
+    private final Map<String, KnowledgeFileStatus> fileStatuses = new LinkedHashMap<>();
     private volatile KnowledgeIndexStatus.State state = KnowledgeIndexStatus.State.EMPTY;
     private volatile OffsetDateTime startedAt;
     private volatile OffsetDateTime finishedAt;
@@ -65,10 +69,15 @@ public class KnowledgeService {
     /**
      * Add a document file to the knowledge base.
      */
-    public void addDocument(String filePath, String fileName) {
+    public synchronized void addDocument(String filePath, String fileName) {
         Path path = Path.of(filePath);
         String extension = extensionOf(fileName);
-        KnowledgeFileStatus indexingStatus = buildStatus(fileName, fileName, path, extension,
+        String statusKey = uploadStatusKey(fileName);
+        startedAt = OffsetDateTime.now();
+        finishedAt = null;
+        state = KnowledgeIndexStatus.State.INDEXING;
+
+        KnowledgeFileStatus indexingStatus = buildStatus(fileName, statusKey, path, extension,
                 KnowledgeFileStatus.Status.INDEXING, 0, null);
         upsertStatus(indexingStatus);
         try {
@@ -81,22 +90,26 @@ public class KnowledgeService {
             if (docs != null && !docs.isEmpty()) {
                 knowledge.addDocuments(docs).block();
             }
-            upsertStatus(buildStatus(fileName, fileName, path, extension,
+            upsertStatus(buildStatus(fileName, statusKey, path, extension,
                     KnowledgeFileStatus.Status.INDEXED, chunkCount, null));
+            state = determineCompletedState();
             log.info("Indexed {} chunks from: {}", chunkCount, fileName);
         } catch (Exception e) {
-            upsertStatus(buildStatus(fileName, fileName, path, extension,
+            upsertStatus(buildStatus(fileName, statusKey, path, extension,
                     KnowledgeFileStatus.Status.FAILED, 0, e.getMessage()));
+            state = determineCompletedState();
             log.error("Failed to index document: {}", fileName, e);
             throw new RuntimeException("Failed to index document: " + e.getMessage(), e);
+        } finally {
+            finishedAt = OffsetDateTime.now();
         }
     }
 
     /**
      * Snapshot the local knowledge indexing status.
      */
-    public KnowledgeIndexStatus getIndexStatus() {
-        List<KnowledgeFileStatus> sortedDocuments = fileStatuses.stream()
+    public synchronized KnowledgeIndexStatus getIndexStatus() {
+        List<KnowledgeFileStatus> sortedDocuments = fileStatuses.values().stream()
                 .sorted(Comparator.comparing(KnowledgeFileStatus::getRelativePath,
                         Comparator.nullsLast(String::compareTo)))
                 .toList();
@@ -118,7 +131,7 @@ public class KnowledgeService {
         startedAt = OffsetDateTime.now();
         finishedAt = null;
         state = KnowledgeIndexStatus.State.INDEXING;
-        fileStatuses.clear();
+        removeTransientLocalStatuses();
 
         try {
             Files.createDirectories(root);
@@ -170,8 +183,8 @@ public class KnowledgeService {
     /**
      * List indexed document names.
      */
-    public List<String> getIndexedDocuments() {
-        return fileStatuses.stream()
+    public synchronized List<String> getIndexedDocuments() {
+        return fileStatuses.values().stream()
                 .filter(status -> status.getStatus() == KnowledgeFileStatus.Status.INDEXED)
                 .map(KnowledgeFileStatus::getFileName)
                 .toList();
@@ -180,8 +193,9 @@ public class KnowledgeService {
     /**
      * Remove a document from the index list (note: InMemoryStore doesn't support removal).
      */
-    public void removeDocument(String fileName) {
-        fileStatuses.removeIf(status -> fileName.equals(status.getFileName()));
+    public synchronized void removeDocument(String fileName) {
+        fileStatuses.entrySet().removeIf(entry -> fileName.equals(entry.getValue().getFileName()));
+        state = determineCompletedState();
         log.info("Removed document from index list: {}", fileName);
     }
 
@@ -239,9 +253,9 @@ public class KnowledgeService {
     }
 
     private KnowledgeIndexStatus.State determineCompletedState() {
-        boolean hasIndexed = fileStatuses.stream()
+        boolean hasIndexed = fileStatuses.values().stream()
                 .anyMatch(status -> status.getStatus() == KnowledgeFileStatus.Status.INDEXED);
-        boolean hasFailed = fileStatuses.stream()
+        boolean hasFailed = fileStatuses.values().stream()
                 .anyMatch(status -> status.getStatus() == KnowledgeFileStatus.Status.FAILED);
 
         if (hasFailed) {
@@ -267,6 +281,14 @@ public class KnowledgeService {
             return "";
         }
         return fileName.substring(dot + 1).toLowerCase();
+    }
+
+    private String uploadStatusKey(String fileName) {
+        return UPLOADS_PREFIX + fileName;
+    }
+
+    private boolean isUploadStatus(KnowledgeFileStatus status) {
+        return status.getRelativePath() != null && status.getRelativePath().startsWith(UPLOADS_PREFIX);
     }
 
     private boolean isSupportedExtension(String extension) {
@@ -298,7 +320,20 @@ public class KnowledgeService {
     }
 
     private void upsertStatus(KnowledgeFileStatus status) {
-        fileStatuses.removeIf(existing -> status.getRelativePath().equals(existing.getRelativePath()));
-        fileStatuses.add(status);
+        fileStatuses.put(status.getRelativePath(), status);
+    }
+
+    private void removeTransientLocalStatuses() {
+        List<KnowledgeFileStatus> staleIndexedLocalStatuses = fileStatuses.values().stream()
+                .filter(status -> !isUploadStatus(status))
+                .filter(status -> status.getStatus() == KnowledgeFileStatus.Status.INDEXED)
+                .map(status -> status.toBuilder()
+                        .message(STALE_VECTOR_MESSAGE)
+                        .updatedAt(OffsetDateTime.now())
+                        .build())
+                .toList();
+
+        fileStatuses.entrySet().removeIf(entry -> !isUploadStatus(entry.getValue()));
+        staleIndexedLocalStatuses.forEach(this::upsertStatus);
     }
 }
