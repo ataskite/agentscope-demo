@@ -6,10 +6,13 @@ import io.agentscope.core.rag.reader.SplitStrategy;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -72,6 +75,24 @@ class KnowledgeServiceStatusTest {
         KnowledgeIndexStatus status = service.getIndexStatus();
         assertEquals(KnowledgeIndexStatus.State.EMPTY, status.getState());
         assertEquals(0, status.getTotalFiles());
+    }
+
+    @Test
+    void directLocalIndexingSkipsWhenIndexingIsAlreadyActive() throws Exception {
+        KnowledgeProperties properties = new KnowledgeProperties();
+        properties.setPath(tempDir.resolve("knowledge").toString());
+        KnowledgeService service = new KnowledgeService("test-api-key", properties);
+        Field activeField = KnowledgeService.class.getDeclaredField("backgroundIndexingActive");
+        activeField.setAccessible(true);
+        ((AtomicBoolean) activeField.get(service)).set(true);
+
+        service.indexLocalKnowledge();
+
+        KnowledgeIndexStatus status = service.getIndexStatus();
+        assertEquals(KnowledgeIndexStatus.State.EMPTY, status.getState());
+        assertEquals(0, status.getTotalFiles());
+        assertNull(status.getStartedAt());
+        assertNull(status.getFinishedAt());
     }
 
     @Test

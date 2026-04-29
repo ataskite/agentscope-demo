@@ -13,10 +13,11 @@ import io.agentscope.core.rag.reader.TableFormat;
 import io.agentscope.core.rag.reader.TextReader;
 import io.agentscope.core.rag.reader.WordReader;
 import io.agentscope.core.rag.store.InMemoryStore;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +32,7 @@ import java.util.Map;
 import java.time.OffsetDateTime;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
@@ -101,13 +103,31 @@ public class KnowledgeService {
             return;
         }
 
-        backgroundIndexer.submit(() -> {
-            try {
-                indexLocalKnowledge();
-            } finally {
-                backgroundIndexingActive.set(false);
+        try {
+            backgroundIndexer.submit(() -> {
+                try {
+                    doIndexLocalKnowledge();
+                } finally {
+                    backgroundIndexingActive.set(false);
+                }
+            });
+        } catch (RuntimeException e) {
+            backgroundIndexingActive.set(false);
+            throw e;
+        }
+    }
+
+    @PreDestroy
+    public void shutdownBackgroundIndexer() {
+        backgroundIndexer.shutdown();
+        try {
+            if (!backgroundIndexer.awaitTermination(5, TimeUnit.SECONDS)) {
+                backgroundIndexer.shutdownNow();
             }
-        });
+        } catch (InterruptedException e) {
+            backgroundIndexer.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**
@@ -171,7 +191,20 @@ public class KnowledgeService {
     /**
      * Scan and index files from the configured local knowledge directory.
      */
-    public synchronized void indexLocalKnowledge() {
+    public void indexLocalKnowledge() {
+        if (!backgroundIndexingActive.compareAndSet(false, true)) {
+            log.info("Skipping local knowledge indexing because an indexing run is already active");
+            return;
+        }
+
+        try {
+            doIndexLocalKnowledge();
+        } finally {
+            backgroundIndexingActive.set(false);
+        }
+    }
+
+    private synchronized void doIndexLocalKnowledge() {
         Path root = knowledgePath();
         startedAt = OffsetDateTime.now();
         finishedAt = null;
