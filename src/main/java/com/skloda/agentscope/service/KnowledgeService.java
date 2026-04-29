@@ -15,7 +15,9 @@ import io.agentscope.core.rag.reader.WordReader;
 import io.agentscope.core.rag.store.InMemoryStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -27,6 +29,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.time.OffsetDateTime;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 /**
@@ -45,6 +50,12 @@ public class KnowledgeService {
 
     private final Knowledge knowledge;
     private final KnowledgeProperties properties;
+    private final ExecutorService backgroundIndexer = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "knowledge-indexer");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final AtomicBoolean backgroundIndexingActive = new AtomicBoolean(false);
     private final Map<String, KnowledgeFileStatus> fileStatuses = new LinkedHashMap<>();
     private volatile KnowledgeIndexStatus.State state = KnowledgeIndexStatus.State.EMPTY;
     private volatile OffsetDateTime startedAt;
@@ -66,6 +77,37 @@ public class KnowledgeService {
 
         log.info("KnowledgeService initialized with InMemoryStore (model={}, dimensions={})",
                 properties.getEmbeddingModel(), properties.getDimensions());
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void onApplicationReady() {
+        startBackgroundIndexing();
+    }
+
+    /**
+     * Trigger local knowledge indexing on a daemon background thread.
+     */
+    public void startBackgroundIndexing() {
+        if (!properties.isEnabled()) {
+            log.info("Skipping background knowledge indexing because knowledge is disabled");
+            return;
+        }
+        if (!properties.isAutoIndexOnStartup()) {
+            log.info("Skipping background knowledge indexing because startup auto-indexing is disabled");
+            return;
+        }
+        if (!backgroundIndexingActive.compareAndSet(false, true)) {
+            log.info("Skipping background knowledge indexing because an indexing run is already active");
+            return;
+        }
+
+        backgroundIndexer.submit(() -> {
+            try {
+                indexLocalKnowledge();
+            } finally {
+                backgroundIndexingActive.set(false);
+            }
+        });
     }
 
     /**

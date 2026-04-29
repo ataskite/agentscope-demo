@@ -47,6 +47,34 @@ class KnowledgeServiceStatusTest {
     }
 
     @Test
+    void startupIndexingIsSkippedWhenDisabled() {
+        KnowledgeProperties properties = new KnowledgeProperties();
+        properties.setPath(tempDir.resolve("knowledge").toString());
+        properties.setEnabled(false);
+        KnowledgeService service = new KnowledgeService("test-api-key", properties);
+
+        service.startBackgroundIndexing();
+
+        KnowledgeIndexStatus status = service.getIndexStatus();
+        assertEquals(KnowledgeIndexStatus.State.EMPTY, status.getState());
+        assertEquals(0, status.getTotalFiles());
+    }
+
+    @Test
+    void autoIndexDisabledAlsoSkips() {
+        KnowledgeProperties properties = new KnowledgeProperties();
+        properties.setPath(tempDir.resolve("knowledge").toString());
+        properties.setAutoIndexOnStartup(false);
+        KnowledgeService service = new KnowledgeService("test-api-key", properties);
+
+        service.startBackgroundIndexing();
+
+        KnowledgeIndexStatus status = service.getIndexStatus();
+        assertEquals(KnowledgeIndexStatus.State.EMPTY, status.getState());
+        assertEquals(0, status.getTotalFiles());
+    }
+
+    @Test
     void scanSkipsImageFilesWithoutFailingIndex() throws Exception {
         Path knowledgePath = tempDir.resolve("knowledge");
         Files.createDirectories(knowledgePath);
