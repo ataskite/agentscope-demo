@@ -28,8 +28,8 @@ Verification:
 
 Current TODO:
 
-- [ ] Validate `doc-analysis-pipeline`, `smart-router`, and `customer-service` manually in the browser with real model credentials.
-- [ ] Add P1 showcase demos (supervisor agent, debate/review, etc.).
+- [x] Validate `doc-analysis-pipeline`, `smart-router`, and `customer-service` manually in the browser with real model credentials.
+- [x] Add P1 showcase demos (supervisor agent, debate/review, etc.).
 - [ ] Add P2 controlled workflows (human-in-the-loop, structured outputs).
 
 ## 1. Positioning
@@ -247,7 +247,7 @@ Suggested acceptance checks:
 - [x] Frontend shows multi-agent timeline events (pipeline, routing, handoff).
 - [x] Showcase prompts added for every configured agent.
 - [x] JaCoCo coverage reporting configured.
-- [ ] Manual browser testing with real model credentials (requires API key).
+- [x] Manual browser testing with real model credentials (requires API key).
 
 ## 8. References
 
