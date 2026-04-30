@@ -2,11 +2,11 @@
 
 **Date**: 2026-04-29
 **Scope**: AgentScope Java demo evolution roadmap
-**Status**: Milestone `multi-agent-runtime-showcase` completed
+**Status**: Milestone `p2-controlled-workflows` in progress
 
 ## Progress Snapshot
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 Completed:
 
@@ -19,18 +19,33 @@ Completed:
 - [x] Added frontend debug panel rendering improvements for multi-agent events (pipeline, routing, handoff).
 - [x] Added polished showcase prompts for every configured agent.
 - [x] Added JaCoCo coverage reporting configuration.
+- [x] Added agent categorized accordion menu (Single/Expert/Collaboration groups).
+- [x] Implemented Generic RAG with local knowledge indexing, status tracking, and config modal display.
+- [x] Added DEBATE agent type with DebatePipeline (parallel debaters + judge synthesis).
+- [x] Enhanced customer-service, doc-pipeline, and expert agent prompts with structured output formats.
+- [x] Added super-supervisor and debate-review collaboration agents.
+- [x] Started P2 controlled workflows with HITL approval infrastructure (`ApprovalHook`, `ApprovalService`, `/chat/approve`, approval UI cards).
+- [x] Added structured output runtime support and schemas for invoice and ID card extraction.
+- [x] Wired `bank-invoice` to require approval before `generate_bank_invoice`.
+- [x] Wired `invoice-extractor` and `idcard-extractor` to structured output schemas.
+- [x] Ensured SSE streams close when the runtime emits `done`, including long-lived merged hook streams.
 
 Verification:
 
-- [x] `mvn -Dtest=AgentRuntimeFactoryTest test` passed with 6 tests.
-- [x] `mvn test` passed with 90 tests, 0 failures, 0 errors.
+- [x] `mvn -Dtest=AgentRuntimeFactoryTest test` passed with 8 tests.
+- [x] `mvn -Dtest=ChatControllerStreamTest,AgentSamplePromptsConfigTest test` passed with 3 tests.
+- [x] `mvn test` passed with 118 tests, 0 failures, 0 errors.
 - [x] JaCoCo coverage report generated at `target/site/jacoco/index.html`.
 
 Current TODO:
 
 - [x] Validate `doc-analysis-pipeline`, `smart-router`, and `customer-service` manually in the browser with real model credentials.
 - [x] Add P1 showcase demos (supervisor agent, debate/review, etc.).
-- [ ] Add P2 controlled workflows (human-in-the-loop, structured outputs).
+- [x] Add P2 foundation for human-in-the-loop approvals and structured outputs.
+- [ ] Add structured output validation and repair loops.
+- [ ] Add contract metadata structured extraction and a contract review workflow.
+- [ ] Store workflow state and intermediate outputs for replay.
+- [ ] Manually validate approval resume behavior with real model credentials.
 
 ## 1. Positioning
 
@@ -54,12 +69,12 @@ Implemented or partially implemented capabilities:
 - Multimodal agents for image and audio inputs.
 - Session persistence through AgentScope `SessionManager`.
 - SSE streaming chat UI with a runtime debug panel.
-- Initial multi-agent configuration for sequential pipeline, routing, and handoffs.
-- `CompositeAgentFactory` already contains creation logic for sequential, parallel, routing, and handoff-style agents.
+- Multi-agent runtime dispatch for sequential pipeline, parallel fanout, routing, handoffs, and debate agents.
+- Controlled workflow foundation with human approval pause/resume and structured output runtime support.
 
 Known gap:
 
-- The generic chat path still creates runtimes through the single-agent path. Composite agents are configured, but the default runtime entry currently does not fully dispatch `SEQUENTIAL`, `PARALLEL`, `ROUTING`, or `HANDOFFS` agents end-to-end.
+- P2 controlled workflows still need validation/repair loops, contract review orchestration, workflow state persistence, and real-model manual verification of approval resume behavior.
 
 ## 3. Guiding Principles
 

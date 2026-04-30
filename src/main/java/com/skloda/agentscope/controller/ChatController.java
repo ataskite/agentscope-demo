@@ -3,11 +3,14 @@ package com.skloda.agentscope.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.AgentConfigService;
-import com.skloda.agentscope.model.ChatEvent;
-import com.skloda.agentscope.model.ChatRequest;
-import com.skloda.agentscope.model.SessionInfo;
+import com.skloda.agentscope.model.*;
+import com.skloda.agentscope.runtime.AgentRuntime;
 import com.skloda.agentscope.service.AgentService;
+import com.skloda.agentscope.service.ApprovalService;
 import com.skloda.agentscope.service.SessionManagerService;
+import io.agentscope.core.message.Msg;
+import io.agentscope.core.message.TextBlock;
+import io.agentscope.core.message.ToolUseBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +52,9 @@ public class ChatController {
 
     @Autowired
     private SessionManagerService sessionManagerService;
+
+    @Autowired
+    private ApprovalService approvalService;
 
     @GetMapping("/")
     public String chat() {
@@ -120,12 +126,65 @@ public class ChatController {
                         sessionId,
                         request.getImages(),
                         request.getAudio())
+                .takeUntil(this::isDoneEvent)
                 .map(this::sseEvent)
                 .onErrorResume(e -> {
                     log.error("Agent stream error", e);
                     String errMsg = e.getMessage() != null ? e.getMessage() : "Unknown error";
                     return errorAndDone(errMsg);
                 });
+    }
+
+    // ---- HITL Approval Endpoint ----
+
+    /**
+     * Handle human-in-the-loop approval or rejection.
+     * Resumes the paused agent if approved, or sends cancellation result if rejected.
+     */
+    @PostMapping(value = "/chat/approve", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @ResponseBody
+    public Flux<ServerSentEvent<String>> handleApproval(@RequestBody ApprovalRequest request) {
+        PendingApproval pa = approvalService.getPendingApproval(request.getApprovalId());
+        if (pa == null) {
+            return errorAndDone("Approval request not found or expired: " + request.getApprovalId());
+        }
+
+        approvalService.removePendingApproval(request.getApprovalId());
+
+        if (!request.isApproved()) {
+            // Build rejection ToolResultBlocks for each pending tool call
+            Msg rejectionMsg = buildRejectionMessage(pa.getPendingToolCalls(), request.getReason());
+            AgentRuntime resumeRuntime = new AgentRuntime(pa.getAgent(), pa.getHook());
+            return resumeRuntime.stream(rejectionMsg, true)
+                    .takeUntil(this::isDoneEvent)
+                    .map(this::sseEvent)
+                    .onErrorResume(e -> errorAndDone(e.getMessage()));
+        }
+
+        // Approved: resume with null message to let tools execute
+        AgentRuntime resumeRuntime = new AgentRuntime(pa.getAgent(), pa.getHook());
+        return resumeRuntime.stream(null, true)
+                .takeUntil(this::isDoneEvent)
+                .map(this::sseEvent)
+                .onErrorResume(e -> errorAndDone(e.getMessage()));
+    }
+
+    private boolean isDoneEvent(Map<String, Object> event) {
+        return event != null && "done".equals(event.get("type"));
+    }
+
+    private Msg buildRejectionMessage(List<ToolUseBlock> pendingToolCalls, String reason) {
+        String rejectionText = reason != null && !reason.isBlank() ? reason : "Operation rejected by user";
+        StringBuilder content = new StringBuilder();
+        content.append("The following tool calls were rejected by the user:\n\n");
+        for (ToolUseBlock tub : pendingToolCalls) {
+            content.append("- ").append(tub.getName()).append(": ").append(rejectionText).append("\n");
+        }
+        content.append("\nPlease inform the user that the operation was not executed and explain why.");
+
+        return Msg.builder()
+                .content(TextBlock.builder().text(content.toString()).build())
+                .build();
     }
 
     // ---- Session Endpoints ----

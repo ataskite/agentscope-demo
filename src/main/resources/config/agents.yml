@@ -147,6 +147,8 @@ agents:
       - parse_docx
       - edit_docx
       - generate_bank_invoice
+    approvalTools:
+      - generate_bank_invoice
     systemTools:
       - view_text_file
       - write_text_file
@@ -254,17 +256,22 @@ agents:
       从用户上传的发票图片中提取以下字段：
       - invoiceNumber: 发票号码
       - invoiceDate: 开票日期（格式：yyyy-MM-dd）
-      - amount: 金额（数字）
-      - vendor: 销售方名称
-      - taxId: 销售方税号
-      - purchaser: 购买方名称
-      - purchaserTaxId: 购买方税号
+      - invoiceType: 发票类型
+      - totalAmount: 含税总金额（数字）
+      - taxAmount: 税额（数字）
+      - sellerName: 销售方名称
+      - sellerTaxId: 销售方税号
+      - buyerName: 购买方名称
+      - buyerTaxId: 购买方税号
+      - items: 发票明细
 
       提取后以结构化格式返回，然后简要说明发票的主要信息。
     modelName: qwen-vl-max
     streaming: true
     enableThinking: false
     modality: vision
+    structuredOutputClass: com.skloda.agentscope.schema.InvoiceData
+    structuredOutputReminder: PROMPT
     skills: []
     userTools: []
     systemTools: []
@@ -290,13 +297,15 @@ agents:
       - birthDate: 出生日期（格式：yyyy-MM-dd）
       - address: 地址
       - issuingAuthority: 签发机关
-      - validDate: 有效期（格式：yyyy-MM-dd）
+      - validPeriod: 有效期
 
       提取后以结构化格式返回，然后简要说明身份信息。
     modelName: qwen-vl-max
     streaming: true
     enableThinking: false
     modality: vision
+    structuredOutputClass: com.skloda.agentscope.schema.IDCardData
+    structuredOutputReminder: PROMPT
     skills: []
     userTools: []
     systemTools: []

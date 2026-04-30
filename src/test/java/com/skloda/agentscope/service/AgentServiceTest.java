@@ -85,7 +85,7 @@ class AgentServiceTest {
         private final StreamingAgentRuntime runtime;
 
         StubRuntimeFactory(StreamingAgentRuntime runtime) {
-            super(null, null);
+            super(null, null, null);
             this.runtime = runtime;
         }
 

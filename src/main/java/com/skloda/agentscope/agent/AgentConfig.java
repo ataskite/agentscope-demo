@@ -39,6 +39,14 @@ public class AgentConfig {
     // Agent category for UI grouping
     private String category = "single"; // single, expert, collaboration
 
+    // HITL approval settings
+    private boolean approvalRequired = false;
+    private List<String> approvalTools = new ArrayList<>();
+
+    // Structured output settings
+    private String structuredOutputClass;
+    private String structuredOutputReminder = "TOOL_CHOICE"; // TOOL_CHOICE or PROMPT
+
     // === Multi-agent fields ===
     private AgentType type = AgentType.SINGLE;
     private List<SubAgentConfig> subAgents = new ArrayList<>();

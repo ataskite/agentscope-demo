@@ -4,7 +4,10 @@ import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.AgentConfigService;
 import com.skloda.agentscope.agent.AgentType;
 import com.skloda.agentscope.composite.CompositeAgentFactory;
+import com.skloda.agentscope.hook.ApprovalHook;
+import com.skloda.agentscope.service.ApprovalService;
 import io.agentscope.core.ReActAgent;
+import io.agentscope.core.hook.Hook;
 import io.agentscope.core.memory.Memory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,9 +16,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,6 +34,9 @@ class AgentRuntimeFactoryTest {
     private AgentConfigService configService;
 
     @Mock
+    private ApprovalService approvalService;
+
+    @Mock
     private ReActAgent agent;
 
     @Mock
@@ -38,7 +46,7 @@ class AgentRuntimeFactoryTest {
 
     @BeforeEach
     void setUp() {
-        runtimeFactory = new AgentRuntimeFactory(compositeFactory, configService);
+        runtimeFactory = new AgentRuntimeFactory(compositeFactory, configService, approvalService);
     }
 
     @Test
@@ -51,6 +59,34 @@ class AgentRuntimeFactoryTest {
 
         assertInstanceOf(AgentRuntime.class, runtime);
         verify(compositeFactory).createSingleAgent("chat-basic", runtime.getHook());
+    }
+
+    @Test
+    void createRuntimeReturnsStructuredOutputRuntimeWhenSchemaIsConfigured() {
+        AgentConfig config = config("invoice-extractor", AgentType.SINGLE);
+        config.setStructuredOutputClass("com.skloda.agentscope.schema.InvoiceData");
+        when(configService.getAgentConfig("invoice-extractor")).thenReturn(config);
+        when(compositeFactory.createSingleAgent(eq("invoice-extractor"), any())).thenReturn(agent);
+
+        StreamingAgentRuntime runtime = runtimeFactory.createRuntime("invoice-extractor");
+
+        assertInstanceOf(StructuredOutputAgentRuntime.class, runtime);
+    }
+
+    @Test
+    void createRuntimeAddsApprovalHookWhenApprovalToolsAreConfigured() {
+        AgentConfig config = config("bank-invoice", AgentType.SINGLE);
+        config.setApprovalTools(java.util.List.of("generate_bank_invoice"));
+        when(configService.getAgentConfig("bank-invoice")).thenReturn(config);
+        when(compositeFactory.createSingleAgent(eq("bank-invoice"), any(), any())).thenReturn(agent);
+
+        StreamingAgentRuntime runtime = runtimeFactory.createRuntime("bank-invoice");
+
+        assertInstanceOf(AgentRuntime.class, runtime);
+        verify(compositeFactory, atLeastOnce()).createSingleAgent(
+                eq("bank-invoice"),
+                any(Hook.class),
+                org.mockito.ArgumentMatchers.argThat(hook -> hook instanceof ApprovalHook));
     }
 
     @Test

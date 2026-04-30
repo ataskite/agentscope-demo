@@ -11,6 +11,7 @@ import io.agentscope.core.memory.autocontext.AutoContextConfig;
 import io.agentscope.core.memory.autocontext.AutoContextMemory;
 import io.agentscope.core.memory.autocontext.ContextOffloadTool;
 import io.agentscope.core.model.DashScopeChatModel;
+import io.agentscope.core.model.StructuredOutputReminder;
 import io.agentscope.core.rag.RAGMode;
 import io.agentscope.core.rag.model.RetrieveConfig;
 import io.agentscope.core.skill.SkillBox;
@@ -108,6 +109,16 @@ public class AgentFactory {
         }
 
         registerToolsAndSkills(builder, toolkit, config, agentId);
+
+        // Configure structured output if specified
+        if (config.getStructuredOutputClass() != null && !config.getStructuredOutputClass().isBlank()) {
+            StructuredOutputReminder reminder = "PROMPT".equalsIgnoreCase(config.getStructuredOutputReminder())
+                    ? StructuredOutputReminder.PROMPT
+                    : StructuredOutputReminder.TOOL_CHOICE;
+            builder.structuredOutputReminder(reminder);
+            log.info("  Configured structured output for agent: {} (class={}, mode={})",
+                    agentId, config.getStructuredOutputClass(), reminder);
+        }
 
         // Register RAG knowledge if enabled
         if (config.isRagEnabled()) {

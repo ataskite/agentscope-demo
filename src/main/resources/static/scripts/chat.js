@@ -356,6 +356,44 @@ async function sendMessage() {
                         case 'handoff_start':
                             handleHandoffStart(payload);
                             break;
+
+                        // ===== HITL APPROVAL EVENT =====
+
+                        case 'pending_approval':
+                            completeThinkingBox();
+                            isStreaming = false;
+                            setStreamingState(false);
+                            endRound('pending_approval');
+
+                            var approvalCard = createApprovalCard(payload);
+                            chatMessages.appendChild(approvalCard);
+                            scrollToBottom(chatMessages);
+                            break;
+
+                        // ===== STRUCTURED OUTPUT EVENT =====
+
+                        case 'structured_data':
+                            if (currentRound) {
+                                addTimelineRow('tool', 'Structured Output',
+                                    (payload.schemaClass || '').split('.').pop(), 'ok');
+                            }
+                            var dataCard = createStructuredDataCard(
+                                payload.schemaClass || '', payload.data || '{}');
+                            if (agentBubble) {
+                                var msgWrapper = agentBubble.closest('.message');
+                                if (msgWrapper) {
+                                    msgWrapper.querySelector('.message-content').appendChild(dataCard);
+                                }
+                            } else {
+                                agentBubble = addAgentBubble();
+                                agentBubble.style.display = 'none';
+                                var msgWrapper2 = agentBubble.closest('.message');
+                                if (msgWrapper2) {
+                                    msgWrapper2.querySelector('.message-content').appendChild(dataCard);
+                                }
+                            }
+                            scrollToBottom(chatMessages);
+                            break;
                     }
                 }
             });
@@ -393,6 +431,165 @@ function stopStreaming() {
     }
     isStreaming = false;
     setStreamingState(false);
+}
+
+/* ===== HITL APPROVAL ===== */
+
+window.submitApproval = async function(approvalId, approved) {
+    var statusEl = document.getElementById('approval-status-' + approvalId);
+    if (statusEl) statusEl.textContent = approved ? 'Approved, resuming...' : 'Rejected';
+
+    // Disable buttons
+    var card = document.getElementById('approval-card-' + approvalId);
+    if (card) {
+        var btns = card.querySelectorAll('.approval-btn');
+        btns.forEach(function(b) { b.disabled = true; });
+    }
+
+    currentAbortController = new AbortController();
+    setStreamingState(true);
+    roundNumber++;
+    startRound(approved ? 'Approval: Approve' : 'Approval: Reject', roundNumber, currentAgent, agents);
+    showTypingIndicator();
+
+    try {
+        var response = await fetch('/chat/approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ approvalId: approvalId, approved: approved }),
+            signal: currentAbortController.signal
+        });
+
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var parser = createSSEParser();
+        var agentBubble = null;
+        var agentRawMarkdown = '';
+
+        while (true) {
+            var result = await reader.read();
+            if (result.done) break;
+
+            parser.parse(decoder.decode(result.value), function(evt) {
+                if (evt.event === 'message' && evt.data) {
+                    var payload;
+                    try { payload = JSON.parse(evt.data); } catch (e) { return; }
+
+                    switch (payload.type) {
+                        case 'text':
+                            if (!agentBubble) {
+                                agentBubble = addAgentBubble();
+                                agentRawMarkdown = '';
+                            }
+                            agentRawMarkdown += (payload.content || '');
+                            agentBubble.classList.add('md-render');
+                            agentBubble.innerHTML = renderMarkdown(agentRawMarkdown);
+                            scrollToBottom(chatMessages);
+                            break;
+                        case 'done':
+                            completeThinkingBox();
+                            isStreaming = false;
+                            setStreamingState(false);
+                            endRound('success');
+                            scrollToBottom(chatMessages);
+                            break;
+                        case 'error':
+                            completeThinkingBox();
+                            if (!agentBubble) agentBubble = addAgentBubble();
+                            agentBubble.textContent += '\n\n[ERROR] ' + (payload.message || 'Unknown error');
+                            endRound('error');
+                            isStreaming = false;
+                            setStreamingState(false);
+                            break;
+                        case 'structured_data':
+                            var dataCard = createStructuredDataCard(
+                                payload.schemaClass || '', payload.data || '{}');
+                            if (agentBubble) {
+                                var mw = agentBubble.closest('.message');
+                                if (mw) mw.querySelector('.message-content').appendChild(dataCard);
+                            }
+                            scrollToBottom(chatMessages);
+                            break;
+                    }
+                }
+            });
+        }
+    } catch (err) {
+        completeThinkingBox();
+        removeTypingIndicator();
+        endRound('error');
+        setStreamingState(false);
+    } finally {
+        currentAbortController = null;
+    }
+};
+
+/* ===== UI COMPONENTS ===== */
+
+function createApprovalCard(data) {
+    var card = document.createElement('div');
+    card.className = 'message agent approval-card-wrapper';
+    card.id = 'approval-card-' + data.approvalId;
+
+    var toolListHtml = (data.toolCalls || []).map(function(tc) {
+        return '<div class="approval-tool-item">' +
+            '<span class="approval-tool-name">' + escapeHtml(tc.name || '') + '</span>' +
+            '<pre class="approval-tool-params">' + escapeHtml(tc.input || '{}') + '</pre>' +
+            '</div>';
+    }).join('');
+
+    card.innerHTML =
+        '<div class="message-content">' +
+            '<div class="approval-header">' +
+                '<span class="approval-icon">&#9888;</span> Human Approval Required' +
+            '</div>' +
+            '<div class="approval-tools">' + toolListHtml + '</div>' +
+            '<div class="approval-actions">' +
+                '<button class="approval-btn approve" onclick="submitApproval(\'' +
+                    data.approvalId + '\', true)">Approve</button>' +
+                '<button class="approval-btn reject" onclick="submitApproval(\'' +
+                    data.approvalId + '\', false)">Reject</button>' +
+            '</div>' +
+            '<div class="approval-status" id="approval-status-' + data.approvalId + '"></div>' +
+        '</div>';
+
+    return card;
+}
+
+function createStructuredDataCard(schemaClass, dataJson) {
+    var card = document.createElement('div');
+    card.className = 'structured-data-card';
+
+    var data;
+    try { data = JSON.parse(dataJson); } catch(e) { data = {}; }
+
+    var className = schemaClass.split('.').pop();
+
+    var tableHtml = '<table class="structured-data-table">';
+    for (var key in data) {
+        if (data.hasOwnProperty(key)) {
+            var value = data[key];
+            if (Array.isArray(value)) {
+                value = '<pre>' + escapeHtml(JSON.stringify(value, null, 2)) + '</pre>';
+            } else if (typeof value === 'object' && value !== null) {
+                value = '<pre>' + escapeHtml(JSON.stringify(value, null, 2)) + '</pre>';
+            } else {
+                value = escapeHtml(String(value != null ? value : ''));
+            }
+            tableHtml += '<tr><td class="sdk-key">' + escapeHtml(key) + '</td><td>' + value + '</td></tr>';
+        }
+    }
+    tableHtml += '</table>';
+
+    card.innerHTML =
+        '<div class="structured-data-header" onclick="this.parentElement.classList.toggle(\'collapsed\')">' +
+            '<span class="structured-data-icon">{ }</span>' +
+            '<span class="structured-data-label">' + escapeHtml(className) + '</span>' +
+            '<span class="structured-data-toggle">&#9660;</span>' +
+        '</div>' +
+        '<div class="structured-data-body">' + tableHtml + '</div>';
+
+    return card;
 }
 
 /* ===== GLOBAL FUNCTIONS FOR ONCLICK ===== */

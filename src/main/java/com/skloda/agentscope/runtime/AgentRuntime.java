@@ -1,6 +1,8 @@
 package com.skloda.agentscope.runtime;
 
+import com.skloda.agentscope.hook.ApprovalHook;
 import com.skloda.agentscope.hook.ObservabilityHook;
+import com.skloda.agentscope.service.ApprovalService;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.EventType;
 import io.agentscope.core.agent.Event;
@@ -24,33 +26,39 @@ public class AgentRuntime implements StreamingAgentRuntime {
 
     private static final Logger log = LoggerFactory.getLogger(AgentRuntime.class);
 
-    /**
-     * -- GETTER --
-     *  Get the underlying Agent instance.
-     */
     @Getter
     private final ReActAgent agent;
-    /**
-     * -- GETTER --
-     *  Get the Hook instance.
-     */
     @Getter
     private final ObservabilityHook hook;
+    private final ApprovalHook approvalHook;
+    private final ApprovalService approvalService;
+    private final String agentId;
+    private final String sessionId;
     private final Sinks.Many<Map<String, Object>> sink;
     private final BiConsumer<String, Map<String, Object>> hookBridge;
     private final Runnable onClose;
 
     public AgentRuntime(ReActAgent agent, ObservabilityHook hook) {
-        this(agent, hook, null);
+        this(agent, hook, null, null, null, null, null);
     }
 
-    public AgentRuntime(ReActAgent agent, ObservabilityHook hook, Runnable onClose) {
+    public AgentRuntime(ReActAgent agent, ObservabilityHook hook, ApprovalHook approvalHook,
+                        ApprovalService approvalService, String agentId) {
+        this(agent, hook, approvalHook, approvalService, agentId, null, null);
+    }
+
+    public AgentRuntime(ReActAgent agent, ObservabilityHook hook, ApprovalHook approvalHook,
+                        ApprovalService approvalService, String agentId, String sessionId,
+                        Runnable onClose) {
         this.agent = agent;
         this.hook = hook;
+        this.approvalHook = approvalHook;
+        this.approvalService = approvalService;
+        this.agentId = agentId;
+        this.sessionId = sessionId;
         this.onClose = onClose;
         this.sink = Sinks.many().multicast().onBackpressureBuffer();
 
-        // Bridge Hook events to Sink
         this.hookBridge = (type, data) -> {
             Map<String, Object> payload = new LinkedHashMap<>(data);
             payload.put("type", type);
@@ -59,13 +67,20 @@ public class AgentRuntime implements StreamingAgentRuntime {
         hook.addConsumer(hookBridge);
     }
 
+    @Override
+    public Flux<Map<String, Object>> stream(Msg userMsg) {
+        return stream(userMsg, false);
+    }
+
     /**
      * Stream agent response as Flux.
      * Merges hook events (timeline/metrics) with agent text stream.
+     *
+     * @param userMsg      the user message
+     * @param isApprovalResume true if this is a resume after HITL approval
      */
-    @Override
-    public Flux<Map<String, Object>> stream(Msg userMsg) {
-        log.debug("Starting stream for agent: {}", agent.getName());
+    public Flux<Map<String, Object>> stream(Msg userMsg, boolean isApprovalResume) {
+        log.debug("Starting stream for agent: {} (resume={})", agent.getName(), isApprovalResume);
 
         StreamOptions streamOptions = StreamOptions.builder()
                 .eventTypes(EventType.REASONING, EventType.TOOL_RESULT)
@@ -73,40 +88,48 @@ public class AgentRuntime implements StreamingAgentRuntime {
                 .includeReasoningResult(false)
                 .build();
 
-        // Hook events flux (from ObservabilityHook)
-        // Use doOnComplete to ensure hook sink is completed when stream completes
         Flux<Map<String, Object>> hookEvents = this.sink.asFlux()
                 .doOnNext(payload -> log.debug("[hook -> stream] {}", payload));
 
-        // Agent text stream flux
-        Flux<Map<String, Object>> textStream = Flux.create(sink -> {
-            agent.stream(userMsg, streamOptions)
-                    .subscribe(
-                            event -> handleStreamEvent(event, sink),
-                            error -> {
-                                log.error("Stream error", error);
-                                sink.error(error);
-                            },
-                            () -> {
-                                log.debug("Text stream completed for agent: {}", agent.getName());
-                                // Small delay before sending done to ensure agent_end hook event is sent first
-                                try {
-                                    Thread.sleep(100);
-                                } catch (InterruptedException e) {
-                                    Thread.currentThread().interrupt();
-                                }
-                                // Send done event
-                                sink.next(Map.of("type", "done"));
-                                sink.complete();
-                            }
-                    );
+        Flux<Map<String, Object>> textStream = Flux.create(fluxSink -> {
+            if (isApprovalResume) {
+                // Resume: call agent with null message to continue executing pending tools
+                agent.call(userMsg != null ? userMsg : Msg.builder().build())
+                        .subscribe(
+                                msg -> {
+                                    if (msg != null && msg.getContent() != null) {
+                                        for (ContentBlock block : msg.getContent()) {
+                                            if (block instanceof TextBlock tb) {
+                                                String text = tb.getText();
+                                                if (text != null && !text.isEmpty()) {
+                                                    fluxSink.next(Map.of("type", "text", "content", text));
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                error -> {
+                                    log.error("Resume stream error", error);
+                                    fluxSink.error(error);
+                                },
+                                () -> completeStream(fluxSink, false)
+                        );
+            } else {
+                agent.stream(userMsg, streamOptions)
+                        .subscribe(
+                                event -> handleStreamEvent(event, fluxSink),
+                                error -> {
+                                    log.error("Stream error", error);
+                                    fluxSink.error(error);
+                                },
+                                () -> completeStream(fluxSink, false)
+                        );
+            }
         });
 
-        // Merge both streams and ensure hook sink is completed when done
         return Flux.merge(hookEvents, textStream)
                 .doOnCancel(this::close)
                 .doOnComplete(() -> {
-                    // Ensure hook sink is completed
                     this.sink.tryEmitComplete();
                     this.close();
                 })
@@ -115,6 +138,38 @@ public class AgentRuntime implements StreamingAgentRuntime {
                     this.sink.tryEmitComplete();
                     this.close();
                 });
+    }
+
+    private void completeStream(reactor.core.publisher.FluxSink<Map<String, Object>> fluxSink,
+                                boolean skipClose) {
+        log.debug("Stream completing for agent: {}", agent.getName());
+
+        // Check if approval was triggered during this stream
+        if (!skipClose && approvalHook != null && approvalHook.isApprovalTriggered()) {
+            // Register the paused agent for later resume
+            String approvalId = approvalService.registerPendingApproval(
+                    agent, hook, approvalHook.getPendingToolUseBlocks(), agentId, sessionId);
+
+            fluxSink.next(Map.of(
+                    "type", "pending_approval",
+                    "approvalId", approvalId,
+                    "agentId", agentId != null ? agentId : "",
+                    "toolCalls", approvalHook.getPendingToolCallsForSse(),
+                    "timestamp", System.currentTimeMillis()
+            ));
+            fluxSink.next(Map.of("type", "done"));
+            fluxSink.complete();
+            return;
+        }
+
+        // Normal completion
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        fluxSink.next(Map.of("type", "done"));
+        fluxSink.complete();
     }
 
     private void handleStreamEvent(Event event, reactor.core.publisher.FluxSink<Map<String, Object>> sink) {
@@ -142,9 +197,6 @@ public class AgentRuntime implements StreamingAgentRuntime {
         }
     }
 
-    /**
-     * Cleanup resources: remove hook consumer, reset hook state, complete sink.
-     */
     @Override
     public void close() {
         hook.removeConsumer(hookBridge);

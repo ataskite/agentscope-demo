@@ -435,3 +435,149 @@
 .md-render a[href*="/chat/download"]:active {
     transform: translateY(0);
 }
+
+/* ===== CONTROLLED WORKFLOW CARDS ===== */
+.approval-card-wrapper {
+    max-width: min(720px, 92%);
+}
+
+.approval-card-wrapper .message-content,
+.structured-data-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-accent);
+    border-left: 3px solid var(--neon-magenta);
+    border-radius: 8px;
+    box-shadow: 0 0 14px rgba(255, 0, 204, 0.16), 0 0 28px rgba(0, 240, 255, 0.06);
+    overflow: hidden;
+}
+
+.approval-header,
+.structured-data-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.approval-icon {
+    color: var(--neon-yellow, #ffd166);
+}
+
+.approval-tools {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+}
+
+.approval-tool-item {
+    border: 1px solid var(--border-dim);
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.14);
+}
+
+.approval-tool-name {
+    display: block;
+    padding: 8px 10px 0;
+    color: var(--neon-cyan);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.approval-tool-params {
+    margin: 0;
+    padding: 8px 10px 10px;
+    max-height: 180px;
+    overflow: auto;
+    color: var(--text-muted);
+    font-size: 11px;
+    white-space: pre-wrap;
+}
+
+.approval-actions {
+    display: flex;
+    gap: 8px;
+    padding: 0 12px 12px;
+}
+
+.approval-btn {
+    border: 1px solid var(--border-accent);
+    border-radius: 6px;
+    padding: 7px 12px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.approval-btn.approve {
+    border-color: var(--neon-green);
+    color: var(--neon-green);
+}
+
+.approval-btn.reject {
+    border-color: var(--neon-magenta);
+    color: var(--neon-magenta);
+}
+
+.approval-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.approval-status {
+    padding: 0 12px 12px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.structured-data-card {
+    width: min(680px, 100%);
+    margin-top: 8px;
+    border-left-color: var(--neon-cyan);
+}
+
+.structured-data-header {
+    cursor: pointer;
+    justify-content: space-between;
+}
+
+.structured-data-icon,
+.structured-data-label {
+    color: var(--neon-cyan);
+}
+
+.structured-data-body {
+    padding: 10px 12px 12px;
+}
+
+.structured-data-card.collapsed .structured-data-body {
+    display: none;
+}
+
+.structured-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.structured-data-table td {
+    border-top: 1px solid var(--border-dim);
+    padding: 8px;
+    vertical-align: top;
+}
+
+.structured-data-table .sdk-key {
+    width: 34%;
+    color: var(--neon-cyan);
+    font-weight: 600;
+}
+
+.structured-data-table pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
