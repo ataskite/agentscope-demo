@@ -317,6 +317,107 @@ agents:
       - prompt: "把身份证信息转成表格格式，并提醒我哪些敏感字段需要脱敏"
         expectedBehavior: "展示结构化整理和隐私保护意识"
 
+  - agentId: contract-extractor
+    category: single
+    name: Contract Extractor
+    description: 合同元数据和风险提取
+    systemPrompt: |
+      你是一个合同元数据提取助手。
+      从用户上传或粘贴的合同内容中提取以下结构化字段：
+      - contractTitle: 合同名称
+      - contractNumber: 合同编号
+      - partyA: 甲方
+      - partyB: 乙方
+      - effectiveDate: 生效日期（格式：yyyy-MM-dd，无法确认则留空）
+      - expiryDate: 到期日期（格式：yyyy-MM-dd，无法确认则留空）
+      - totalAmount: 合同金额（数字，无法确认则留空）
+      - currency: 币种，如 CNY
+      - keyClauses: 关键条款列表，至少包含标题、摘要、类别
+      - risks: 风险列表，至少包含条款、描述、严重度和建议
+      - overallRiskLevel: LOW、MEDIUM、HIGH 或 CRITICAL
+      - summary: 合同审查摘要
+
+      如果字段无法从合同中确认，请不要编造；但 keyClauses、risks、overallRiskLevel 和 summary 必须基于已知文本给出审查结论。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    structuredOutputClass: com.skloda.agentscope.schema.ContractMetadata
+    structuredOutputReminder: PROMPT
+    skills:
+      - docx
+      - pdf
+    userTools:
+      - parse_docx
+      - parse_pdf
+    systemTools:
+      - view_text_file
+    samplePrompts:
+      - prompt: "请解析我上传的合同，提取合同编号、双方主体、关键条款和风险点"
+        expectedBehavior: "输出 ContractMetadata 结构化数据并附上中文摘要"
+      - prompt: "请检查这份合同的关键字段是否完整，列出缺失项和潜在风险"
+        expectedBehavior: "展示合同字段校验、条款归纳和风险分级"
+      - prompt: "把这份合同整理成可机器读取的 JSON，并说明总体风险等级"
+        expectedBehavior: "展示合同结构化提取和风险审查能力"
+
+  - agentId: contract-review-workflow
+    category: collaboration
+    name: 合同审查工作流
+    description: 合同解析、风险审查、审批后生成报告
+    systemPrompt: |
+      你是一个合同审查工作流助手。
+      你的任务是完成一个可控的合同审查流程：
+      1. 如果用户上传了 .docx 或 .pdf 合同，先使用 parse_docx 或 parse_pdf 读取合同内容
+      2. 提取合同名称、编号、甲方、乙方、生效日期、到期日期、金额、关键条款和风险点
+      3. 整理合同名称、编号、双方主体、日期、金额、关键条款摘要、风险摘要、总体风险等级和审查摘要
+      4. 在生成审查报告前，调用 generate_contract_review_report 工具。工具参数必须是普通 JSON 对象字段：
+         contractTitle、contractNumber、partyA、partyB、effectiveDate、expiryDate、totalAmount、currency、
+         keyClausesSummary、risksSummary、overallRiskLevel、summary
+      5. 工具调用会触发人工审批；审批通过后才会写入报告文件
+      6. 报告生成成功后，用 Markdown 链接展示 downloadUrl
+
+      风险等级使用 LOW、MEDIUM、HIGH 或 CRITICAL。不要编造合同中不存在的编号、日期或金额。
+      不要把完整 ContractMetadata JSON 字符串作为工具参数传入；keyClausesSummary 和 risksSummary 使用普通文本。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    skills:
+      - docx
+      - pdf
+    userTools:
+      - parse_docx
+      - parse_pdf
+      - generate_contract_review_report
+    approvalTools:
+      - generate_contract_review_report
+    systemTools:
+      - view_text_file
+    samplePrompts:
+      - prompt: |
+          请审查下面这份合同，提取合同编号、双方主体、付款条款、违约责任、终止条款和主要风险点。完成审查后，请发起人工审批；审批通过后调用报告生成工具生成合同审查报告。
+
+          合同名称：软件开发服务合同
+          合同编号：HT-2026-0501-001
+          甲方：蓝海科技有限公司
+          乙方：星河软件服务有限公司
+          生效日期：2026-05-01
+          到期日期：2027-04-30
+          合同金额：人民币 500000 元
+
+          一、服务内容：乙方为甲方开发客户管理系统，包括需求分析、系统设计、开发、测试、上线支持和三个月运维服务。
+          二、付款条款：甲方在合同签署后 5 个工作日内支付 30% 预付款；系统验收通过后 10 个工作日内支付 60%；运维期结束后支付剩余 10%。
+          三、交付要求：乙方应在 2026-08-31 前完成系统上线。每延期 1 日，乙方按合同总金额的 0.5% 向甲方支付违约金，违约金累计不超过合同总金额的 10%。
+          四、知识产权：项目源代码及交付文档的知识产权归甲方所有，乙方保留通用组件和既有技术成果的所有权。
+          五、保密条款：双方应对合作中获得的商业秘密和用户数据保密，保密期限为合同终止后 3 年。
+          六、终止条款：任一方严重违约且在收到书面通知后 15 日内未改正的，守约方有权解除合同。
+          七、争议解决：双方协商不成的，提交甲方所在地人民法院诉讼解决。
+        expectedBehavior: "用完整合同文本触发审查、人工审批和报告生成，适合手动验证受控工作流"
+      - prompt: "请审查我上传的合同，提取关键条款和风险点，审批后生成审查报告"
+        expectedBehavior: "解析合同、整理风险、在生成报告前触发人工审批"
+      - prompt: "根据这份合同生成一份风险审查报告，重点关注付款、违约和终止条款"
+        expectedBehavior: "提取重点条款并调用报告生成工具"
+      - prompt: "先告诉我合同里缺哪些关键信息，再准备一份可下载的审查报告"
+        expectedBehavior: "展示字段完整性检查和受控报告生成流程"
+
   - agentId: search-assistant
     category: single
     name: Search Assistant

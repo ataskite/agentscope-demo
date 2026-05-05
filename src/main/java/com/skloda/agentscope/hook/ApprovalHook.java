@@ -73,6 +73,7 @@ public class ApprovalHook implements Hook {
                     map.put("id", t.getId() != null ? t.getId() : "");
                     map.put("name", t.getName() != null ? t.getName() : "");
                     map.put("input", t.getInput() != null ? t.getInput().toString() : "{}");
+                    map.put("inputParams", t.getInput() != null ? t.getInput() : Map.of());
                     return map;
                 })
                 .toList();

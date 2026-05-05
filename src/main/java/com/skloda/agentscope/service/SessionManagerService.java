@@ -7,15 +7,12 @@ import com.skloda.agentscope.model.SessionInfo;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.memory.InMemoryMemory;
 import io.agentscope.core.memory.Memory;
-import io.agentscope.core.session.JsonSession;
 import io.agentscope.core.session.SessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
@@ -24,11 +21,10 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Stream;
 
 /**
- * Manages session lifecycle: create, cache, persist, list, delete.
- * Each session holds a cached ReActAgent + Memory + AgentScope SessionManager.
+ * Manages in-process session lifecycle for the demo.
+ * Each session holds Memory for the life of the current application process.
  */
 @Service
 public class SessionManagerService {
@@ -49,12 +45,8 @@ public class SessionManagerService {
         this.agentFactory = agentFactory;
         this.configService = configService;
         this.sessionBasePath = Paths.get(storagePath);
-        try {
-            Files.createDirectories(sessionBasePath);
-        } catch (IOException e) {
-            log.error("Failed to create session directory: {}", sessionBasePath, e);
-        }
-        log.info("Session storage path: {}", sessionBasePath.toAbsolutePath());
+        log.info("Session storage mode: in-memory (configured path ignored: {})",
+                sessionBasePath.toAbsolutePath());
     }
 
     // ---- Inner context class ----
@@ -101,14 +93,23 @@ public class SessionManagerService {
                 cached.touch();
                 return cached;
             }
-            // Try to load from disk
-            SessionContext loaded = loadFromDisk(sessionId, agentId);
-            if (loaded != null) {
-                return loaded;
-            }
         }
         // Create new session
         return createNewSession(agentId);
+    }
+
+    /**
+     * Get the current in-memory session for an agent, or create one.
+     */
+    public SessionContext getOrCreateSessionForAgent(String agentId) {
+        return activeSessions.values().stream()
+                .filter(ctx -> Objects.equals(ctx.getAgentId(), agentId))
+                .findFirst()
+                .map(ctx -> {
+                    ctx.touch();
+                    return ctx;
+                })
+                .orElseGet(() -> createNewSession(agentId));
     }
 
     /**
@@ -120,86 +121,34 @@ public class SessionManagerService {
     }
 
     private SessionContext createSessionContext(String sessionId, String agentId) {
-        AgentConfig config = configService.getAgentConfig(agentId);
-
         // Create memory based on config
         Memory memory = agentFactory.createMemory(agentId);
 
         // Create agent with this memory (hooks are per-request, not set here)
         ReActAgent agent = agentFactory.createAgentForSession(agentId, memory);
 
-        // Create AgentScope SessionManager
-        Path sessionDir = sessionBasePath.resolve(sessionId);
-        SessionManager sessionManager = SessionManager.forSessionId(sessionId)
-                .withSession(new JsonSession(sessionDir))
-                .addComponent(agent)
-                .addComponent(memory);
-
-        // Try loading existing state
-        try {
-            sessionManager.loadIfExists();
-            log.info("Session {} loaded from disk (agent: {})", sessionId, agentId);
-        } catch (Exception e) {
-            log.debug("Session {} is new (agent: {})", sessionId, agentId);
-        }
-
-        SessionContext ctx = new SessionContext(sessionId, agentId, agent, memory, sessionManager);
+        SessionContext ctx = new SessionContext(sessionId, agentId, agent, memory, null);
         activeSessions.put(sessionId, ctx);
         log.info("Created session: {} for agent: {}", sessionId, agentId);
         return ctx;
     }
 
-    private SessionContext loadFromDisk(String sessionId, String agentId) {
-        Path sessionDir = sessionBasePath.resolve(sessionId);
-        if (!Files.exists(sessionDir)) {
-            return null;
-        }
-        try {
-            return createSessionContext(sessionId, agentId);
-        } catch (Exception e) {
-            log.error("Failed to load session {} from disk", sessionId, e);
-            return null;
-        }
-    }
-
     /**
-     * Save session to disk.
+     * Mark session as recently used. In-memory demo sessions are not written to disk.
      */
     public void saveSession(String sessionId) {
         SessionContext ctx = activeSessions.get(sessionId);
         if (ctx == null) return;
-        try {
-            ctx.getSessionManager().saveSession();
-            log.debug("Session {} saved", sessionId);
-        } catch (Exception e) {
-            log.error("Failed to save session {}", sessionId, e);
-        }
+        ctx.touch();
+        log.debug("Session {} touched", sessionId);
     }
 
     /**
-     * List all sessions (from disk + active cache).
+     * List all active in-memory sessions.
      */
     public List<SessionInfo> listSessions() {
         Map<String, SessionInfo> sessions = new LinkedHashMap<>();
 
-        // From disk
-        if (Files.exists(sessionBasePath)) {
-            try (Stream<Path> paths = Files.list(sessionBasePath)) {
-                paths.filter(Files::isDirectory)
-                     .forEach(p -> {
-                         String sid = p.getFileName().toString();
-                         SessionInfo info = new SessionInfo();
-                         info.setSessionId(sid);
-                         info.setCreatedAt(formatTime(getDirTime(p)));
-                         info.setLastAccessedAt(formatTime(getDirTime(p)));
-                         sessions.put(sid, info);
-                     });
-            } catch (IOException e) {
-                log.error("Failed to list sessions", e);
-            }
-        }
-
-        // Enrich with cached data
         activeSessions.forEach((sid, ctx) -> {
             SessionInfo info = sessions.getOrDefault(sid, new SessionInfo());
             info.setSessionId(sid);
@@ -226,21 +175,10 @@ public class SessionManagerService {
     }
 
     /**
-     * Delete a session (disk + cache).
+     * Delete a session from the active in-memory cache.
      */
     public void deleteSession(String sessionId) {
         activeSessions.remove(sessionId);
-        Path sessionDir = sessionBasePath.resolve(sessionId);
-        if (Files.exists(sessionDir)) {
-            try (Stream<Path> paths = Files.walk(sessionDir)) {
-                paths.sorted(Comparator.reverseOrder())
-                     .forEach(p -> {
-                         try { Files.delete(p); } catch (IOException ignored) {}
-                     });
-            } catch (IOException e) {
-                log.error("Failed to delete session dir: {}", sessionDir, e);
-            }
-        }
         log.info("Session {} deleted", sessionId);
     }
 
@@ -252,14 +190,6 @@ public class SessionManagerService {
     }
 
     // ---- Helpers ----
-
-    private long getDirTime(Path dir) {
-        try {
-            return Files.getLastModifiedTime(dir).toMillis();
-        } catch (IOException e) {
-            return System.currentTimeMillis();
-        }
-    }
 
     private String formatTime(long epochMs) {
         return LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMs), ZoneId.systemDefault())

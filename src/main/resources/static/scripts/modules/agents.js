@@ -1,7 +1,7 @@
-import { fetchAgents, fetchSkillInfo, fetchToolInfo, fetchKnowledgeStatus } from '../api.js';
+import { fetchAgents, fetchSamplePrompt, fetchSkillInfo, fetchToolInfo, fetchKnowledgeStatus } from '../api.js?v=2.5';
 import { escapeHtml } from './utils.js';
 import { setStreamingState } from './ui.js';
-import { agents } from '../state.js';
+import { agents } from '../state.js?v=2.4';
 
 /* ===== CATEGORY DEFINITIONS ===== */
 const CATEGORIES = [
@@ -173,7 +173,7 @@ export async function selectAgent(agentId) {
 
     // Auto-create a new session for this agent (dynamic import to avoid circular dependency)
     try {
-        var sessionModule = await import('./session.js');
+        var sessionModule = await import('./session.js?v=2.5');
         await sessionModule.createNewSession(agentId);
     } catch (err) {
         console.error('Failed to create session:', err);
@@ -199,12 +199,13 @@ function showSamplePrompts(agentId) {
         '<div class="sample-prompts-title">示例提示</div>' +
         '<div class="sample-prompts-list">';
 
-    agent.config.samplePrompts.forEach(function(sample) {
-        promptsHtml += '<div class="sample-prompt-item" onclick="useSamplePrompt(\'' +
-            sample.prompt.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n') +
-            '\')">' +
-            '<div class="sample-prompt-text">' + escapeHtml(sample.prompt) + '</div>' +
-            '<div class="sample-prompt-hint">' + escapeHtml(sample.expectedBehavior) + '</div>' +
+    agent.config.samplePrompts.forEach(function(sample, index) {
+        var prompt = sample.prompt || '';
+        var expectedBehavior = sample.expectedBehavior || '';
+        promptsHtml += '<div class="sample-prompt-item" data-agent-id="' + escapeHtml(agentId) +
+            '" data-sample-index="' + index + '" onclick="useSamplePromptFromElement(this)">' +
+            '<div class="sample-prompt-text">' + escapeHtml(prompt) + '</div>' +
+            '<div class="sample-prompt-hint">' + escapeHtml(expectedBehavior) + '</div>' +
             '</div>';
     });
 
@@ -229,6 +230,19 @@ window.useSamplePrompt = function(prompt) {
         input.focus();
         // Trigger auto-resize
         input.dispatchEvent(new Event('input'));
+    }
+};
+
+window.useSamplePromptFromElement = async function(element) {
+    if (!element) return;
+    var promptText = element.querySelector('.sample-prompt-text');
+    var fallbackPrompt = promptText ? promptText.textContent : '';
+    try {
+        var sample = await fetchSamplePrompt(element.dataset.agentId, element.dataset.sampleIndex);
+        window.useSamplePrompt(sample.prompt || fallbackPrompt);
+    } catch (e) {
+        console.error('Failed to load sample prompt:', e);
+        window.useSamplePrompt(fallbackPrompt);
     }
 };
 

@@ -1,274 +1,438 @@
 # AgentScope Demo Roadmap
 
-**Date**: 2026-04-29
-**Scope**: AgentScope Java demo evolution roadmap
-**Status**: Milestone `p2-controlled-workflows` in progress
+**Date**: 2026-05-06
+**Scope**: AgentScope Java feature-complete demo evolution
+**Status**: Milestone `p2-controlled-workflows` completed; next milestone `feature-complete-core`
 
 ## Progress Snapshot
 
-Last updated: 2026-04-30
+Last updated: 2026-05-06
 
 Completed:
 
-- [x] Created this roadmap document and captured the long-term AgentScope Demo direction.
-- [x] Implemented the first P0 foundation task: unified streaming runtime dispatch for single and composite agents.
-- [x] Added `StreamingAgentRuntime` so `AgentRuntime` and `PipelineAgentRuntime` share one service-facing contract.
-- [x] Updated `AgentRuntimeFactory` and `AgentService` so `SINGLE`, `SEQUENTIAL`, `PARALLEL`, `ROUTING`, and `HANDOFFS` all flow through the normal chat runtime path.
-- [x] Added runtime dispatch tests for single, sequential, parallel, routing, handoffs, and session-memory composite dispatch.
-- [x] Expanded unit test coverage across model DTOs, multimodal message creation, file upload/download handling, `AgentService` message assembly, document parser tools, basic tools, web search guardrails, and bank invoice generation.
-- [x] Added frontend debug panel rendering improvements for multi-agent events (pipeline, routing, handoff).
-- [x] Added polished showcase prompts for every configured agent.
-- [x] Added JaCoCo coverage reporting configuration.
-- [x] Added agent categorized accordion menu (Single/Expert/Collaboration groups).
-- [x] Implemented Generic RAG with local knowledge indexing, status tracking, and config modal display.
-- [x] Added DEBATE agent type with DebatePipeline (parallel debaters + judge synthesis).
-- [x] Enhanced customer-service, doc-pipeline, and expert agent prompts with structured output formats.
-- [x] Added super-supervisor and debate-review collaboration agents.
-- [x] Started P2 controlled workflows with HITL approval infrastructure (`ApprovalHook`, `ApprovalService`, `/chat/approve`, approval UI cards).
-- [x] Added structured output runtime support and schemas for invoice and ID card extraction.
-- [x] Wired `bank-invoice` to require approval before `generate_bank_invoice`.
-- [x] Wired `invoice-extractor` and `idcard-extractor` to structured output schemas.
-- [x] Ensured SSE streams close when the runtime emits `done`, including long-lived merged hook streams.
-
-Verification:
-
-- [x] `mvn -Dtest=AgentRuntimeFactoryTest test` passed with 8 tests.
-- [x] `mvn -Dtest=ChatControllerStreamTest,AgentSamplePromptsConfigTest test` passed with 3 tests.
-- [x] `mvn test` passed with 118 tests, 0 failures, 0 errors.
-- [x] JaCoCo coverage report generated at `target/site/jacoco/index.html`.
+- [x] P0 Multi-agent foundation: unified streaming runtime, composite agent dispatch, debug events.
+- [x] P1 Multi-agent showcase: routing, handoffs, supervisor, debate/review, sample prompts.
+- [x] P2 Controlled workflows: HITL approval hook, structured output (invoice/ID card/contract), validation & repair, workflow snapshots.
+- [x] Manual approval resume flow validated with real model credentials.
+- [x] 140 unit tests passing, JaCoCo coverage configured.
+- [x] Cyberpunk-themed UI with categorized agent menu (Single/Expert/Collaboration).
+- [x] Generic RAG with local knowledge indexing, DashScope embeddings, status tracking.
+- [x] Vision (OCR, chart, scene) and audio (speech-to-text) multimodal agents.
+- [x] Session persistence via AgentScope SessionManager.
+- [x] ObservabilityHook with timeline, metrics, thinking, and tool-call detail events.
+- [x] SSE streaming chat UI with real-time debug panel.
 
 Current TODO:
 
-- [x] Validate `doc-analysis-pipeline`, `smart-router`, and `customer-service` manually in the browser with real model credentials.
-- [x] Add P1 showcase demos (supervisor agent, debate/review, etc.).
-- [x] Add P2 foundation for human-in-the-loop approvals and structured outputs.
-- [ ] Add structured output validation and repair loops.
-- [ ] Add contract metadata structured extraction and a contract review workflow.
-- [ ] Store workflow state and intermediate outputs for replay.
-- [ ] Manually validate approval resume behavior with real model credentials.
+- [ ] Start P3 Planning & Memory demos.
+- [ ] Implement remaining AgentScope features as real demo scenarios.
 
 ## 1. Positioning
 
-This project is already more than a basic AgentScope Java demo. It has single-agent chat, tool calling, document parsing, template document generation, RAG, multimodal input, session persistence, and an observability/debug panel.
+This project is a **feature-complete AgentScope Java showcase**: every major capability the framework offers should have at least one runnable, visible demo with a realistic business scenario and a polished UI outcome.
 
-The next stage should turn it into a clear AgentScope Java showcase:
+The demo should:
 
-- Demonstrate the framework's core agent patterns.
-- Provide realistic business scenarios instead of isolated toy agents.
-- Make agent execution observable, controllable, and reproducible.
-- Keep the codebase approachable for developers who want to learn AgentScope Java.
+- Demonstrate every core framework capability through concrete business scenarios.
+- Make each feature observable, controllable, and reproducible via the debug panel.
+- Serve as a learning reference for developers adopting AgentScope Java.
+- Keep the codebase approachable — YAML-first configuration, scenario-driven features.
 
-## 2. Current Baseline
+## 2. Feature Coverage Matrix
 
-Implemented or partially implemented capabilities:
+**Legend**: ✅ Implemented | 🔧 Partial | ❌ Not started
 
-- Single ReAct agents configured from `src/main/resources/config/agents.yml`.
-- Tool calling with custom Java POJO tools and AgentScope system tools.
-- Skill-backed document workflows for DOCX, PDF, XLSX, and bank invoice generation.
-- RAG knowledge base with `SimpleKnowledge`, DashScope embeddings, and in-memory store.
-- Multimodal agents for image and audio inputs.
-- Session persistence through AgentScope `SessionManager`.
-- SSE streaming chat UI with a runtime debug panel.
-- Multi-agent runtime dispatch for sequential pipeline, parallel fanout, routing, handoffs, and debate agents.
-- Controlled workflow foundation with human approval pause/resume and structured output runtime support.
+### Core Agent
 
-Known gap:
+| AgentScope Feature | Status | Demo Agent / Scenario |
+|---|---|---|
+| ReAct Agent (Reasoning + Acting loop) | ✅ | `chat-basic`, `tool-test-simple` |
+| Tool Calling (@Tool POJO methods) | ✅ | All tool-calling agents |
+| Streaming (Reactive SSE) | ✅ | `/chat/send` SSE endpoint |
+| Session / State persistence | ✅ | SessionManager, JSON file storage |
+| Hook System (lifecycle events) | ✅ | `ObservabilityHook` (timeline, metrics) |
+| Multi-modal — Vision | ✅ | `vision-analyzer` (qwen-vl-max) |
+| Multi-modal — Audio | ✅ | `voice-assistant` (qwen-audio-turbo) |
+| Structured Output (TOOL_CHOICE/PROMPT) | ✅ | `invoice-extractor`, `idcard-extractor`, `contract-extractor` |
+| Structured Output validation & repair | ✅ | `StructuredOutputValidator`, one-pass retry |
+| Human-in-the-Loop (HITL) | ✅ | `bank-invoice`, `contract-review-workflow`, `ApprovalHook` |
+| PlanNotebook (structured planning) | ❌ | Planned: `project-planner` upgrade |
+| Agent Interrupt / Cancel | 🔧 | Partially via HITL; need runtime interrupt |
 
-- P2 controlled workflows still need validation/repair loops, contract review orchestration, workflow state persistence, and real-model manual verification of approval resume behavior.
+### Memory
+
+| AgentScope Feature | Status | Demo Agent / Scenario |
+|---|---|---|
+| InMemoryMemory (short-term) | ✅ | All session-based agents |
+| AutoContextMemory (auto-compression) | ❌ | Planned: long-conversation agent |
+| Long-term Memory — Mem0 | ❌ | Planned: cross-session preference recall |
+| Long-term Memory — ReMe | ❌ | Planned: cross-session knowledge retention |
+| Long-term Memory Mode (STATIC/AGENT/BOTH) | ❌ | Planned: memory mode comparison demo |
+
+### RAG & Knowledge
+
+| AgentScope Feature | Status | Demo Agent / Scenario |
+|---|---|---|
+| RAG Generic Mode (auto-inject) | ✅ | `rag-chat` |
+| RAG Agentic Mode (on-demand tool) | ❌ | Planned: `rag-agent` with `retrieve_knowledge` tool |
+| Local Knowledge — SimpleKnowledge | ✅ | InMemoryStore + DashScope embeddings |
+| Local Knowledge — Qdrant persistent store | ❌ | Planned: production RAG demo |
+| Cloud Knowledge — Bailian | ❌ | Planned: enterprise knowledge base |
+| Cloud Knowledge — Dify | ❌ | Planned: Dify integration demo |
+| Cloud Knowledge — RAGFlow | ❌ | Planned: RAGFlow integration demo |
+| Citation display & chunk preview | ❌ | Planned: RAG UI enhancement |
+
+### Multi-Agent Patterns
+
+| AgentScope Pattern | Status | Demo Agent / Scenario |
+|---|---|---|
+| Pipeline — Sequential | ✅ | `doc-analysis-pipeline` |
+| Pipeline — Parallel | ✅ | Debate prelude, parallel fanout |
+| Routing (classify → specialist → merge) | ✅ | `smart-router` |
+| Handoffs (state-driven agent switching) | ✅ | `customer-service` |
+| Supervisor (one tool per specialist) | ✅ | `super-supervisor` |
+| Debate (MsgHub + moderator) | ✅ | `debate-review` |
+| Agent as Tool (sub-agent invocation) | ✅ | SubAgentTool in routing/supervisor |
+| Subagents (Task/TaskOutput orchestration) | ❌ | Planned: orchestrator with sub-agent tasks |
+| Skills (progressive disclosure) | ✅ | SKILL.md + `read_skill` via ToolRegistry |
+| MsgHub (group conversation) | 🔧 | Debate uses MsgHub pattern; need standalone demo |
+| Custom Workflow (StateGraph) | ❌ | Planned: mixed deterministic + agentic steps |
+
+### Tool Ecosystem
+
+| AgentScope Feature | Status | Demo Agent / Scenario |
+|---|---|---|
+| Custom @Tool POJO tools | ✅ | 12+ tools registered |
+| System tools (file, shell) | ✅ | `view_text_file`, `write_text_file`, `execute_shell_command` |
+| Skill system (SKILL.md) | ✅ | 6 skills configured |
+| MCP — StdIO transport | ❌ | Planned: local MCP server connection |
+| MCP — SSE transport | ❌ | Planned: remote MCP server connection |
+| MCP — HTTP transport | ❌ | Planned: stateless MCP connection |
+| MCP — Tool filtering (enable/disable) | ❌ | Planned: selective MCP tool registration |
+| MCP — Tool Groups | ❌ | Planned: grouped tool activation |
+| MCP — Higress AI Gateway | ❌ | Planned: semantic tool search |
+| Tool allowlist / denylist per agent | ❌ | Planned: per-agent tool permissions |
+
+### Interoperability
+
+| AgentScope Feature | Status | Demo Agent / Scenario |
+|---|---|---|
+| A2A — Client (call remote agents) | ❌ | Planned: call remote A2A service |
+| A2A — Server (expose local agents) | ❌ | Planned: expose agents as A2A service |
+| A2A — Nacos discovery | ❌ | Planned: Nacos-registered agent discovery |
+| AG-UI protocol | ❌ | Planned: frontend interop endpoints |
+| Studio integration | ❌ | Planned: AgentScope Studio visual debug |
+| JSONL Trace Exporter | ❌ | Planned: execution trace export |
+| OpenTelemetry tracing | ❌ | Planned: distributed trace integration |
+
+### CLI & OpenClaw Integration
+
+| AgentScope Feature | Status | Demo Agent / Scenario |
+|---|---|---|
+| CLI-Anything wrapper (agent → CLI) | ❌ | Planned: `agentscope` CLI commands for all agents |
+| HTTP API CLI adapter | ❌ | Planned: CLI calls `/chat/send` SSE endpoint |
+| OpenClaw SKILL.md generation | ❌ | Planned: per-agent skill descriptors |
+| OpenClaw skill packaging | ❌ | Planned: `openclaw skills install agentscope-demo` |
 
 ## 3. Guiding Principles
 
-- Prefer scenario-first features: each new capability should have a demo conversation and a visible UI outcome.
-- Keep YAML configuration as the primary extension point for agents, tools, skills, memory, RAG, and multi-agent topology.
-- Make every autonomous action inspectable in the debug panel.
-- Add guardrails before adding powerful tools.
-- Keep production-oriented additions optional so the repository remains easy to run locally.
+- **Feature = Demo**: every framework capability must have a runnable demo with a visible UI outcome.
+- **YAML-first**: agents, tools, skills, RAG, and multi-agent topology are configured from `agents.yml`.
+- **Observable by default**: every autonomous action should be inspectable in the debug panel.
+- **Scenario-driven**: each demo tells a story (e.g., "upload a contract → extract risks → approve → generate report").
+- **Keep it runnable**: production-oriented additions are optional; the repo runs locally with `mvn spring-boot:run`.
 
 ## 4. Roadmap Overview
 
 | Phase | Theme | Outcome |
-| --- | --- | --- |
-| P0 | Multi-agent foundation | Existing composite agent configs run through `/chat/send` and stream observable events. |
-| P1 | Multi-agent showcase | A complete customer-service and document-analysis showcase demonstrates routing, pipelines, handoffs, and supervisor behavior. |
-| P2 | Controlled workflows | Human approval, structured outputs, and custom workflows make agent behavior safer and more deterministic. |
-| P3 | Tool and knowledge ecosystem | MCP connectors, persistent RAG, and tool governance turn the demo into an extensible agent platform. |
-| P4 | Business workflow expansion | Multimodal document, invoice, ID card, and banking workflows become reusable end-to-end demos. |
-| P5 | Productization and interop | AG-UI, A2A, evaluation, replay, auth, and deployment support make the project closer to a production reference app. |
+|---|---|---|
+| P0 | Multi-agent foundation | ✅ Composite agents stream through `/chat/send` with observable events. |
+| P1 | Multi-agent showcase | ✅ Customer service, document pipeline, routing, supervisor, and debate demos. |
+| P2 | Controlled workflows | ✅ HITL approval, structured output, validation, workflow snapshots, manual approval resume validation. |
+| P3 | Planning & memory | PlanNotebook demo, AutoContextMemory, long-term memory (Mem0/ReMe). |
+| P4 | RAG ecosystem | Agentic RAG, Qdrant persistent store, cloud knowledge (Bailian/Dify/RAGFlow), citation UI. |
+| P5 | MCP tool ecosystem | MCP transports (StdIO/SSE/HTTP), tool filtering, groups, Higress gateway. |
+| P6 | Advanced multi-agent | Subagents orchestration, MsgHub standalone, Custom Workflow (StateGraph). |
+| P7 | Interoperability & observability | A2A client/server, Nacos discovery, AG-UI, Studio, OTEL tracing. |
+| P8 | CLI & OpenClaw integration | CLI-Anything wrapper, OpenClaw skills, agent capabilities callable from CLI/assistant. |
 
 ## 5. Phase Details
 
-### P0: Multi-agent Foundation
+### P0: Multi-agent Foundation ✅
 
-Goal: make the current multi-agent architecture work reliably before adding more patterns.
+**Status**: Completed.
 
-Recommended work:
+Unified runtime dispatch for all agent types (SINGLE, SEQUENTIAL, PARALLEL, ROUTING, HANDOFFS, DEBATE). Debug panel shows multi-agent timeline events. 90+ tests passing.
 
-- Introduce a shared runtime abstraction for both `AgentRuntime` and `PipelineAgentRuntime`.
-- Update `AgentService` to dispatch by `AgentType`.
-- Support stateless and session-aware execution for `SINGLE`, `SEQUENTIAL`, `PARALLEL`, `ROUTING`, and `HANDOFFS`.
-- Ensure pipeline runtimes emit `pipeline_start`, `pipeline_step_start`, `pipeline_step_end`, and `pipeline_end`.
-- Ensure routing and handoff runtimes emit useful `routing_decision` and `handoff_start` events.
-- Add backend tests for each composite type.
-- Add one frontend smoke path for each composite type.
+### P1: Multi-agent Showcase ✅
 
-Success criteria:
+**Status**: Completed.
 
-- Selecting `doc-analysis-pipeline`, `smart-router`, or `customer-service` from the UI no longer fails at runtime.
-- Debug panel shows which agent or sub-agent handled each step.
-- Existing single-agent behavior remains unchanged.
+Polished showcase prompts for every agent. Supervisor agent, debate/review, customer-service handoffs. Categorized accordion menu UI.
 
-### P1: Multi-agent Showcase
+### P2: Controlled Workflows ✅
 
-Goal: make multi-agent collaboration obvious and compelling to a first-time user.
+**Status**: Completed.
 
-Recommended work:
+Completed:
 
-- Build a "Smart Customer Service" demo using routing plus handoffs.
-- Build a "Document Research Pipeline" demo: parse document, extract facts, search supplements, generate report.
-- Add a supervisor-style agent that can call document, search, vision, and invoice experts as sub-agent tools.
-- Add a debate/review demo where multiple expert agents critique a proposal and a judge agent summarizes the decision.
-- Add predefined sample prompts in the UI for each showcase.
+- [x] HITL approval: `ApprovalHook`, `ApprovalService`, `/chat/approve`, UI approval cards.
+- [x] Approval resume: pending tool calls resume after human approval, tool result is streamed below the approval card, and the approved card remains expandable.
+- [x] Structured output: invoice, ID card, contract metadata schemas.
+- [x] Validation & repair loops: `StructuredOutputValidator`, one-pass retry.
+- [x] Contract review workflow: upload → extract metadata → approval gate → generate report.
+- [x] Workflow run snapshots with event capture and replay APIs.
 
-Success criteria:
+### P3: Planning & Memory
 
-- A user can understand the difference between pipeline, routing, handoffs, supervisor, and debate from the UI alone.
-- Each demo has a repeatable prompt and expected behavior.
+**Goal**: Demonstrate AgentScope's planning and memory capabilities with real scenarios.
 
-### P2: Controlled Workflows
+**Recommended work**:
 
-Goal: make agent behavior safer, more deterministic, and easier to integrate.
+- **PlanNotebook demo**: Upgrade `project-planner` to use `enablePlan()`. Scenario: "Plan and execute a multi-step project" — the agent creates a structured plan, the user confirms, then the agent executes subtasks step by step with visible progress in the debug panel.
+- **AutoContextMemory demo**: Create a `long-conversation` agent with `AutoContextMemory`. Scenario: "Extended technical consultation" — a 50+ turn conversation where the agent auto-compresses context, offloads large content, and reloads on demand.
+- **Long-term memory — Mem0 demo**: Add `Mem0LongTermMemory` to a personal assistant agent. Scenario: "Remember my preferences" — the agent recalls user preferences (language, format, domain expertise) across sessions.
+- **Long-term memory — ReMe demo**: Add `ReMeLongTermMemory` as an alternative. Scenario: "Knowledge retention across sessions" — accumulated insights are preserved.
+- **Memory mode comparison**: Show `STATIC_CONTROL` vs `AGENT_CONTROL` vs `BOTH` modes in a single agent with UI toggle.
 
-Recommended work:
+**Success criteria**:
 
-- Add Human-in-the-Loop approval before sensitive actions such as shell execution, file writing, invoice generation, or external API calls.
-- Add structured output schemas for invoice extraction, ID card extraction, contract metadata, and bank invoice parameters.
-- Add validation and repair loops for structured outputs.
-- Add a custom workflow demo such as `Contract Review Workflow`: upload contract, extract clauses, identify risks, request approval, generate report.
-- Store workflow state and intermediate outputs for replay.
+- PlanNotebook: agent creates plans, user confirms, subtasks execute with visible status.
+- AutoContextMemory: long conversation completes without context overflow.
+- Long-term memory: user preferences persist across new sessions.
 
-Success criteria:
+### P4: RAG Ecosystem
 
-- Sensitive tool calls pause for approval before execution.
-- Extraction agents return machine-readable JSON that passes schema validation.
-- Workflow runs can be inspected after completion.
+**Goal**: Demonstrate all RAG modes and knowledge backends.
 
-### P3: Tool and Knowledge Ecosystem
+**Recommended work**:
 
-Goal: evolve from hard-coded demo tools to an extensible tool and knowledge platform.
+- **Agentic RAG demo**: Create `rag-agent` with `RAGMode.AGENTIC`. Scenario: "Research assistant" — the agent decides when to retrieve from the knowledge base using `retrieve_knowledge` tool, only querying when relevant.
+- **Persistent RAG — Qdrant**: Replace `InMemoryStore` with `QdrantStore` for a production RAG demo. Knowledge survives app restarts.
+- **Cloud RAG — Bailian**: Create `enterprise-knowledge` agent using `BailianKnowledge`. Scenario: "Enterprise document Q&A" with reranking, query rewriting, and multi-turn retrieval.
+- **Cloud RAG — Dify**: Create `dify-rag` agent using `DifyKnowledge`. Scenario: "Dify-powered knowledge base" with hybrid search.
+- **Cloud RAG — RAGFlow**: Create `ragflow-rag` agent using `RAGFlowKnowledge`. Scenario: "OCR-enhanced document retrieval" with knowledge graph.
+- **Citation UI**: Add chunk preview, citation links, and retrieval score display to the RAG chat UI.
 
-Recommended work:
+**Success criteria**:
 
-- Add MCP server registration and tool discovery.
-- Support MCP transport options where practical: StdIO, HTTP, and SSE.
-- Add tool allowlist/denylist, tool grouping, and per-agent tool permissions.
-- Replace or supplement in-memory RAG with a persistent vector store option.
-- Add document deletion, re-indexing, chunk preview, citation display, and retrieval debugging.
-- Add source-grounded answer mode for RAG Chat.
+- Both Generic and Agentic RAG modes are demoable.
+- At least one persistent store (Qdrant) and one cloud knowledge backend work.
+- Users can see which chunks were retrieved, their scores, and source documents.
 
-Success criteria:
+### P5: MCP Tool Ecosystem
 
-- New tools can be attached without writing Java code for every integration.
-- RAG knowledge survives app restarts.
-- Users can see which chunks were retrieved and cited.
+**Goal**: Connect agents to the MCP tool ecosystem.
 
-### P4: Business Workflow Expansion
+**Recommended work**:
 
-Goal: turn individual agents into reusable business workflows.
+- **MCP StdIO demo**: Create `mcp-filesystem` agent connecting to `@modelcontextprotocol/server-filesystem` via StdIO. Scenario: "File management assistant" — the agent reads, writes, and lists files on the local filesystem through MCP tools.
+- **MCP SSE demo**: Create `mcp-remote` agent connecting to a remote MCP server via SSE. Scenario: "Remote service integration" — agent calls external tools through an MCP gateway.
+- **MCP HTTP demo**: Create `mcp-api` agent using streamable HTTP transport. Scenario: "Stateless API tool integration".
+- **Tool filtering demo**: Show enable/disable specific MCP tools per agent. Scenario: "Restricted file agent" — only `read_file` and `list_directory` enabled, `write_file` disabled.
+- **Tool Groups demo**: Create an agent with grouped MCP tools that can be activated/deactivated. Scenario: "Multi-mode agent" — filesystem tools active in one mode, web tools in another.
+- **Higress AI Gateway demo**: Use `HigressMcpClientBuilder` with semantic tool search. Scenario: "Smart tool discovery" — the agent automatically finds the most relevant tools for a given query.
 
-Recommended work:
+**Success criteria**:
 
-- Create an invoice workflow: image upload, OCR, structured extraction, validation, export.
-- Create an ID verification workflow: ID card extraction, masking, validation, and audit log.
-- Create a bank invoice workflow: collect missing fields, validate parameters, generate Excel and Word, expose download links.
-- Create a document comparison workflow for contracts or policy documents.
-- Add batch upload and batch extraction for document-heavy demos.
+- At least one MCP transport (StdIO) works with a real MCP server.
+- Tool filtering and groups are configurable from `agents.yml`.
+- New MCP tools can be added without writing Java integration code.
 
-Success criteria:
+### P6: Advanced Multi-Agent Patterns
 
-- Each business workflow has a clear start, intermediate state, final artifact, and downloadable output.
-- Workflows can be demoed with sample files from the repository or generated fixtures.
+**Goal**: Demonstrate the remaining multi-agent collaboration patterns.
 
-### P5: Productization and Interop
+**Recommended work**:
 
-Goal: make the demo useful as a reference architecture for real AgentScope Java applications.
+- **Subagents orchestration**: Create `task-orchestrator` using Task/TaskOutput pattern. Scenario: "Research report generator" — orchestrator delegates research, analysis, and writing to specialized sub-agents, each running in isolation with its own context.
+- **MsgHub standalone demo**: Create `round-table` agent using MsgHub for group conversation. Scenario: "Expert round-table discussion" — multiple experts share messages and debate in a shared context, visible as a multi-agent conversation thread.
+- **Custom Workflow (StateGraph)**: Create `approval-workflow` using StateGraph. Scenario: "Document approval pipeline" — mixed deterministic (classify → validate) and agentic (analyze → review) steps with explicit state transitions.
+- **Loop Pipeline**: Create `refinement-loop` using loop pipeline. Scenario: "Iterative content refinement" — content goes through writer → critic → revision loop until quality threshold is met.
 
-Recommended work:
+**Success criteria**:
 
-- Add AG-UI-compatible agent endpoints for frontend interoperability.
-- Add A2A server/client experiments so local agents can call remote agents and expose themselves as remote agents.
-- Add evaluation datasets for routing, extraction, RAG, and tool-use behavior.
-- Add conversation replay and run comparison.
-- Add auth, tenant isolation, file retention policy, and audit logging.
-- Add Docker Compose and deployment docs.
-- Add OpenTelemetry-friendly tracing or structured run logs.
+- All 10 multi-agent patterns from the AgentScope docs have at least one demo.
+- Each demo has a repeatable prompt and visible multi-agent orchestration in the debug panel.
 
-Success criteria:
+### P7: Interoperability & Observability
 
-- The app can be used as a local teaching demo and a reference implementation.
-- Agent runs are replayable, testable, and auditable.
-- External clients can integrate without depending on the current vanilla JS chat UI.
+**Goal**: Connect to external systems and demonstrate framework observability capabilities.
+
+**Recommended work**:
+
+- **A2A Client demo**: Create `remote-caller` agent using `A2aAgent`. Scenario: "Call a remote agent" — the local agent discovers and calls a remote A2A service (e.g., a deployed AgentScope agent) and returns the result.
+- **A2A Server demo**: Expose local agents as A2A services using `agentscope-a2a-spring-boot-starter`. Scenario: "Agent as a service" — external clients can call the demo's agents via A2A protocol.
+- **Nacos discovery**: Register A2A services with Nacos. Scenario: "Service mesh of agents" — agents discover each other through Nacos registry.
+- **AG-UI endpoints**: Add AG-UI-compatible streaming endpoints. Scenario: "Frontend protocol compatibility" — external frontends (CopilotKit, etc.) can drive the agents.
+- **AgentScope Studio**: Integrate `StudioMessageHook` and `StudioUserAgent`. Scenario: "Visual debugging" — agent runs are visualized in AgentScope Studio's web UI alongside the local debug panel.
+- **JSONL Trace**: Add `JsonlTraceExporter` as a configurable hook. Scenario: "Execution trace export" — all agent actions are logged to a JSONL file for offline analysis.
+- **OpenTelemetry**: Add OTEL tracing via Tracer SPI. Scenario: "Distributed tracing" — agent calls are traced end-to-end with spans for LLM, tool, and pipeline steps.
+
+**Success criteria**:
+
+- Local agents can call and be called by remote agents via A2A.
+- At least one external frontend can drive agents via AG-UI.
+- Agent runs produce exportable traces (JSONL and/or OTEL).
+
+### P8: CLI & OpenClaw Integration
+
+**Goal**: Make agent capabilities callable from CLI and OpenClaw assistant via CLI-Anything generated CLIs and SKILL.md skills.
+
+**Recommended work**:
+
+- **CLI-Anything wrapper**: Use CLI-Anything methodology to generate CLI harnesses for the project's core agent capabilities. Each CLI command maps to an agent or workflow:
+  - `agentscope chat --agent chat-basic --message "你好"` — single agent conversation
+  - `agentscope extract --agent invoice-extractor --file invoice.jpg` — structured extraction
+  - `agentscope pipeline --agent doc-analysis-pipeline --file report.pdf` — pipeline execution
+  - `agentscope search --agent search-assistant --query "今日新闻"` — web search
+  - `agentscope rag --agent rag-chat --query "知识库内容"` — RAG Q&A
+  - `agentscope approve --run-id <id> --action approve` — HITL approval
+  - All commands support `--json` for machine-readable output, `--session <id>` for session continuity
+- **HTTP API CLI adapter**: Create a lightweight CLI adapter that calls the existing `/chat/send` and `/chat/upload` HTTP endpoints, enabling CLI usage without modifying the Spring Boot backend:
+  - The CLI reads `agents.yml` to discover available agents and their descriptions
+  - Streams SSE responses to the terminal with real-time text rendering
+  - Supports file upload, session management, and structured output extraction
+- **OpenClaw SKILL.md generation**: Generate SKILL.md files for each agent capability following the CLI-Anything Phase 6 standard. These skills describe:
+  - Agent ID, description, input parameters, output format
+  - Example commands and expected behavior
+  - File types supported, approval requirements, streaming behavior
+- **OpenClaw skill packaging**: Bundle all SKILL.md files into an OpenClaw-installable skill package:
+  - `openclaw skills install agentscope-demo`
+  - After installation, OpenClaw assistant can directly invoke any agent: `@agentscope 用 invoice-extractor 提取这张发票信息`
+- **Skill-based agent dispatch**: The OpenClaw skill reads the CLI output and returns structured results back to the assistant's conversation context, enabling multi-turn CLI-driven agent workflows.
+
+**Success criteria**:
+
+- `agentscope chat --agent chat-basic --message "你好"` returns a streaming response in the terminal.
+- `agentscope extract --agent invoice-extractor --file invoice.jpg --json` outputs structured invoice JSON.
+- `openclaw skills install agentscope-demo` succeeds and all agent skills are discoverable.
+- OpenClaw assistant can invoke agents and receive structured results via the installed skills.
 
 ## 6. Feature Backlog
 
-High priority:
+### High Priority (P3–P4)
 
-- Unified runtime abstraction for single and composite agents.
-- Multi-agent UI visualization.
-- Supervisor agent showcase.
-- Human approval checkpoints.
-- Structured output schemas for extraction agents.
-- Persistent RAG store option.
+- PlanNotebook demo with structured planning.
+- AutoContextMemory for long conversations.
+- Long-term memory (Mem0 or ReMe).
+- Agentic RAG mode.
+- Persistent RAG store (Qdrant).
+- Cloud knowledge backend (Bailian or Dify).
 
-Medium priority:
+### Medium Priority (P5–P6)
 
-- MCP connector management.
-- Tool permission model.
-- Workflow state persistence.
-- Debate/reviewer agent demo.
-- Batch document workflows.
-- Retrieval citation UI.
+- MCP StdIO transport demo.
+- MCP tool filtering and groups.
+- Subagents orchestration (Task/TaskOutput).
+- Custom Workflow (StateGraph).
+- Loop pipeline.
 
-Later:
+### Later (P7–P8)
 
-- AG-UI compatibility.
-- A2A interoperability.
-- Evaluation dashboard.
-- Multi-tenant auth.
-- Deployment hardening.
-- Plugin or marketplace-style tool catalog.
+- A2A client/server demo.
+- Nacos service discovery.
+- AG-UI protocol endpoints.
+- AgentScope Studio integration.
+- JSONL Trace and OpenTelemetry.
+- CLI-Anything wrapper and OpenClaw skill packaging.
 
-## 7. Suggested First Milestone
+## 7. Suggested Next Milestone
 
-Milestone name: `multi-agent-runtime-showcase`
+**Milestone name**: `feature-complete-core`
 
-Status: ✅ Completed
+**Scope** (P3 + P4 core follow-up):
 
-Scope:
+- [ ] PlanNotebook demo: upgrade `project-planner` to use `enablePlan()`.
+- [ ] AutoContextMemory demo: create `long-conversation` agent.
+- [ ] Long-term memory demo: add Mem0 or ReMe to a personal assistant.
+- [ ] Agentic RAG demo: create `rag-agent` with `RAGMode.AGENTIC`.
+- [ ] Persistent RAG: add Qdrant store option.
 
-- [x] Fix runtime dispatch for composite agents.
-- [x] Add tests for sequential, parallel, routing, and handoffs.
-- [x] Improve debug panel rendering for multi-agent events.
-- [x] Add polished showcase prompts for every configured agent.
+**Why this next**:
 
-Why this first:
+- Planning and memory are core AgentScope differentiators that have no demo yet.
+- Agentic RAG is the most requested feature after Generic RAG.
+- These features require no external services (except optional Qdrant) and work locally.
+- They complete the "core agent capabilities" story before moving to ecosystem and interop.
 
-- It unlocks features already present in configuration and factory code.
-- It creates the strongest visible improvement with the least conceptual churn.
-- It gives future phases a stable execution model.
+**Suggested acceptance checks**:
 
-Suggested acceptance checks:
+- [ ] `mvn test` passes with 0 failures.
+- [ ] `project-planner` creates, confirms, and executes multi-step plans in the UI.
+- [ ] `long-conversation` sustains 50+ turns without context overflow.
+- [ ] `rag-agent` uses `retrieve_knowledge` tool only when relevant.
+- [ ] Debug panel shows plan status, memory compression events, and RAG tool calls.
 
-- [x] `mvn test` passes (90 tests, 0 failures, 0 errors).
-- [x] Frontend shows multi-agent timeline events (pipeline, routing, handoff).
-- [x] Showcase prompts added for every configured agent.
-- [x] JaCoCo coverage reporting configured.
-- [x] Manual browser testing with real model credentials (requires API key).
+## 8. AgentScope Feature → Demo Scenario Quick Reference
 
-## 8. References
+| # | Framework Feature | Demo Scenario | Agent ID | Phase |
+|---|---|---|---|---|
+| 1 | ReAct Agent | General AI chat with thinking | `chat-basic` | ✅ P0 |
+| 2 | Tool Calling | Calculator, time, weather tools | `tool-test-simple` | ✅ P0 |
+| 3 | Document Parsing | Upload DOCX/PDF/XLSX for analysis | `task-document-analysis` | ✅ P0 |
+| 4 | Template Generation | Bank invoice Excel + Word generation | `bank-invoice` | ✅ P0 |
+| 5 | RAG (Generic) | Knowledge base Q&A with auto-inject | `rag-chat` | ✅ P0 |
+| 6 | Vision | Image OCR, chart analysis, scene understanding | `vision-analyzer` | ✅ P0 |
+| 7 | Audio | Speech-to-text voice interaction | `voice-assistant` | ✅ P0 |
+| 8 | Web Search | News, weather, stock queries | `search-assistant` | ✅ P0 |
+| 9 | Session Persistence | Multi-turn conversation with save/restore | All agents | ✅ P0 |
+| 10 | Streaming SSE | Real-time incremental response display | All agents | ✅ P0 |
+| 11 | Hook System | Timeline, metrics, tool detail in debug panel | All agents | ✅ P0 |
+| 12 | Pipeline Sequential | Document analysis → supplementary search | `doc-analysis-pipeline` | ✅ P1 |
+| 13 | Routing | Smart dispatch to doc/search/vision/sales experts | `smart-router` | ✅ P1 |
+| 14 | Handoffs | Customer service → sales/complaint switching | `customer-service` | ✅ P1 |
+| 15 | Supervisor | Super-supervisor coordinating experts | `super-supervisor` | ✅ P1 |
+| 16 | Debate | Multi-expert debate with judge synthesis | `debate-review` | ✅ P1 |
+| 17 | Structured Output | Invoice/ID card/contract extraction to JSON | `invoice-extractor` etc. | ✅ P2 |
+| 18 | Structured Validation | Auto-repair invalid extraction output | All extractors | ✅ P2 |
+| 19 | Human-in-the-Loop | Approval gate before invoice generation | `bank-invoice`, `contract-review-workflow` | ✅ P2 |
+| 20 | Workflow Snapshots | Capture and replay workflow runs | `WorkflowRunService` | ✅ P2 |
+| 21 | PlanNotebook | Multi-step project planning with user confirm | `project-planner` | P3 |
+| 22 | AutoContextMemory | Long conversation with auto-compression | `long-conversation` | P3 |
+| 23 | Long-term Memory (Mem0) | Cross-session user preference recall | `personal-assistant` | P3 |
+| 24 | Long-term Memory (ReMe) | Cross-session knowledge retention | `knowledge-assistant` | P3 |
+| 25 | RAG (Agentic) | On-demand knowledge retrieval via tool | `rag-agent` | P4 |
+| 26 | RAG (Qdrant) | Persistent vector store across restarts | `rag-chat` upgrade | P4 |
+| 27 | RAG (Bailian) | Enterprise cloud knowledge base | `enterprise-knowledge` | P4 |
+| 28 | RAG (Dify) | Dify-managed knowledge base | `dify-rag` | P4 |
+| 29 | RAG (RAGFlow) | OCR-enhanced document retrieval | `ragflow-rag` | P4 |
+| 30 | MCP (StdIO) | Local filesystem MCP server connection | `mcp-filesystem` | P5 |
+| 31 | MCP (SSE) | Remote MCP server streaming connection | `mcp-remote` | P5 |
+| 32 | MCP (HTTP) | Stateless MCP API connection | `mcp-api` | P5 |
+| 33 | MCP Tool Filtering | Selective tool enable/disable per agent | Config in `agents.yml` | P5 |
+| 34 | MCP Tool Groups | Grouped tool activation modes | `mcp-multi-mode` | P5 |
+| 35 | Higress Gateway | Semantic tool search via AI gateway | `higress-agent` | P5 |
+| 36 | Subagents | Orchestrator delegating to isolated sub-agents | `task-orchestrator` | P6 |
+| 37 | MsgHub Standalone | Group conversation round-table | `round-table` | P6 |
+| 38 | Custom Workflow | StateGraph mixed deterministic + agentic | `approval-workflow` | P6 |
+| 39 | Loop Pipeline | Iterative refinement until quality threshold | `refinement-loop` | P6 |
+| 40 | A2A Client | Call remote Agent2Agent services | `remote-caller` | P7 |
+| 41 | A2A Server | Expose local agents as A2A services | A2A starter config | P7 |
+| 42 | A2A Nacos | Nacos-based agent service discovery | `nacos-discovery` | P7 |
+| 43 | AG-UI | Frontend protocol compatibility endpoints | AG-UI controller | P7 |
+| 44 | Studio | AgentScope Studio visual debugging | StudioMessageHook | P7 |
+| 45 | JSONL Trace | Execution trace file export | JsonlTraceExporter | P7 |
+| 46 | OpenTelemetry | Distributed tracing integration | OTEL Tracer SPI | P7 |
+| 47 | CLI-Anything Wrapper | Agent capabilities as CLI commands | `agentscope` CLI binary | P8 |
+| 48 | HTTP API CLI Adapter | CLI → `/chat/send` SSE streaming | CLI adapter module | P8 |
+| 49 | OpenClaw SKILL.md | Per-agent skill descriptors for OpenClaw | `~/.openclaw/skills/` | P8 |
+| 50 | OpenClaw Skill Package | Installable skill: `openclaw skills install agentscope-demo` | Skill package | P8 |
 
+## 9. References
+
+- AgentScope Java intro: https://java.agentscope.io/zh/intro.html
 - AgentScope Java multi-agent overview: https://java.agentscope.io/zh/multi-agent/overview.html
 - AgentScope Java MCP integration: https://java.agentscope.io/zh/task/mcp.html
-- AgentScope Java Human-in-the-Loop: https://java.agentscope.io/zh/task/human-in-the-loop.html
-- AgentScope Java structured output: https://java.agentscope.io/zh/task/structured-output.html
-- AgentScope Java AG-UI integration: https://java.agentscope.io/zh/task/ag-ui.html
 - AgentScope Java A2A protocol: https://java.agentscope.io/zh/task/a2a.html
+- AgentScope Java structured output: https://java.agentscope.io/zh/task/structured-output.html
+- AgentScope Java RAG: https://java.agentscope.io/zh/task/rag.html
+- AgentScope Java memory: https://java.agentscope.io/zh/task/memory.html
+- AgentScope Java hook system: https://java.agentscope.io/zh/task/hook.html
+- AgentScope Java state management: https://java.agentscope.io/zh/task/state.html
+- AgentScope Java plan: https://java.agentscope.io/zh/task/plan.html
+- AgentScope Java studio: https://java.agentscope.io/zh/task/studio.html
+- AgentScope GitHub: https://github.com/agentscope-ai/agentscope-java
+- CLI-Anything: https://github.com/HKUDS/CLI-Anything
+- OpenClaw: https://github.com/open-claw/openclaw
+- OpenCLI: https://github.com/jackwener/opencli

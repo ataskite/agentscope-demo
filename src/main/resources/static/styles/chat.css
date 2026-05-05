@@ -1,15 +1,15 @@
 /* ===== FRONTEND MODULE REFACTORING - CSS ENTRY POINT ===== */
 /* Import base styles */
-@import url('base.css');
+@import url('base.css?v=2.4');
 
 /* Import component-specific CSS modules */
-@import url('modules/header.css');
-@import url('modules/sidebar.css');
-@import url('modules/chat.css');
-@import url('modules/debug.css');
-@import url('modules/upload.css');
-@import url('modules/modal.css');
-@import url('modules/utils.css');
+@import url('modules/header.css?v=2.4');
+@import url('modules/sidebar.css?v=2.4');
+@import url('modules/chat.css?v=2.4');
+@import url('modules/debug.css?v=2.4');
+@import url('modules/upload.css?v=2.4');
+@import url('modules/modal.css?v=2.4');
+@import url('modules/utils.css?v=2.4');
 
 /* ===== APP LAYOUT ===== */
 .app {

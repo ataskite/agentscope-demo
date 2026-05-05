@@ -12,7 +12,7 @@ export const debugRounds = document.getElementById('debugRounds');
 export const debugToggle = document.getElementById('debugToggle');
 
 /* ===== MESSAGE RENDERING ===== */
-export function appendMessage(role, text, fileInfo) {
+export function appendMessage(role, text, fileInfo, thinkingContent) {
     var wrapper = document.createElement('div');
     wrapper.className = 'message ' + role;
 
@@ -25,7 +25,7 @@ export function appendMessage(role, text, fileInfo) {
     }
 
     var content = document.createElement('div');
-    content.className = 'message-content';
+    content.className = (role === 'agent' && thinkingContent) ? 'agent-response-wrapper' : 'message-content';
 
     // Handle media info (can be fileInfo object or mediaInfo object with file/images/audio)
     if (fileInfo && role === 'user') {
@@ -78,6 +78,16 @@ export function appendMessage(role, text, fileInfo) {
         }
     }
 
+    if (role === 'agent' && thinkingContent) {
+        content.appendChild(createHistoricalThinkingBox(thinkingContent));
+    }
+
+    var bubbleContent = content;
+    if (role === 'agent' && thinkingContent) {
+        bubbleContent = document.createElement('div');
+        bubbleContent.className = 'message-content';
+    }
+
     var bubble = document.createElement('div');
     bubble.className = 'message-bubble';
     if (role === 'agent') {
@@ -91,14 +101,39 @@ export function appendMessage(role, text, fileInfo) {
     time.className = 'message-time';
     time.textContent = getTimestamp();
 
-    content.appendChild(bubble);
-    content.appendChild(time);
+    bubbleContent.appendChild(bubble);
+    bubbleContent.appendChild(time);
+    if (bubbleContent !== content) {
+        content.appendChild(bubbleContent);
+    }
     wrapper.appendChild(avatar);
     wrapper.appendChild(content);
     chatMessages.appendChild(wrapper);
     scrollToBottom(chatMessages);
 
     return bubble;
+}
+
+function createHistoricalThinkingBox(thinkingContent) {
+    var box = document.createElement('div');
+    box.className = 'thinking-box completed collapsed';
+    box.innerHTML = '<div class="thinking-header" onclick="toggleThinking(this)">' +
+        '<div class="thinking-header-icon"><div class="thinking-spinner"></div></div>' +
+        '<div class="thinking-header-text">Thinking</div>' +
+        '</div>' +
+        '<div class="thinking-content"></div>';
+    var contentEl = box.querySelector('.thinking-content');
+    contentEl.textContent = formatThinkingContent(thinkingContent);
+    return box;
+}
+
+function formatThinkingContent(content) {
+    return String(content || '').split('\n')
+        .filter(function(line) {
+            var trimmed = line.trim();
+            return trimmed !== '' && !trimmed.includes('__fragment__');
+        })
+        .join('\n\n');
 }
 
 /* ===== THINKING BOX MANAGEMENT ===== */
@@ -206,6 +241,15 @@ export function createAgentMessageWrapper() {
     return wrapper;
 }
 
+export function createAgentMessageWrapperAfter(anchorEl) {
+    var wrapper = createAgentMessageWrapper();
+    if (anchorEl && anchorEl.parentNode === chatMessages) {
+        chatMessages.insertBefore(wrapper, anchorEl.nextSibling);
+        scrollToBottom(chatMessages);
+    }
+    return wrapper;
+}
+
 export function addAgentBubble() {
     if (!window.currentAgentMessageWrapper) {
         createAgentMessageWrapper();
@@ -228,6 +272,13 @@ export function addAgentBubble() {
 
     scrollToBottom(chatMessages);
     return bubble;
+}
+
+export function addAgentBubbleAfter(anchorEl) {
+    if (!window.currentAgentMessageWrapper) {
+        createAgentMessageWrapperAfter(anchorEl);
+    }
+    return addAgentBubble();
 }
 
 export function removeTypingIndicator() {

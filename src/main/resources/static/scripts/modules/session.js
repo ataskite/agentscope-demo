@@ -1,5 +1,6 @@
-import { fetchSessions, createSession, deleteSession as deleteSessionApi } from '../api.js';
+import { fetchSessions, createSession, deleteSession as deleteSessionApi, fetchAgentMessages } from '../api.js?v=2.5';
 import { escapeHtml } from './utils.js';
+import { appendMessage } from './ui.js';
 
 /* ===== SESSION MANAGEMENT ===== */
 export async function loadSessions() {
@@ -41,7 +42,7 @@ export async function createNewSession(agentId) {
         var data = await createSession(agentId);
         if (data.sessionId) {
             window.currentSessionId = data.sessionId;
-            clearChatArea();
+            await loadAgentMessages(agentId);
             loadSessions();
         }
     } catch (err) {
@@ -58,7 +59,7 @@ export async function selectSession(sessionId, agentId) {
 
     // Switch agent if needed (dynamic import to avoid circular dependency)
     if (agentId && agentId !== window.currentAgent) {
-        var { selectAgent } = await import('./agents.js');
+        var { selectAgent } = await import('./agents.js?v=2.5');
         await selectAgent(agentId);
     } else {
         // Focus input if not switching agents
@@ -117,4 +118,25 @@ function clearChatArea() {
     window.rounds = [];
     window.currentRound = null;
     window.roundNumber = 0;
+}
+
+async function loadAgentMessages(agentId) {
+    clearChatArea();
+    try {
+        var messages = await fetchAgentMessages(agentId);
+        if (!Array.isArray(messages) || messages.length === 0) {
+            return;
+        }
+        var chatEmpty = document.getElementById('chatEmpty');
+        if (chatEmpty) {
+            chatEmpty.style.display = 'none';
+        }
+        messages.forEach(function(message) {
+            var role = message.role === 'assistant' ? 'agent' : message.role;
+            appendMessage(role, message.content || '', null, message.thinkingContent || '');
+            window.messageCount++;
+        });
+    } catch (err) {
+        console.error('Failed to load agent messages', err);
+    }
 }

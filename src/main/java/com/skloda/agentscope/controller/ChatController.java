@@ -3,13 +3,17 @@ package com.skloda.agentscope.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.AgentConfigService;
+import com.skloda.agentscope.agent.SamplePrompt;
 import com.skloda.agentscope.model.*;
 import com.skloda.agentscope.runtime.AgentRuntime;
 import com.skloda.agentscope.service.AgentService;
 import com.skloda.agentscope.service.ApprovalService;
+import com.skloda.agentscope.service.ChatHistoryRepository;
 import com.skloda.agentscope.service.SessionManagerService;
+import io.agentscope.core.message.ContentBlock;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.TextBlock;
+import io.agentscope.core.message.ToolResultBlock;
 import io.agentscope.core.message.ToolUseBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +33,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -55,6 +60,9 @@ public class ChatController {
 
     @Autowired
     private ApprovalService approvalService;
+
+    @Autowired
+    private ChatHistoryRepository chatHistoryRepository;
 
     @GetMapping("/")
     public String chat() {
@@ -152,7 +160,6 @@ public class ChatController {
         approvalService.removePendingApproval(request.getApprovalId());
 
         if (!request.isApproved()) {
-            // Build rejection ToolResultBlocks for each pending tool call
             Msg rejectionMsg = buildRejectionMessage(pa.getPendingToolCalls(), request.getReason());
             AgentRuntime resumeRuntime = new AgentRuntime(pa.getAgent(), pa.getHook());
             return resumeRuntime.stream(rejectionMsg, true)
@@ -175,15 +182,19 @@ public class ChatController {
 
     private Msg buildRejectionMessage(List<ToolUseBlock> pendingToolCalls, String reason) {
         String rejectionText = reason != null && !reason.isBlank() ? reason : "Operation rejected by user";
-        StringBuilder content = new StringBuilder();
-        content.append("The following tool calls were rejected by the user:\n\n");
-        for (ToolUseBlock tub : pendingToolCalls) {
-            content.append("- ").append(tub.getName()).append(": ").append(rejectionText).append("\n");
-        }
-        content.append("\nPlease inform the user that the operation was not executed and explain why.");
+        List<ContentBlock> results = pendingToolCalls.stream()
+                .map(tub -> ToolResultBlock.builder()
+                        .id(tub.getId())
+                        .name(tub.getName())
+                        .output(TextBlock.builder()
+                                .text("Tool call rejected by user: " + rejectionText)
+                                .build())
+                        .build())
+                .map(ContentBlock.class::cast)
+                .toList();
 
         return Msg.builder()
-                .content(TextBlock.builder().text(content.toString()).build())
+                .content(results)
                 .build();
     }
 
@@ -195,7 +206,10 @@ public class ChatController {
     @GetMapping("/api/sessions")
     @ResponseBody
     public List<SessionInfo> listSessions() {
-        return sessionManagerService.listSessions();
+        return sessionManagerService.listSessions().stream()
+                .peek(info -> info.setMessageCount(
+                        chatHistoryRepository.findByAgentId(info.getAgentId()).size()))
+                .toList();
     }
 
     /**
@@ -206,12 +220,13 @@ public class ChatController {
     public ResponseEntity<?> createSession(@RequestBody Map<String, String> body) {
         String agentId = body.getOrDefault("agentId", "chat-basic");
         try {
-            SessionManagerService.SessionContext ctx = sessionManagerService.createNewSession(agentId);
+            SessionManagerService.SessionContext ctx = sessionManagerService.getOrCreateSessionForAgent(agentId);
             SessionInfo info = new SessionInfo();
             info.setSessionId(ctx.getSessionId());
             info.setAgentId(ctx.getAgentId());
             AgentConfig cfg = agentConfigService.findAgentConfig(ctx.getAgentId()).orElse(null);
             info.setAgentName(cfg != null ? cfg.getName() : ctx.getAgentId());
+            info.setMessageCount(chatHistoryRepository.findByAgentId(ctx.getAgentId()).size());
             return ResponseEntity.ok(info);
         } catch (Exception e) {
             log.error("Failed to create session for agent: {}", agentId, e);
@@ -225,8 +240,21 @@ public class ChatController {
     @DeleteMapping("/api/sessions/{sessionId}")
     @ResponseBody
     public ResponseEntity<?> deleteSession(@PathVariable String sessionId) {
+        SessionManagerService.SessionContext ctx = sessionManagerService.getSession(sessionId);
+        if (ctx != null) {
+            chatHistoryRepository.clear(ctx.getAgentId());
+        }
         sessionManagerService.deleteSession(sessionId);
         return ResponseEntity.ok(Map.of("deleted", true));
+    }
+
+    /**
+     * Load the in-memory chat transcript for an agent.
+     */
+    @GetMapping("/api/agents/{agentId}/messages")
+    @ResponseBody
+    public List<ChatMessage> listAgentMessages(@PathVariable String agentId) {
+        return chatHistoryRepository.findByAgentId(agentId);
     }
 
     // ---- Agent Config Endpoints ----
@@ -237,7 +265,9 @@ public class ChatController {
     @GetMapping("/api/agents")
     @ResponseBody
     public List<AgentConfig> listAgents() {
-        return agentConfigService.getAllAgents();
+        return agentConfigService.getAllAgents().stream()
+                .map(this::toAgentConfigPreview)
+                .toList();
     }
 
     /**
@@ -250,7 +280,79 @@ public class ChatController {
         if (config.isEmpty()) {
             return ResponseEntity.status(404).body(Map.of("error", "Agent not found: " + agentId));
         }
-        return ResponseEntity.ok(config.get());
+        return ResponseEntity.ok(toAgentConfigPreview(config.get()));
+    }
+
+    /**
+     * Get the full text for one sample prompt. Agent lists only expose previews.
+     */
+    @GetMapping("/api/agents/{agentId}/sample-prompts/{index}")
+    @ResponseBody
+    public ResponseEntity<?> getSamplePrompt(@PathVariable String agentId, @PathVariable int index) {
+        Optional<AgentConfig> config = agentConfigService.findAgentConfig(agentId);
+        if (config.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("error", "Agent not found: " + agentId));
+        }
+        List<SamplePrompt> prompts = config.get().getSamplePrompts();
+        if (index < 0 || index >= prompts.size()) {
+            return ResponseEntity.status(404).body(Map.of("error", "Sample prompt not found: " + index));
+        }
+        SamplePrompt sample = prompts.get(index);
+        return ResponseEntity.ok(Map.of(
+                "agentId", agentId,
+                "index", index,
+                "prompt", sample.getPrompt() != null ? sample.getPrompt() : "",
+                "expectedBehavior", sample.getExpectedBehavior() != null ? sample.getExpectedBehavior() : ""
+        ));
+    }
+
+    private AgentConfig toAgentConfigPreview(AgentConfig source) {
+        AgentConfig target = new AgentConfig();
+        target.setAgentId(source.getAgentId());
+        target.setName(source.getName());
+        target.setDescription(source.getDescription());
+        target.setSystemPrompt(source.getSystemPrompt());
+        target.setModelName(source.getModelName());
+        target.setStreaming(source.isStreaming());
+        target.setEnableThinking(source.isEnableThinking());
+        target.setSkills(new ArrayList<>(source.getSkills()));
+        target.setUserTools(new ArrayList<>(source.getUserTools()));
+        target.setSystemTools(new ArrayList<>(source.getSystemTools()));
+        target.setAutoContext(source.isAutoContext());
+        target.setAutoContextMsgThreshold(source.getAutoContextMsgThreshold());
+        target.setAutoContextLastKeep(source.getAutoContextLastKeep());
+        target.setAutoContextTokenRatio(source.getAutoContextTokenRatio());
+        target.setRagEnabled(source.isRagEnabled());
+        target.setRagRetrieveLimit(source.getRagRetrieveLimit());
+        target.setRagScoreThreshold(source.getRagScoreThreshold());
+        target.setRagMode(source.getRagMode());
+        target.setModality(source.getModality());
+        target.setCategory(source.getCategory());
+        target.setApprovalRequired(source.isApprovalRequired());
+        target.setApprovalTools(new ArrayList<>(source.getApprovalTools()));
+        target.setStructuredOutputClass(source.getStructuredOutputClass());
+        target.setStructuredOutputReminder(source.getStructuredOutputReminder());
+        target.setType(source.getType());
+        target.setSubAgents(new ArrayList<>(source.getSubAgents()));
+        target.setParallel(source.getParallel());
+        target.setHandoffTriggers(new ArrayList<>(source.getHandoffTriggers()));
+        target.setSamplePrompts(source.getSamplePrompts().stream()
+                .map(sample -> new SamplePrompt(preview(sample.getPrompt()),
+                        sample.getExpectedBehavior() != null ? sample.getExpectedBehavior() : ""))
+                .toList());
+        return target;
+    }
+
+    private String preview(String text) {
+        if (text == null) {
+            return "";
+        }
+        String normalized = text.replaceAll("\\s+", " ").trim();
+        int maxLength = 96;
+        if (normalized.length() <= maxLength) {
+            return normalized;
+        }
+        return normalized.substring(0, maxLength) + "...";
     }
 
     /**

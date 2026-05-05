@@ -72,8 +72,24 @@ class AgentSamplePromptsConfigTest {
                     agents.get("invoice-extractor").getStructuredOutputClass());
             assertEquals("com.skloda.agentscope.schema.IDCardData",
                     agents.get("idcard-extractor").getStructuredOutputClass());
+            assertEquals("com.skloda.agentscope.schema.ContractMetadata",
+                    agents.get("contract-extractor").getStructuredOutputClass());
             assertEquals("PROMPT", agents.get("invoice-extractor").getStructuredOutputReminder());
             assertEquals("PROMPT", agents.get("idcard-extractor").getStructuredOutputReminder());
+            assertEquals("PROMPT", agents.get("contract-extractor").getStructuredOutputReminder());
+
+            AgentConfig contractReview = agents.get("contract-review-workflow");
+            assertNotNull(contractReview, "contract-review-workflow should exist");
+            assertEquals("合同审查工作流", contractReview.getName());
+            assertTrue(contractReview.getUserTools().contains("generate_contract_review_report"),
+                    "contract-review-workflow should be able to generate review reports");
+            assertTrue(contractReview.getApprovalTools().contains("generate_contract_review_report"),
+                    "contract-review-workflow should require approval before writing reports");
+            assertTrue(contractReview.getSamplePrompts().stream()
+                            .anyMatch(samplePrompt -> samplePrompt.getPrompt().contains("蓝海科技有限公司")
+                                    && samplePrompt.getPrompt().contains("生成合同审查报告")
+                                    && samplePrompt.getPrompt().length() > 300),
+                    "contract-review-workflow should include a complete manual review sample prompt");
         } catch (Exception e) {
             throw new AssertionError("Failed to load agents.yml", e);
         }

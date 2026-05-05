@@ -1,12 +1,12 @@
-import './state.js';
-import { createSSEParser, uploadFile, fetchAgents, fetchSessions, createSession as createSessionApi, deleteSession as deleteSessionApi, fetchKnowledgeDocs, uploadKnowledgeDoc, removeKnowledgeDoc as removeKnowledgeDocApi, fetchSkillInfo, fetchToolInfo } from './api.js';
-import { renderMarkdown, escapeHtml, getTimestamp, formatDuration, scrollToBottom, createFileList } from './modules/utils.js';
-import { chatMessages, messageInput, sendBtn, chatEmpty, chatHeaderName, chatHeaderDesc, debugPanel, debugRounds, debugToggle, appendMessage, createThinkingBox, updateThinkingBox, collapseThinkingBox, completeThinkingBox, addAgentBubble, removeTypingIndicator, setStreamingState, showTypingIndicator, createAgentMessageWrapper } from './modules/ui.js';
-import { startRound, endRound, addTimelineRow, addTimelineRowForRound, clearDebug, toggleDebug, handlePipelineStart, handlePipelineStepStart, handlePipelineStepEnd, handleRoutingDecision, handleHandoffStart, updateRoundMetrics, updateRoundMetricsForRound } from './modules/debug.js';
-import { loadAgents, selectAgent, showAgentConfig, showSkillInfo, showToolInfo } from './modules/agents.js';
-import { loadSessions, createNewSession, selectSession, deleteSession, clearSession as clearSessionFn } from './modules/session.js';
-import { loadKnowledgeDocs, uploadToKnowledge, removeKnowledgeDoc } from './modules/knowledge.js';
-import { initUpload } from './modules/upload.js';
+import './state.js?v=2.4';
+import { createSSEParser, uploadFile, fetchAgents, fetchSessions, createSession as createSessionApi, deleteSession as deleteSessionApi, fetchKnowledgeDocs, uploadKnowledgeDoc, removeKnowledgeDoc as removeKnowledgeDocApi, fetchSkillInfo, fetchToolInfo } from './api.js?v=2.5';
+import { renderMarkdown, escapeHtml, getTimestamp, formatDuration, scrollToBottom, createFileList } from './modules/utils.js?v=2.4';
+import { chatMessages, messageInput, sendBtn, chatEmpty, chatHeaderName, chatHeaderDesc, debugPanel, debugRounds, debugToggle, appendMessage, createThinkingBox, updateThinkingBox, collapseThinkingBox, completeThinkingBox, addAgentBubble, addAgentBubbleAfter, removeTypingIndicator, setStreamingState, showTypingIndicator, createAgentMessageWrapper } from './modules/ui.js?v=2.4';
+import { startRound, endRound, addTimelineRow, addTimelineRowForRound, clearDebug, toggleDebug, handlePipelineStart, handlePipelineStepStart, handlePipelineStepEnd, handleRoutingDecision, handleHandoffStart, updateRoundMetrics, updateRoundMetricsForRound } from './modules/debug.js?v=2.4';
+import { loadAgents, selectAgent, showAgentConfig, showSkillInfo, showToolInfo } from './modules/agents.js?v=2.5';
+import { loadSessions, createNewSession, selectSession, deleteSession, clearSession as clearSessionFn } from './modules/session.js?v=2.5';
+import { loadKnowledgeDocs, uploadToKnowledge, removeKnowledgeDoc } from './modules/knowledge.js?v=2.4';
+import { initUpload } from './modules/upload.js?v=2.5';
 
 /* ===== INPUT HANDLING ===== */
 messageInput.addEventListener('keydown', function(e) {
@@ -318,6 +318,7 @@ async function sendMessage() {
                         case 'done':
                             console.log('[SSE] Received done event, currentRound:', currentRound ? '#' + currentRound.number : 'null');
                             completeThinkingBox();
+                            removeTypingIndicator();
                             isStreaming = false;
                             setStreamingState(false);
                             endRound('success');
@@ -437,11 +438,19 @@ function stopStreaming() {
 
 window.submitApproval = async function(approvalId, approved) {
     var statusEl = document.getElementById('approval-status-' + approvalId);
-    if (statusEl) statusEl.textContent = approved ? 'Approved, resuming...' : 'Rejected';
+    if (statusEl) {
+        statusEl.innerHTML = '<span class="approval-status-dot"></span>' + (approved ? '已批准，正在继续执行' : '已拒绝');
+    }
 
     // Disable buttons
     var card = document.getElementById('approval-card-' + approvalId);
     if (card) {
+        card.classList.add('approval-collapsed');
+        card.classList.add(approved ? 'approval-approved' : 'approval-rejected');
+        var header = card.querySelector('.approval-header');
+        if (header) {
+            header.setAttribute('aria-expanded', 'false');
+        }
         var btns = card.querySelectorAll('.approval-btn');
         btns.forEach(function(b) { b.disabled = true; });
     }
@@ -451,6 +460,9 @@ window.submitApproval = async function(approvalId, approved) {
     roundNumber++;
     startRound(approved ? 'Approval: Approve' : 'Approval: Reject', roundNumber, currentAgent, agents);
     showTypingIndicator();
+    window.currentAgentMessageWrapper = null;
+    window.currentThinkingBox = null;
+    window.thinkingContent = '';
 
     try {
         var response = await fetch('/chat/approve', {
@@ -478,7 +490,8 @@ window.submitApproval = async function(approvalId, approved) {
                     switch (payload.type) {
                         case 'text':
                             if (!agentBubble) {
-                                agentBubble = addAgentBubble();
+                                removeTypingIndicator();
+                                agentBubble = card ? addAgentBubbleAfter(card) : addAgentBubble();
                                 agentRawMarkdown = '';
                             }
                             agentRawMarkdown += (payload.content || '');
@@ -488,6 +501,10 @@ window.submitApproval = async function(approvalId, approved) {
                             break;
                         case 'done':
                             completeThinkingBox();
+                            removeTypingIndicator();
+                            if (approved && statusEl) {
+                                statusEl.innerHTML = '<span class="approval-status-dot"></span>已批准';
+                            }
                             isStreaming = false;
                             setStreamingState(false);
                             endRound('success');
@@ -495,7 +512,8 @@ window.submitApproval = async function(approvalId, approved) {
                             break;
                         case 'error':
                             completeThinkingBox();
-                            if (!agentBubble) agentBubble = addAgentBubble();
+                            removeTypingIndicator();
+                            if (!agentBubble) agentBubble = card ? addAgentBubbleAfter(card) : addAgentBubble();
                             agentBubble.textContent += '\n\n[ERROR] ' + (payload.message || 'Unknown error');
                             endRound('error');
                             isStreaming = false;
@@ -524,6 +542,16 @@ window.submitApproval = async function(approvalId, approved) {
     }
 };
 
+window.toggleApprovalCard = function(approvalId) {
+    var card = document.getElementById('approval-card-' + approvalId);
+    if (!card) return;
+    card.classList.toggle('approval-collapsed');
+    var header = card.querySelector('.approval-header');
+    if (header) {
+        header.setAttribute('aria-expanded', String(!card.classList.contains('approval-collapsed')));
+    }
+};
+
 /* ===== UI COMPONENTS ===== */
 
 function createApprovalCard(data) {
@@ -532,28 +560,151 @@ function createApprovalCard(data) {
     card.id = 'approval-card-' + data.approvalId;
 
     var toolListHtml = (data.toolCalls || []).map(function(tc) {
+        var inputParams = getApprovalInputParams(tc);
         return '<div class="approval-tool-item">' +
-            '<span class="approval-tool-name">' + escapeHtml(tc.name || '') + '</span>' +
-            '<pre class="approval-tool-params">' + escapeHtml(tc.input || '{}') + '</pre>' +
+            '<div class="approval-tool-title">' +
+                '<span class="approval-tool-name">' + escapeHtml(getApprovalToolLabel(tc.name || '')) + '</span>' +
+                '<span class="approval-tool-action">等待人工确认</span>' +
+            '</div>' +
+            renderApprovalSummary(tc.name || '', inputParams) +
+            '<details class="approval-raw">' +
+                '<summary>查看原始参数</summary>' +
+                '<pre class="approval-tool-params">' + escapeHtml(formatApprovalRawParams(inputParams, tc.input || '{}')) + '</pre>' +
+            '</details>' +
             '</div>';
     }).join('');
 
     card.innerHTML =
         '<div class="message-content">' +
-            '<div class="approval-header">' +
-                '<span class="approval-icon">&#9888;</span> Human Approval Required' +
-            '</div>' +
-            '<div class="approval-tools">' + toolListHtml + '</div>' +
-            '<div class="approval-actions">' +
-                '<button class="approval-btn approve" onclick="submitApproval(\'' +
-                    data.approvalId + '\', true)">Approve</button>' +
-                '<button class="approval-btn reject" onclick="submitApproval(\'' +
-                    data.approvalId + '\', false)">Reject</button>' +
+            '<button class="approval-header" type="button" onclick="toggleApprovalCard(\'' +
+                data.approvalId + '\')" aria-expanded="true" aria-controls="approval-body-' + data.approvalId + '">' +
+                '<span class="approval-icon">&#9888;</span>' +
+                '<span class="approval-header-text">请求人工审批</span>' +
+                '<span class="approval-toggle" aria-hidden="true">&#9660;</span>' +
+            '</button>' +
+            '<div class="approval-body" id="approval-body-' + data.approvalId + '">' +
+                '<div class="approval-tools">' + toolListHtml + '</div>' +
+                '<div class="approval-actions">' +
+                    '<button class="approval-btn approve" onclick="submitApproval(\'' +
+                        data.approvalId + '\', true)">批准执行</button>' +
+                    '<button class="approval-btn reject" onclick="submitApproval(\'' +
+                        data.approvalId + '\', false)">拒绝</button>' +
+                '</div>' +
             '</div>' +
             '<div class="approval-status" id="approval-status-' + data.approvalId + '"></div>' +
         '</div>';
 
     return card;
+}
+
+function getApprovalInputParams(toolCall) {
+    if (toolCall.inputParams && typeof toolCall.inputParams === 'object') {
+        return toolCall.inputParams;
+    }
+    return parseApprovalInputString(toolCall.input || '{}');
+}
+
+function parseApprovalInputString(input) {
+    if (!input || typeof input !== 'string') return {};
+    var trimmed = input.trim();
+    if (!trimmed) return {};
+    try {
+        return JSON.parse(trimmed);
+    } catch (e) {
+        // AgentScope Map#toString fallback: {key=value, another=value}
+    }
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        trimmed = trimmed.slice(1, -1);
+    }
+    var result = {};
+    var matches = trimmed.matchAll(/(?:^|,\s*)([A-Za-z][A-Za-z0-9_]*)=/g);
+    var positions = Array.from(matches);
+    positions.forEach(function(match, index) {
+        var key = match[1];
+        var valueStart = match.index + match[0].length;
+        var valueEnd = index + 1 < positions.length ? positions[index + 1].index : trimmed.length;
+        result[key] = trimmed.slice(valueStart, valueEnd).trim();
+    });
+    return result;
+}
+
+function renderApprovalSummary(toolName, params) {
+    if (toolName === 'generate_contract_review_report') {
+        return renderContractReviewApproval(params);
+    }
+
+    var rows = Object.keys(params).map(function(key) {
+        return renderApprovalField(key, key, params[key]);
+    }).join('');
+    return '<div class="approval-field-grid">' + rows + '</div>';
+}
+
+function renderContractReviewApproval(params) {
+    var riskLevel = String(params.overallRiskLevel || '').toUpperCase();
+    var riskClass = riskLevel ? ' risk-' + riskLevel.toLowerCase() : '';
+    var summary = params.summary || params.risksSummary || '';
+
+    return '<div class="approval-review">' +
+        '<div class="approval-decision-strip">' +
+            '<span class="approval-decision-label">即将生成报告</span>' +
+            (riskLevel ? '<span class="approval-risk-badge' + riskClass + '">' + escapeHtml(riskLevel) + '</span>' : '') +
+        '</div>' +
+        renderApprovalSection('基本信息', [
+            ['合同名称', params.contractTitle],
+            ['合同编号', params.contractNumber],
+            ['甲方', params.partyA],
+            ['乙方', params.partyB],
+            ['生效日期', params.effectiveDate],
+            ['到期日期', params.expiryDate],
+            ['合同金额', formatApprovalAmount(params.totalAmount, params.currency)]
+        ]) +
+        renderApprovalSection('审查结论', [
+            ['摘要', summary],
+            ['关键条款', params.keyClausesSummary],
+            ['风险与建议', params.risksSummary]
+        ], true) +
+        '</div>';
+}
+
+function renderApprovalSection(title, fields, allowLongText) {
+    var rows = fields
+        .filter(function(field) { return field[1] !== undefined && field[1] !== null && String(field[1]).trim() !== ''; })
+        .map(function(field) { return renderApprovalField(field[0], field[0], field[1], allowLongText); })
+        .join('');
+    if (!rows) return '';
+    return '<section class="approval-section">' +
+        '<div class="approval-section-title">' + escapeHtml(title) + '</div>' +
+        '<div class="approval-field-grid">' + rows + '</div>' +
+        '</section>';
+}
+
+function renderApprovalField(label, key, value, allowLongText) {
+    var text = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
+    var longClass = allowLongText || text.length > 80 ? ' long' : '';
+    return '<div class="approval-field' + longClass + '">' +
+        '<div class="approval-field-label">' + escapeHtml(label || key) + '</div>' +
+        '<div class="approval-field-value">' + escapeHtml(text) + '</div>' +
+        '</div>';
+}
+
+function formatApprovalAmount(amount, currency) {
+    if (amount === undefined || amount === null || amount === '') return '';
+    return String(amount) + (currency ? ' ' + String(currency) : '');
+}
+
+function getApprovalToolLabel(toolName) {
+    var labels = {
+        generate_contract_review_report: '生成合同审查报告',
+        generate_bank_invoice: '生成银行发票'
+    };
+    return labels[toolName] || toolName;
+}
+
+function formatApprovalRawParams(params, fallback) {
+    if (params && Object.keys(params).length > 0) {
+        return JSON.stringify(params, null, 2);
+    }
+    return fallback;
 }
 
 function createStructuredDataCard(schemaClass, dataJson) {

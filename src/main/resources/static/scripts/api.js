@@ -46,6 +46,15 @@ export async function fetchAgents() {
     return await response.json();
 }
 
+export async function fetchSamplePrompt(agentId, index) {
+    var response = await fetch('/api/agents/' + encodeURIComponent(agentId) + '/sample-prompts/' + index);
+    if (!response.ok) {
+        var err = await response.json();
+        throw new Error(err.error || 'Sample prompt not found');
+    }
+    return await response.json();
+}
+
 /* ===== SESSION API ===== */
 export async function fetchSessions() {
     var response = await fetch('/api/sessions');
@@ -63,6 +72,11 @@ export async function createSession(agentId) {
 
 export async function deleteSession(sessionId) {
     return await fetch('/api/sessions/' + sessionId, { method: 'DELETE' });
+}
+
+export async function fetchAgentMessages(agentId) {
+    var response = await fetch('/api/agents/' + encodeURIComponent(agentId) + '/messages');
+    return await response.json();
 }
 
 /* ===== KNOWLEDGE API ===== */

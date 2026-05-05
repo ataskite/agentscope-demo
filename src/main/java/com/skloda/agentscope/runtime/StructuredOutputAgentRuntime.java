@@ -5,6 +5,7 @@ import com.skloda.agentscope.hook.ObservabilityHook;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.message.ContentBlock;
 import io.agentscope.core.message.Msg;
+import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
 import lombok.Getter;
 import org.slf4j.Logger;
@@ -25,20 +26,32 @@ public class StructuredOutputAgentRuntime implements StreamingAgentRuntime {
 
     private static final Logger log = LoggerFactory.getLogger(StructuredOutputAgentRuntime.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final int DEFAULT_MAX_REPAIR_ATTEMPTS = 1;
 
     @Getter
     private final ReActAgent agent;
     @Getter
     private final ObservabilityHook hook;
     private final String structuredOutputClassName;
+    private final StructuredOutputValidator validator;
+    private final int maxRepairAttempts;
     private final Sinks.Many<Map<String, Object>> sink;
     private final BiConsumer<String, Map<String, Object>> hookBridge;
 
     public StructuredOutputAgentRuntime(ReActAgent agent, ObservabilityHook hook,
                                          String structuredOutputClassName) {
+        this(agent, hook, structuredOutputClassName, new StructuredOutputValidator(), DEFAULT_MAX_REPAIR_ATTEMPTS);
+    }
+
+    StructuredOutputAgentRuntime(ReActAgent agent, ObservabilityHook hook,
+                                 String structuredOutputClassName,
+                                 StructuredOutputValidator validator,
+                                 int maxRepairAttempts) {
         this.agent = agent;
         this.hook = hook;
         this.structuredOutputClassName = structuredOutputClassName;
+        this.validator = validator;
+        this.maxRepairAttempts = maxRepairAttempts;
         this.sink = Sinks.many().multicast().onBackpressureBuffer();
 
         this.hookBridge = (type, data) -> {
@@ -60,31 +73,55 @@ public class StructuredOutputAgentRuntime implements StreamingAgentRuntime {
             try {
                 Class<?> schemaClass = Class.forName(structuredOutputClassName);
 
-                Msg response = agent.call(userMsg, schemaClass).block();
+                Msg response = null;
+                Object structuredData = null;
+                StructuredOutputValidator.ValidationResult validation = null;
 
-                if (response != null) {
-                    // Emit text content
-                    if (response.getContent() != null) {
-                        for (ContentBlock block : response.getContent()) {
-                            if (block instanceof TextBlock tb) {
-                                String text = tb.getText();
-                                if (text != null && !text.isEmpty()) {
-                                    fluxSink.next(Map.of("type", "text", "content", text));
-                                }
-                            }
-                        }
+                for (int attempt = 0; attempt <= maxRepairAttempts; attempt++) {
+                    Msg request = attempt == 0
+                            ? userMsg
+                            : buildRepairMessage(schemaClass, validation);
+                    response = agent.call(request, schemaClass).block();
+                    emitTextContent(response, fluxSink);
+
+                    structuredData = extractStructuredData(response, schemaClass);
+                    validation = validator.validate(structuredData);
+                    if (validation.valid()) {
+                        fluxSink.next(Map.of(
+                                "type", "structured_validation_passed",
+                                "schemaClass", structuredOutputClassName,
+                                "attempt", attempt
+                        ));
+                        break;
                     }
 
-                    // Emit structured data
-                    Object structuredData = response.getStructuredData(schemaClass);
-                    if (structuredData != null) {
-                        String json = objectMapper.writeValueAsString(structuredData);
+                    fluxSink.next(Map.of(
+                            "type", "structured_validation_failed",
+                            "schemaClass", structuredOutputClassName,
+                            "attempt", attempt,
+                            "missingFields", validation.missingFields(),
+                            "message", validation.message()
+                    ));
+                    if (attempt < maxRepairAttempts) {
                         fluxSink.next(Map.of(
-                                "type", "structured_data",
+                                "type", "structured_repair_start",
                                 "schemaClass", structuredOutputClassName,
-                                "data", json
+                                "attempt", attempt + 1,
+                                "missingFields", validation.missingFields()
                         ));
                     }
+                }
+
+                if (validation == null || validation.invalid()) {
+                    fluxSink.next(Map.of("type", "error", "message",
+                            validation != null ? validation.message() : "Structured output validation failed."));
+                } else if (structuredData != null) {
+                    String json = objectMapper.writeValueAsString(structuredData);
+                    fluxSink.next(Map.of(
+                            "type", "structured_data",
+                            "schemaClass", structuredOutputClassName,
+                            "data", json
+                    ));
                 }
 
                 fluxSink.next(Map.of("type", "done"));
@@ -115,6 +152,45 @@ public class StructuredOutputAgentRuntime implements StreamingAgentRuntime {
                     this.sink.tryEmitComplete();
                     this.close();
                 });
+    }
+
+    private void emitTextContent(Msg response, reactor.core.publisher.FluxSink<Map<String, Object>> fluxSink) {
+        if (response == null || response.getContent() == null) {
+            return;
+        }
+        for (ContentBlock block : response.getContent()) {
+            if (block instanceof TextBlock tb) {
+                String text = tb.getText();
+                if (text != null && !text.isEmpty()) {
+                    fluxSink.next(Map.of("type", "text", "content", text));
+                }
+            }
+        }
+    }
+
+    private Object extractStructuredData(Msg response, Class<?> schemaClass) {
+        if (response == null || !response.hasStructuredData()) {
+            return null;
+        }
+        return response.getStructuredData(schemaClass);
+    }
+
+    private Msg buildRepairMessage(Class<?> schemaClass,
+                                   StructuredOutputValidator.ValidationResult validation) {
+        String missing = validation != null
+                ? String.join(", ", validation.missingFields())
+                : "unknown";
+        String content = """
+                The previous structured output for schema %s failed validation.
+                Missing or invalid fields: %s.
+                Return the same schema again with every required field completed.
+                Preserve correct values from the previous extraction when possible.
+                """.formatted(schemaClass.getSimpleName(), missing);
+        return Msg.builder()
+                .name("user")
+                .role(MsgRole.USER)
+                .textContent(content)
+                .build();
     }
 
     private void emit(Map<String, Object> payload) {

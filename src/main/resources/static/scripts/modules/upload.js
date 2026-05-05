@@ -1,4 +1,4 @@
-import { uploadFile } from '../api.js';
+import { uploadFile } from '../api.js?v=2.5';
 import { escapeHtml } from './utils.js';
 
 /* ===== INIT: bind upload events programmatically ===== */
@@ -58,7 +58,7 @@ async function handleFileSelect(input) {
             window.uploadedFile = data;
             showFileTag(data.fileName);
             if (window.currentAgent !== 'task-document-analysis') {
-                var { selectAgent } = await import('./agents.js');
+                var { selectAgent } = await import('./agents.js?v=2.5');
                 await selectAgent('task-document-analysis');
                 // selectAgent clears uploadedFile via removeFile(), restore it after
                 window.uploadedFile = data;
@@ -69,7 +69,7 @@ async function handleFileSelect(input) {
             window.uploadedImages.push(data);
             showImagePreviews();
             if (window.agents['vision-analyzer']) {
-                var { selectAgent } = await import('./agents.js');
+                var { selectAgent } = await import('./agents.js?v=2.5');
                 await selectAgent('vision-analyzer');
                 // Restore image data after agent switch
                 window.uploadedImages.push(data);
@@ -80,7 +80,7 @@ async function handleFileSelect(input) {
             window.uploadedAudio = data;
             showAudioPreview();
             if (window.agents['voice-assistant']) {
-                var { selectAgent } = await import('./agents.js');
+                var { selectAgent } = await import('./agents.js?v=2.5');
                 await selectAgent('voice-assistant');
                 // Restore audio data after agent switch
                 window.uploadedAudio = data;
