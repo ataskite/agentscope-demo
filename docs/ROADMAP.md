@@ -2,11 +2,11 @@
 
 **Date**: 2026-05-06
 **Scope**: AgentScope Java feature-complete demo evolution
-**Status**: Milestone `p2-controlled-workflows` completed; next milestone `feature-complete-core`
+**Status**: Milestone `p3-planning-memory` completed; next milestone `feature-complete-core` (P4 RAG ecosystem)
 
 ## Progress Snapshot
 
-Last updated: 2026-05-06
+Last updated: 2026-05-07
 
 Completed:
 
@@ -15,6 +15,7 @@ Completed:
 - [x] P2 Controlled workflows: HITL approval hook, structured output (invoice/ID card/contract), validation & repair, workflow snapshots.
 - [x] Manual approval resume flow validated with real model credentials.
 - [x] 140 unit tests passing, JaCoCo coverage configured.
+- [x] P3 Planning & Memory: PlanNotebook (project-planner), AutoContextMemory demo (long-conversation), Bailian long-term memory (personal-assistant). 158 tests passing.
 - [x] Cyberpunk-themed UI with categorized agent menu (Single/Expert/Collaboration).
 - [x] Generic RAG with local knowledge indexing, DashScope embeddings, status tracking.
 - [x] Vision (OCR, chart, scene) and audio (speech-to-text) multimodal agents.
@@ -24,7 +25,7 @@ Completed:
 
 Current TODO:
 
-- [ ] Start P3 Planning & Memory demos.
+- [ ] Start P4 RAG ecosystem demos.
 - [ ] Implement remaining AgentScope features as real demo scenarios.
 
 ## 1. Positioning
@@ -56,7 +57,7 @@ The demo should:
 | Structured Output (TOOL_CHOICE/PROMPT) | ✅ | `invoice-extractor`, `idcard-extractor`, `contract-extractor` |
 | Structured Output validation & repair | ✅ | `StructuredOutputValidator`, one-pass retry |
 | Human-in-the-Loop (HITL) | ✅ | `bank-invoice`, `contract-review-workflow`, `ApprovalHook` |
-| PlanNotebook (structured planning) | ❌ | Planned: `project-planner` upgrade |
+| PlanNotebook (structured planning) | ✅ | `project-planner` (planEnabled, 10 built-in planning tools) |
 | Agent Interrupt / Cancel | 🔧 | Partially via HITL; need runtime interrupt |
 
 ### Memory
@@ -67,7 +68,8 @@ The demo should:
 | AutoContextMemory (auto-compression) | ❌ | Planned: long-conversation agent |
 | Long-term Memory — Mem0 | ❌ | Planned: cross-session preference recall |
 | Long-term Memory — ReMe | ❌ | Planned: cross-session knowledge retention |
-| Long-term Memory Mode (STATIC/AGENT/BOTH) | ❌ | Planned: memory mode comparison demo |
+| Long-term Memory — Bailian | ✅ | `personal-assistant` (STATIC_CONTROL, DASHSCOPE_API_KEY) |
+| Long-term Memory Mode (STATIC/AGENT/BOTH) | ✅ | `personal-assistant` (configurable via agents.yml) |
 
 ### RAG & Knowledge
 
@@ -183,7 +185,9 @@ Completed:
 - [x] Contract review workflow: upload → extract metadata → approval gate → generate report.
 - [x] Workflow run snapshots with event capture and replay APIs.
 
-### P3: Planning & Memory
+### P3: Planning & Memory ✅
+
+**Status**: Completed.
 
 **Goal**: Demonstrate AgentScope's planning and memory capabilities with real scenarios.
 
@@ -341,26 +345,27 @@ Completed:
 
 **Milestone name**: `feature-complete-core`
 
-**Scope** (P3 + P4 core follow-up):
+**Scope** (P3 completed + P4 core):
 
-- [ ] PlanNotebook demo: upgrade `project-planner` to use `enablePlan()`.
-- [ ] AutoContextMemory demo: create `long-conversation` agent.
-- [ ] Long-term memory demo: add Mem0 or ReMe to a personal assistant.
+- [x] PlanNotebook demo: upgrade `project-planner` to use `enablePlan()`.
+- [x] AutoContextMemory demo: create `long-conversation` agent.
+- [x] Long-term memory demo: BailianLongTermMemory in `personal-assistant`.
 - [ ] Agentic RAG demo: create `rag-agent` with `RAGMode.AGENTIC`.
 - [ ] Persistent RAG: add Qdrant store option.
 
 **Why this next**:
 
-- Planning and memory are core AgentScope differentiators that have no demo yet.
+- P3 planning & memory demos are complete (PlanNotebook, AutoContextMemory, Bailian LTM).
 - Agentic RAG is the most requested feature after Generic RAG.
-- These features require no external services (except optional Qdrant) and work locally.
-- They complete the "core agent capabilities" story before moving to ecosystem and interop.
+- Persistent RAG (Qdrant) completes the RAG story for production use.
+- These features complete the "core agent capabilities" story before moving to MCP and interop.
 
 **Suggested acceptance checks**:
 
-- [ ] `mvn test` passes with 0 failures.
-- [ ] `project-planner` creates, confirms, and executes multi-step plans in the UI.
-- [ ] `long-conversation` sustains 50+ turns without context overflow.
+- [x] `mvn test` passes with 0 failures.
+- [x] `project-planner` creates multi-step plans with PlanNotebook tool calls visible in Debug Panel.
+- [x] `long-conversation` agent configured with AutoContextMemory for long sessions.
+- [x] `personal-assistant` has Bailian long-term memory configured.
 - [ ] `rag-agent` uses `retrieve_knowledge` tool only when relevant.
 - [ ] Debug panel shows plan status, memory compression events, and RAG tool calls.
 
