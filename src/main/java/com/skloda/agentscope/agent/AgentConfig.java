@@ -47,6 +47,12 @@ public class AgentConfig {
     private String structuredOutputClass;
     private String structuredOutputReminder = "TOOL_CHOICE"; // TOOL_CHOICE or PROMPT
 
+    // PlanNotebook settings
+    private boolean planEnabled = false;
+
+    // Long-term memory settings
+    private LongTermMemoryConfig longTermMemory;
+
     // === Multi-agent fields ===
     private AgentType type = AgentType.SINGLE;
     private List<SubAgentConfig> subAgents = new ArrayList<>();
@@ -55,5 +61,13 @@ public class AgentConfig {
 
     // === Showcase fields ===
     private List<SamplePrompt> samplePrompts = new ArrayList<>();
+
+    @Setter
+    @Getter
+    public static class LongTermMemoryConfig {
+        private String type = "none";
+        private String mode = "STATIC_CONTROL";
+        private String userId = "default_user";
+    }
 
 }
