@@ -87,6 +87,13 @@
             <version>${agentscope.version}</version>
         </dependency>
 
+        <!-- AgentScope Bailian Long-term Memory -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-memory-bailian</artifactId>
+            <version>${agentscope.version}</version>
+        </dependency>
+
         <!-- Spring Boot Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -94,6 +101,14 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <repositories>
+        <!-- Maven Central (before Aliyun mirrors for latest artifacts) -->
+        <repository>
+            <id>central</id>
+            <url>https://repo1.maven.org/maven2</url>
+        </repository>
+    </repositories>
 
     <build>
         <plugins>
