@@ -465,21 +465,21 @@ agents:
   - agentId: project-planner
     category: single
     name: Project Planner
-    description: 项目规划和任务分解助手
+    description: 项目规划和任务分解助手，支持创建和执行结构化计划
     systemPrompt: |
-      你是一个项目规划助手。
+      你是一个项目规划助手，擅长将复杂任务分解为可执行的步骤。
       你可以帮助用户：
-      1. 将复杂任务分解为具体的步骤
+      1. 将复杂任务分解为具体的步骤和子任务
       2. 制定项目计划和时间表
       3. 识别任务依赖关系和风险
-      4. 提供执行建议和最佳实践
+      4. 跟踪任务执行进度
 
       当用户提出项目或任务时：
       1. 首先理解目标和范围
-      2. 将任务分解为可执行的步骤
-      3. 标注每个步骤的优先级和预估时间
-      4. 识别潜在的依赖和风险
-      5. 提供清晰的行动计划
+      2. 使用 create_plan 工具创建结构化计划
+      3. 按计划逐步执行子任务
+      4. 完成每个子任务时调用 finish_subtask
+      5. 全部完成后调用 finish_plan
 
       回答格式：
       - 使用清晰的标题和步骤编号
@@ -489,21 +489,77 @@ agents:
     modelName: qwen-plus
     streaming: true
     enableThinking: true
+    planEnabled: true
     autoContext: true
     autoContextMsgThreshold: 20
     autoContextLastKeep: 8
     autoContextTokenRatio: 0.3
     skills: []
     userTools: []
-    systemTools:
-      - plan_notebook
+    systemTools: []
     samplePrompts:
-      - prompt: "帮我规划一个两周内上线文档分析 Agent Demo 的项目计划"
-        expectedBehavior: "输出阶段拆解、优先级、时间估算和风险"
-      - prompt: "把“搭建知识库问答系统”拆成可以执行的任务清单"
-        expectedBehavior: "展示任务分解、依赖识别和执行建议"
-      - prompt: "评估一下下周交付这个 Demo 的主要风险，并给出应对方案"
-        expectedBehavior: "展示项目风险分析和行动计划"
+      - prompt: “帮我规划一个两周内上线文档分析 Agent Demo 的项目计划”
+        expectedBehavior: “使用 create_plan 创建结构化计划，逐步执行子任务”
+      - prompt: “把”搭建知识库问答系统”拆成可以执行的任务清单”
+        expectedBehavior: “创建计划，展示任务分解和依赖关系”
+      - prompt: “评估一下下周交付这个 Demo 的主要风险，并给出应对方案”
+        expectedBehavior: “创建风险分析计划，逐步评估并给出方案”
+
+  - agentId: long-conversation
+    category: single
+    name: 长对话助手
+    description: 支持超长对话的技术顾问，自动压缩上下文
+    systemPrompt: |
+      你是一个技术顾问助手，擅长各种技术领域的深入讨论。
+      你能够进行长时间的多轮对话，始终保持连贯性和准确性。
+      当对话变得很长时，系统会自动管理上下文，你不需要特殊处理。
+      请专注于提供准确、有深度的技术解答。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    autoContext: true
+    autoContextMsgThreshold: 20
+    autoContextLastKeep: 8
+    autoContextTokenRatio: 0.3
+    skills: []
+    userTools: []
+    systemTools: []
+    samplePrompts:
+      - prompt: “我想从零开始学习微服务架构，请从基础概念开始逐步讲解”
+        expectedBehavior: “开始详细的技术讲解，支持持续多轮深入讨论”
+      - prompt: “帮我分析 Java Spring Boot 和 Quarkus 的技术选型”
+        expectedBehavior: “深入对比分析，支持持续追问和细节讨论”
+
+  - agentId: personal-assistant
+    category: single
+    name: 个人助手
+    description: 跨会话记住你的偏好和习惯
+    systemPrompt: |
+      你是一个贴心的个人助手。
+      你能记住用户在对话中表达的偏好和习惯，在后续对话中自动应用。
+      例如：
+      - 语言偏好（中文/英文）
+      - 回答格式偏好（Markdown、列表、表格等）
+      - 技术栈偏好
+      - 沟通风格偏好
+
+      当用户表达偏好时，认真记住并在之后的对话中遵循。
+      如果用户问起，主动说明你记住的偏好。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    skills: []
+    userTools: []
+    systemTools: []
+    longTermMemory:
+      type: bailian
+      mode: STATIC_CONTROL
+      userId: default_user
+    samplePrompts:
+      - prompt: “我喜欢用中文回答，格式用 Markdown，技术栈偏好 Java”
+        expectedBehavior: “记住用户偏好，后续对话中遵循这些偏好”
+      - prompt: “按我的偏好介绍一下你自己”
+        expectedBehavior: “根据之前记住的偏好回答（中文、Markdown、Java）”
 
 # ============================================================
 # Phase 3: Multi-Agent Collaboration Configurations
