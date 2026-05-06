@@ -6,7 +6,10 @@ import io.agentscope.core.ReActAgent;
 import io.agentscope.core.formatter.dashscope.DashScopeChatFormatter;
 import io.agentscope.core.hook.Hook;
 import io.agentscope.core.memory.InMemoryMemory;
+import io.agentscope.core.memory.LongTermMemory;
+import io.agentscope.core.memory.LongTermMemoryMode;
 import io.agentscope.core.memory.Memory;
+import io.agentscope.core.memory.bailian.BailianLongTermMemory;
 import io.agentscope.core.memory.autocontext.AutoContextConfig;
 import io.agentscope.core.memory.autocontext.AutoContextMemory;
 import io.agentscope.core.memory.autocontext.ContextOffloadTool;
@@ -22,7 +25,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class AgentFactory {
@@ -100,6 +105,12 @@ public class AgentFactory {
                 .model(model)
                 .memory(memory);
 
+        // Enable PlanNotebook if configured
+        if (config.isPlanEnabled()) {
+            builder.enablePlan();
+            log.info("  Enabled PlanNotebook for agent: {}", agentId);
+        }
+
         Toolkit toolkit = new Toolkit();
 
         // Register ContextOffloadTool for AutoContextMemory
@@ -133,6 +144,17 @@ public class AgentFactory {
                     agentId, ragMode, config.getRagRetrieveLimit(), config.getRagScoreThreshold());
         }
 
+        // Configure long-term memory if enabled
+        if (config.getLongTermMemory() != null && !"none".equals(config.getLongTermMemory().getType())) {
+            LongTermMemory ltm = createLongTermMemory(config.getLongTermMemory());
+            if (ltm != null) {
+                LongTermMemoryMode mode = parseLtmMode(config.getLongTermMemory().getMode());
+                builder.longTermMemory(ltm).longTermMemoryMode(mode);
+                log.info("  Enabled long-term memory for agent: {} (type={}, mode={})",
+                        agentId, config.getLongTermMemory().getType(), mode);
+            }
+        }
+
         // Register hooks if provided
         if (hooks != null && hooks.length > 0) {
             builder.hooks(List.of(hooks));
@@ -144,21 +166,16 @@ public class AgentFactory {
 
     private void registerToolsAndSkills(ReActAgent.Builder builder, Toolkit toolkit,
                                          AgentConfig config, String agentId) {
-        // Register user tools (deduplicated — one instance per class)
-        for (Object toolInstance : toolRegistry.getDeduplicatedInstances(config.getUserTools())) {
-            toolkit.registerTool(toolInstance);
-            log.info("  Registered user tool class: {} for agent: {}", toolInstance.getClass().getSimpleName(), agentId);
-        }
+        // Collect tool names covered by skills to avoid double registration.
+        // SkillBox registers tools into inactive groups — if the same tool is also
+        // registered directly (ungrouped, active), isActiveTool checks the inactive
+        // group first and rejects the call with "Unauthorized tool call".
+        Set<String> skillToolNames = new HashSet<>();
 
-        // Register system tools (deduplicated — one instance per class)
-        for (Object toolInstance : toolRegistry.getDeduplicatedInstances(config.getSystemTools())) {
-            toolkit.registerTool(toolInstance);
-            log.info("  Registered system tool class: {} for agent: {}", toolInstance.getClass().getSimpleName(), agentId);
-        }
-
-        // Register skills with their tool bindings (from skills field in config)
+        // Register skills FIRST so we know which tools they cover
+        SkillBox skillBox = null;
         if (!config.getSkills().isEmpty()) {
-            SkillBox skillBox = new SkillBox(toolkit);
+            skillBox = new SkillBox(toolkit);
             try (ClasspathSkillRepository repo = new ClasspathSkillRepository("skills")) {
                 for (String skillName : config.getSkills()) {
                     if (toolRegistry.hasTool(skillName)) {
@@ -166,6 +183,8 @@ public class AgentFactory {
                                 .skill(repo.getSkill(skillName))
                                 .tool(toolRegistry.getTool(skillName))
                                 .apply();
+                        // Track which @Tool function names this skill covers
+                        skillToolNames.addAll(toolRegistry.getToolNamesForClass(skillName));
                         log.info("  Registered skill: {} for agent: {}", skillName, agentId);
                     } else {
                         log.error("  Tool for skill not found in registry: {} (agent: {})", skillName, agentId);
@@ -174,6 +193,27 @@ public class AgentFactory {
             } catch (Exception e) {
                 log.error("  Failed to load skills for agent: {}", agentId, e);
             }
+        }
+
+        // Register user tools, skipping those already covered by skills
+        List<String> userToolsFiltered = config.getUserTools().stream()
+                .filter(name -> !skillToolNames.contains(name))
+                .toList();
+        for (Object toolInstance : toolRegistry.getDeduplicatedInstances(userToolsFiltered)) {
+            toolkit.registerTool(toolInstance);
+            log.info("  Registered user tool class: {} for agent: {}", toolInstance.getClass().getSimpleName(), agentId);
+        }
+        if (!skillToolNames.isEmpty()) {
+            log.info("  Skipped user tools already covered by skills: {} (agent: {})", skillToolNames, agentId);
+        }
+
+        // Register system tools (deduplicated — one instance per class)
+        for (Object toolInstance : toolRegistry.getDeduplicatedInstances(config.getSystemTools())) {
+            toolkit.registerTool(toolInstance);
+            log.info("  Registered system tool class: {} for agent: {}", toolInstance.getClass().getSimpleName(), agentId);
+        }
+
+        if (skillBox != null) {
             builder.toolkit(toolkit).skillBox(skillBox);
         } else {
             builder.toolkit(toolkit);
@@ -192,6 +232,25 @@ public class AgentFactory {
                 log.warn("Unknown RAG mode '{}', falling back to GENERIC", value);
                 yield RAGMode.GENERIC;
             }
+        };
+    }
+
+    LongTermMemory createLongTermMemory(AgentConfig.LongTermMemoryConfig config) {
+        return switch (config.getType().toLowerCase()) {
+            case "bailian" -> BailianLongTermMemory.builder()
+                    .apiKey(apiKey)
+                    .userId(config.getUserId())
+                    .build();
+            default -> null;
+        };
+    }
+
+    LongTermMemoryMode parseLtmMode(String value) {
+        if (value == null) return LongTermMemoryMode.STATIC_CONTROL;
+        return switch (value.trim().toUpperCase()) {
+            case "AGENT_CONTROL" -> LongTermMemoryMode.AGENT_CONTROL;
+            case "BOTH" -> LongTermMemoryMode.BOTH;
+            default -> LongTermMemoryMode.STATIC_CONTROL;
         };
     }
 }
