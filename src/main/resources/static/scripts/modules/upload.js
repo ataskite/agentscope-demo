@@ -52,17 +52,28 @@ async function handleFileSelect(input) {
             return;
         }
 
-        // Handle based on file type — set data FIRST, then switch agent
+        // Handle based on file type — set data FIRST, then switch agent if needed
         if (isDoc) {
             console.log('[upload] Document uploaded:', data.fileName);
             window.uploadedFile = data;
             showFileTag(data.fileName);
-            if (window.currentAgent !== 'task-document-analysis') {
+
+            // Only auto-switch if current agent lacks document processing capabilities
+            var currentAgentConfig = window.agents[window.currentAgent];
+            var hasDocSkill = currentAgentConfig &&
+                (currentAgentConfig.skills || []).some(function(s) {
+                    return s === 'docx' || s === 'pdf' || s === 'xlsx';
+                });
+
+            if (!hasDocSkill && window.currentAgent !== 'task-document-analysis') {
+                console.log('[upload] Current agent lacks document skills, switching to task-document-analysis');
                 var { selectAgent } = await import('./agents.js?v=2.5');
                 await selectAgent('task-document-analysis');
                 // selectAgent clears uploadedFile via removeFile(), restore it after
                 window.uploadedFile = data;
                 showFileTag(data.fileName);
+            } else {
+                console.log('[upload] Current agent has document skills, no auto-switch needed');
             }
         } else if (isImage) {
             console.log('[upload] Image uploaded:', data.fileName);
