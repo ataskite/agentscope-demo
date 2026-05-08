@@ -240,13 +240,15 @@ public class CompositeAgentFactory {
                     .formatter(new DashScopeChatFormatter())
                     .build();
 
-            // Create sub-agent with modified prompt and no toolkit
+            // Create sub-agent with modified prompt and no toolkit.
+            // Enable pending tool recovery to handle orphaned tool calls gracefully.
             ReActAgent subAgent = ReActAgent.builder()
                     .name(subConfig.getAgentId())
                     .sysPrompt(modifiedPrompt)
                     .model(subModel)
                     .memory(effectiveMemory)
                     .toolkit(new Toolkit()) // Empty toolkit - no tools for sub-agents in ROUTING
+                    .enablePendingToolRecovery(true)
                     .build();
 
             subAgents.add(subAgent);
@@ -378,13 +380,15 @@ public class CompositeAgentFactory {
                     .formatter(new DashScopeChatFormatter())
                     .build();
 
-            // Create sub-agent with modified prompt and no toolkit
+            // Create sub-agent with modified prompt and no toolkit.
+            // Enable pending tool recovery to handle orphaned tool calls gracefully.
             ReActAgent subAgent = ReActAgent.builder()
                     .name(subConfig.getAgentId())
                     .sysPrompt(modifiedPrompt)
                     .model(subModel)
                     .memory(effectiveMemory)
                     .toolkit(new Toolkit()) // Empty toolkit - no tools for sub-agents in HANDOFFS
+                    .enablePendingToolRecovery(true)
                     .build();
 
             SubAgentProvider<ReActAgent> provider = () -> subAgent;

@@ -161,6 +161,11 @@ public class AgentFactory {
             log.info("  Registered {} hooks for agent: {}", hooks.length, agentId);
         }
 
+        // Enable pending tool recovery to handle orphaned tool calls gracefully.
+        // This is important for sub-agents in multi-agent compositions where tool calls
+        // may fail or be interrupted, preventing IllegalStateException.
+        builder.enablePendingToolRecovery(true);
+
         return builder.build();
     }
 
