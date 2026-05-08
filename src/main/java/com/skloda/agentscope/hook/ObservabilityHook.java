@@ -1,7 +1,10 @@
 package com.skloda.agentscope.hook;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.agentscope.core.ReActAgent;
 import io.agentscope.core.hook.*;
+import io.agentscope.core.memory.autocontext.AutoContextMemory;
+import io.agentscope.core.memory.autocontext.CompressionEvent;
 import io.agentscope.core.message.*;
 import io.agentscope.core.model.ChatUsage;
 import org.slf4j.Logger;
@@ -48,6 +51,8 @@ public class ObservabilityHook implements Hook {
     private final List<BiConsumer<String, Map<String, Object>>> consumers = Collections.synchronizedList(new ArrayList<>());
 
     private final ConcurrentHashMap<String, Long> toolStartNanos = new ConcurrentHashMap<>();
+    private static final Map<AutoContextMemory, Integer> AUTO_CONTEXT_EVENT_OFFSETS =
+            Collections.synchronizedMap(new WeakHashMap<>());
     private final AtomicInteger llmCallCount = new AtomicInteger(0);
     private final AtomicInteger toolCallCount = new AtomicInteger(0);
     private long agentStartNanos;
@@ -106,6 +111,8 @@ public class ObservabilityHook implements Hook {
 
     // ---- PreReasoning: LLM call begins ----
     private void handlePreReasoning(PreReasoningEvent e) {
+        emitNewAutoContextCompressionEvents(e);
+
         int callNum = llmCallCount.incrementAndGet();
         int msgCount = e.getInputMessages() != null ? e.getInputMessages().size() : 0;
         emit("llm_start", Map.of(
@@ -114,6 +121,42 @@ public class ObservabilityHook implements Hook {
                 "inputMessageCount", msgCount,
                 "timestamp", System.currentTimeMillis()
         ));
+    }
+
+    private void emitNewAutoContextCompressionEvents(PreReasoningEvent e) {
+        if (!(e.getAgent() instanceof ReActAgent agent)
+                || !(agent.getMemory() instanceof AutoContextMemory memory)) {
+            return;
+        }
+
+        List<CompressionEvent> events = memory.getCompressionEvents();
+        if (events == null || events.isEmpty()) {
+            return;
+        }
+
+        int startIndex = AUTO_CONTEXT_EVENT_OFFSETS.getOrDefault(memory, 0);
+        if (startIndex >= events.size()) {
+            return;
+        }
+
+        for (int i = startIndex; i < events.size(); i++) {
+            CompressionEvent event = events.get(i);
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("eventType", event.getEventType());
+            data.put("timestamp", event.getTimestamp());
+            data.put("compressedMessageCount", event.getCompressedMessageCount());
+            data.put("previousMessageId", safeString(event.getPreviousMessageId()));
+            data.put("nextMessageId", safeString(event.getNextMessageId()));
+            data.put("compressedMessageId", safeString(event.getCompressedMessageId()));
+            data.put("tokenBefore", event.getTokenBefore());
+            data.put("tokenAfter", event.getTokenAfter());
+            data.put("tokenReduction", event.getTokenReduction());
+            data.put("compressInputToken", event.getCompressInputToken());
+            data.put("compressOutputToken", event.getCompressOutputToken());
+            emit("memory_compression", data);
+        }
+
+        AUTO_CONTEXT_EVENT_OFFSETS.put(memory, events.size());
     }
 
     // ---- ReasoningChunk: streaming thinking text ----
@@ -249,6 +292,10 @@ public class ObservabilityHook implements Hook {
                 "duration_ms", totalMs,
                 "timestamp", System.currentTimeMillis()
         ));
+    }
+
+    private String safeString(String value) {
+        return value != null ? value : "";
     }
 
     /** Extract skill name from load_skill_through_path params.

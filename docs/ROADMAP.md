@@ -65,7 +65,7 @@ The demo should:
 | AgentScope Feature | Status | Demo Agent / Scenario |
 |---|---|---|
 | InMemoryMemory (short-term) | ✅ | All session-based agents |
-| AutoContextMemory (auto-compression) | ❌ | Planned: long-conversation agent |
+| AutoContextMemory (auto-compression) | ✅ | `long-conversation` (AutoContextHook + `context_reload`) |
 | Long-term Memory — Mem0 | ❌ | Planned: cross-session preference recall |
 | Long-term Memory — ReMe | ❌ | Planned: cross-session knowledge retention |
 | Long-term Memory — Bailian | ✅ | `personal-assistant` (STATIC_CONTROL, DASHSCOPE_API_KEY) |
@@ -151,7 +151,7 @@ The demo should:
 | P0 | Multi-agent foundation | ✅ Composite agents stream through `/chat/send` with observable events. |
 | P1 | Multi-agent showcase | ✅ Customer service, document pipeline, routing, supervisor, and debate demos. |
 | P2 | Controlled workflows | ✅ HITL approval, structured output, validation, workflow snapshots, manual approval resume validation. |
-| P3 | Planning & memory | PlanNotebook demo, AutoContextMemory, long-term memory (Mem0/ReMe). |
+| P3 | Planning & memory | ✅ PlanNotebook demo, AutoContextMemory, Bailian long-term memory. |
 | P4 | RAG ecosystem | Agentic RAG, Qdrant persistent store, cloud knowledge (Bailian/Dify/RAGFlow), citation UI. |
 | P5 | MCP tool ecosystem | MCP transports (StdIO/SSE/HTTP), tool filtering, groups, Higress gateway. |
 | P6 | Advanced multi-agent | Subagents orchestration, MsgHub standalone, Custom Workflow (StateGraph). |
@@ -195,9 +195,9 @@ Completed:
 
 - **PlanNotebook demo**: Upgrade `project-planner` to use `enablePlan()`. Scenario: "Plan and execute a multi-step project" — the agent creates a structured plan, the user confirms, then the agent executes subtasks step by step with visible progress in the debug panel.
 - **AutoContextMemory demo**: Create a `long-conversation` agent with `AutoContextMemory`. Scenario: "Extended technical consultation" — a 50+ turn conversation where the agent auto-compresses context, offloads large content, and reloads on demand.
-- **Long-term memory — Mem0 demo**: Add `Mem0LongTermMemory` to a personal assistant agent. Scenario: "Remember my preferences" — the agent recalls user preferences (language, format, domain expertise) across sessions.
-- **Long-term memory — ReMe demo**: Add `ReMeLongTermMemory` as an alternative. Scenario: "Knowledge retention across sessions" — accumulated insights are preserved.
-- **Memory mode comparison**: Show `STATIC_CONTROL` vs `AGENT_CONTROL` vs `BOTH` modes in a single agent with UI toggle.
+- **Long-term memory — Bailian demo**: Add `BailianLongTermMemory` to `personal-assistant`. Scenario: "Remember my preferences" — the agent recalls user preferences (language, format, domain expertise) across sessions.
+- **Long-term memory — Mem0/ReMe follow-up**: Keep Mem0 and ReMe as optional future comparison demos if those backends are needed.
+- **Memory mode comparison**: Support `STATIC_CONTROL` vs `AGENT_CONTROL` vs `BOTH` modes through `agents.yml`.
 
 **Success criteria**:
 
@@ -364,10 +364,11 @@ Completed:
 
 - [x] `mvn test` passes with 0 failures.
 - [x] `project-planner` creates multi-step plans with PlanNotebook tool calls visible in Debug Panel.
-- [x] `long-conversation` agent configured with AutoContextMemory for long sessions.
+- [x] `long-conversation` agent configured with AutoContextMemory and AutoContextHook for long sessions.
 - [x] `personal-assistant` has Bailian long-term memory configured.
 - [ ] `rag-agent` uses `retrieve_knowledge` tool only when relevant.
-- [ ] Debug panel shows plan status, memory compression events, and RAG tool calls.
+- [x] Debug panel shows plan status and memory compression events.
+- [ ] Debug panel shows RAG tool calls for `rag-agent`.
 
 ## 8. AgentScope Feature → Demo Scenario Quick Reference
 
@@ -393,10 +394,10 @@ Completed:
 | 18 | Structured Validation | Auto-repair invalid extraction output | All extractors | ✅ P2 |
 | 19 | Human-in-the-Loop | Approval gate before invoice generation | `bank-invoice`, `contract-review-workflow` | ✅ P2 |
 | 20 | Workflow Snapshots | Capture and replay workflow runs | `WorkflowRunService` | ✅ P2 |
-| 21 | PlanNotebook | Multi-step project planning with user confirm | `project-planner` | P3 |
-| 22 | AutoContextMemory | Long conversation with auto-compression | `long-conversation` | P3 |
-| 23 | Long-term Memory (Mem0) | Cross-session user preference recall | `personal-assistant` | P3 |
-| 24 | Long-term Memory (ReMe) | Cross-session knowledge retention | `knowledge-assistant` | P3 |
+| 21 | PlanNotebook | Multi-step project planning with user confirm | `project-planner` | ✅ P3 |
+| 22 | AutoContextMemory | Long conversation with auto-compression | `long-conversation` | ✅ P3 |
+| 23 | Long-term Memory (Bailian) | Cross-session user preference recall | `personal-assistant` | ✅ P3 |
+| 24 | Long-term Memory Modes | STATIC/AGENT/BOTH mode comparison by config | `personal-assistant` | ✅ P3 |
 | 25 | RAG (Agentic) | On-demand knowledge retrieval via tool | `rag-agent` | P4 |
 | 26 | RAG (Qdrant) | Persistent vector store across restarts | `rag-chat` upgrade | P4 |
 | 27 | RAG (Bailian) | Enterprise cloud knowledge base | `enterprise-knowledge` | P4 |

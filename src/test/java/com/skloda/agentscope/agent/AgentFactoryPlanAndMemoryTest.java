@@ -2,6 +2,8 @@ package com.skloda.agentscope.agent;
 
 import com.skloda.agentscope.service.KnowledgeService;
 import com.skloda.agentscope.tool.ToolRegistry;
+import io.agentscope.core.memory.autocontext.AutoContextHook;
+import io.agentscope.core.memory.autocontext.AutoContextMemory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -83,6 +85,27 @@ class AgentFactoryPlanAndMemoryTest {
         when(configService.getAgentConfig("plan-agent")).thenReturn(config);
 
         assertDoesNotThrow(() -> agentFactory.createAgent("plan-agent"));
+    }
+
+    @Test
+    void testCreateMemoryUsesAutoContextMemoryWhenConfigured() {
+        AgentConfig config = baseConfig("auto-context-agent");
+        config.setAutoContext(true);
+        when(configService.getAgentConfig("auto-context-agent")).thenReturn(config);
+
+        assertInstanceOf(AutoContextMemory.class, agentFactory.createMemory("auto-context-agent"));
+    }
+
+    @Test
+    void testCreateSessionAgentWithAutoContextMemoryRegistersAutoContextHook() {
+        AgentConfig config = baseConfig("auto-context-session-agent");
+        config.setAutoContext(true);
+        when(configService.getAgentConfig("auto-context-session-agent")).thenReturn(config);
+
+        var memory = agentFactory.createMemory("auto-context-session-agent");
+        var agent = agentFactory.createAgentForSession("auto-context-session-agent", memory);
+
+        assertTrue(agent.getHooks().stream().anyMatch(AutoContextHook.class::isInstance));
     }
 
     @Test

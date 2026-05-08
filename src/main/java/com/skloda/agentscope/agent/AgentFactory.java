@@ -10,9 +10,9 @@ import io.agentscope.core.memory.LongTermMemory;
 import io.agentscope.core.memory.LongTermMemoryMode;
 import io.agentscope.core.memory.Memory;
 import io.agentscope.core.memory.bailian.BailianLongTermMemory;
+import io.agentscope.core.memory.autocontext.AutoContextHook;
 import io.agentscope.core.memory.autocontext.AutoContextConfig;
 import io.agentscope.core.memory.autocontext.AutoContextMemory;
-import io.agentscope.core.memory.autocontext.ContextOffloadTool;
 import io.agentscope.core.model.DashScopeChatModel;
 import io.agentscope.core.model.StructuredOutputReminder;
 import io.agentscope.core.rag.RAGMode;
@@ -113,10 +113,10 @@ public class AgentFactory {
 
         Toolkit toolkit = new Toolkit();
 
-        // Register ContextOffloadTool for AutoContextMemory
-        if (memory instanceof AutoContextMemory acm) {
-            toolkit.registerTool(new ContextOffloadTool(acm));
-            log.info("  Registered ContextOffloadTool for agent: {}", agentId);
+        // AutoContextHook registers context_reload and triggers compression before reasoning.
+        if (memory instanceof AutoContextMemory) {
+            builder.hook(new AutoContextHook());
+            log.info("  Enabled AutoContextHook for agent: {}", agentId);
         }
 
         registerToolsAndSkills(builder, toolkit, config, agentId);

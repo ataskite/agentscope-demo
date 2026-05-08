@@ -167,6 +167,7 @@ function getTimelineIcon(type) {
     switch (type) {
         case 'phase': return '◆';
         case 'llm': return '↻';
+        case 'memory': return '◈';
         case 'skill': return '◉';
         case 'tool': return '⚡';
         case 'error': return '⚠';
@@ -178,6 +179,7 @@ function getTimelineConnector(type) {
     switch (type) {
         case 'phase': return '─';
         case 'llm': return '├';
+        case 'memory': return '├';
         case 'skill': return '├';
         case 'tool': return '│';
         default: return '│';

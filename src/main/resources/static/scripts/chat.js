@@ -165,6 +165,15 @@ async function sendMessage() {
                             }
                             break;
 
+                        case 'memory_compression':
+                            if (currentRound) {
+                                var memType = payload.eventType || 'compression';
+                                var reduction = payload.tokenReduction ? ('-' + payload.tokenReduction + ' tokens') : '';
+                                var count = payload.compressedMessageCount ? (payload.compressedMessageCount + ' messages') : '';
+                                addTimelineRow('memory', 'Memory → ' + memType, [count, reduction].filter(Boolean).join(' '), 'ok');
+                            }
+                            break;
+
                         case 'llm_start':
                             if (currentRound) {
                                 var callNum = payload.callNumber || (currentRound.llmCallCount + 1);
