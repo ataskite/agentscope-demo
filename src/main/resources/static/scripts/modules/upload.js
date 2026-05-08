@@ -52,50 +52,55 @@ async function handleFileSelect(input) {
             return;
         }
 
-        // Handle based on file type — set data FIRST, then switch agent if needed
+        // Handle based on file type — set data FIRST, then suggest agent if needed
         if (isDoc) {
             console.log('[upload] Document uploaded:', data.fileName);
             window.uploadedFile = data;
             showFileTag(data.fileName);
 
-            // Only auto-switch if current agent lacks document processing capabilities
+            // Check if current agent has document processing capabilities
             var currentAgentConfig = window.agents[window.currentAgent];
             var hasDocSkill = currentAgentConfig &&
                 (currentAgentConfig.skills || []).some(function(s) {
                     return s === 'docx' || s === 'pdf' || s === 'xlsx';
                 });
 
-            if (!hasDocSkill && window.currentAgent !== 'task-document-analysis') {
-                console.log('[upload] Current agent lacks document skills, switching to task-document-analysis');
-                var { selectAgent } = await import('./agents.js?v=2.5');
-                await selectAgent('task-document-analysis');
-                // selectAgent clears uploadedFile via removeFile(), restore it after
-                window.uploadedFile = data;
-                showFileTag(data.fileName);
+            if (!hasDocSkill) {
+                console.log('[upload] Current agent lacks document skills, suggesting task-document-analysis');
+                showAgentSuggestionModal('task-document-analysis', '文档分析助手',
+                    '当前选择的智能体不支持文档处理，是否切换到「文档分析助手」来处理此文档？');
             } else {
-                console.log('[upload] Current agent has document skills, no auto-switch needed');
+                console.log('[upload] Current agent has document skills, ready to process');
             }
         } else if (isImage) {
             console.log('[upload] Image uploaded:', data.fileName);
             window.uploadedImages.push(data);
             showImagePreviews();
-            if (window.agents['vision-analyzer']) {
-                var { selectAgent } = await import('./agents.js?v=2.5');
-                await selectAgent('vision-analyzer');
-                // Restore image data after agent switch
-                window.uploadedImages.push(data);
-                showImagePreviews();
+
+            // Check if current agent supports vision
+            var currentAgentConfig = window.agents[window.currentAgent];
+            var supportsVision = currentAgentConfig &&
+                (currentAgentConfig.modality === 'vision' || currentAgentConfig.modality === 'multi');
+
+            if (!supportsVision && window.agents['vision-analyzer']) {
+                console.log('[upload] Current agent does not support vision, suggesting vision-analyzer');
+                showAgentSuggestionModal('vision-analyzer', '图片识别助手',
+                    '当前选择的智能体不支持图片处理，是否切换到「图片识别助手」来处理此图片？');
             }
         } else if (isAudio) {
             console.log('[upload] Audio uploaded:', data.fileName);
             window.uploadedAudio = data;
             showAudioPreview();
-            if (window.agents['voice-assistant']) {
-                var { selectAgent } = await import('./agents.js?v=2.5');
-                await selectAgent('voice-assistant');
-                // Restore audio data after agent switch
-                window.uploadedAudio = data;
-                showAudioPreview();
+
+            // Check if current agent supports audio
+            var currentAgentConfig = window.agents[window.currentAgent];
+            var supportsAudio = currentAgentConfig &&
+                (currentAgentConfig.modality === 'audio' || currentAgentConfig.modality === 'multi');
+
+            if (!supportsAudio && window.agents['voice-assistant']) {
+                console.log('[upload] Current agent does not support audio, suggesting voice-assistant');
+                showAgentSuggestionModal('voice-assistant', '语音助手',
+                    '当前选择的智能体不支持语音处理，是否切换到「语音助手」来处理此音频？');
             }
         }
     } catch (err) {
@@ -147,6 +152,62 @@ function showImagePreviews() {
 function showAudioPreview() {
     showImagePreviews();
 }
+
+/* ===== AGENT SUGGESTION MODAL ===== */
+function showAgentSuggestionModal(targetAgentId, targetAgentName, message) {
+    // Remove existing modal if any
+    var existingModal = document.getElementById('agentSuggestionModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    var modal = document.createElement('div');
+    modal.id = 'agentSuggestionModal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML =
+        '<div class="modal-content" style="max-width: 400px;">' +
+            '<div class="modal-header">' +
+                '<h3>智能体切换建议</h3>' +
+                '<button class="modal-close" onclick="closeAgentSuggestionModal()">×</button>' +
+            '</div>' +
+            '<div class="modal-body">' +
+                '<p style="margin-bottom: 15px; line-height: 1.6;">' + message + '</p>' +
+                '<div class="modal-actions">' +
+                    '<button class="btn btn-primary" id="switchAgentBtn" style="margin-right: 10px;">切换到「' + targetAgentName + '」</button>' +
+                    '<button class="btn btn-secondary" id="keepCurrentAgentBtn">保持当前智能体</button>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+
+    document.body.appendChild(modal);
+
+    // Bind button events
+    document.getElementById('switchAgentBtn').addEventListener('click', function() {
+        closeAgentSuggestionModal();
+        switchToAgent(targetAgentId);
+    });
+
+    document.getElementById('keepCurrentAgentBtn').addEventListener('click', function() {
+        closeAgentSuggestionModal();
+    });
+}
+
+window.closeAgentSuggestionModal = function() {
+    var modal = document.getElementById('agentSuggestionModal');
+    if (modal) {
+        modal.remove();
+    }
+};
+
+async function switchToAgent(agentId) {
+    try {
+        var { selectAgent } = await import('./agents.js?v=2.5');
+        await selectAgent(agentId);
+    } catch (err) {
+        console.error('[upload] Failed to switch agent:', err);
+    }
+};
+
 
 // Global functions for onclick
 window.removeFile = function() {
