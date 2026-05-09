@@ -226,8 +226,9 @@ public class CompositeAgentFactory {
         Map<String, ReActAgent> stateAgents = new LinkedHashMap<>();
         for (StateConfig state : states) {
             if (state.getAgent() != null) {
-                AgentConfig agentConfig = configService.getAgentConfig(state.getAgent());
-                ReActAgent agent = (ReActAgent) singleAgentFactory.createAgent(agentConfig, memory);
+                ReActAgent agent = memory != null
+                        ? singleAgentFactory.createAgentForSession(state.getAgent(), memory)
+                        : singleAgentFactory.createAgent(state.getAgent());
                 stateAgents.put(state.getName(), agent);
             }
         }
@@ -583,7 +584,9 @@ public class CompositeAgentFactory {
     }
 
     private AgentBase findOrCreateAgent(SubAgentConfig subConfig, Memory memory) {
-        AgentConfig agentConfig = configService.getAgentConfig(subConfig.getAgentId());
-        return singleAgentFactory.createAgent(agentConfig, memory);
+        String agentId = subConfig.getAgentId();
+        return memory != null
+                ? singleAgentFactory.createAgentForSession(agentId, memory)
+                : singleAgentFactory.createAgent(agentId);
     }
 }
