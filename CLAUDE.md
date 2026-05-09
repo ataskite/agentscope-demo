@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Spring Boot 3.5.13 + Java 17 demo for AgentScope (v1.0.11), a Java agent framework with LLM-backed ReAct agents. Features multiple agent types: basic chat, tool-calling, document analysis, multi-modal support (vision/audio), RAG knowledge base, session management, web search, and multi-agent collaboration (sequential pipelines, routing, handoffs).
+Spring Boot 3.5.13 + Java 17 demo for AgentScope (v1.0.11), a Java agent framework with LLM-backed ReAct agents. Features multiple agent types: basic chat, tool-calling, document analysis, multi-modal support (vision/audio), RAG knowledge base, session management, web search, and multi-agent collaboration (10 patterns: sequential, parallel, routing, handoffs, debate, loop, state graph, msg hub, subagents-sequential, subagents-parallel).
 
 ## Build & Run
 
@@ -105,6 +105,20 @@ Each session maintains its own agent instance with isolated memory.
 | `pipeline_step_end` | Multi-agent | step completion | Debug panel |
 | `routing_decision` | Multi-agent | selected agent, reasoning | Debug panel |
 | `handoff_start` | Multi-agent | from/to agent, reason | Debug panel |
+| `loop_start` | P6 Loop | iteration number | Debug panel |
+| `loop_end` | P6 Loop | total iterations, final status | Debug panel |
+| `loop_iteration_result` | P6 Loop | iteration, approved status | Debug panel |
+| `graph_transition` | P6 StateGraph | from state, to state, trigger | Debug panel |
+| `graph_agent_call` | P6 StateGraph | state name, agent ID | Debug panel |
+| `roundtable_start` | P6 MsgHub | participants, rounds | Debug panel |
+| `round_start` | P6 MsgHub | round number | Debug panel |
+| `round_end` | P6 MsgHub | round completion | Debug panel |
+| `round_message` | P6 MsgHub | agent, message content | Debug panel |
+| `roundtable_summary` | P6 MsgHub | summary content | Debug panel |
+| `task_delegate` | P6 Subagents | from, to, task | Debug panel |
+| `task_start` | P6 Subagents | agent ID | Debug panel |
+| `task_end` | P6 Subagents | agent, output preview | Debug panel |
+| `task_aggregate` | P6 Subagents | total tasks | Debug panel |
 | `text` | Agent stream | incremental response text | Main chat area |
 | `error` | Hook/ErrorEvent | error message | Alert |
 
@@ -116,7 +130,8 @@ Each session maintains its own agent instance with isolated memory.
 - **Metrics collection**: token counts (input/output/total), LLM time, tool durations
 - **Tool call details**: name, parameters, result preview, success status
 - **Skill identification**: recognizes `load_skill_through_path` and extracts skill names
-- **Multi-agent events**: pipeline, routing, and handoff tracking
+- **Multi-agent events**: pipeline, routing, handoff, and debate tracking
+- **P6 advanced pattern events**: loop, state graph, msg hub (roundtable), and subagents (task orchestration/dispatch) tracking
 
 ### File Upload Flow
 
@@ -169,6 +184,31 @@ Each session maintains its own agent instance with isolated memory.
 - Intent-based agent switching with explicit trigger rules
 - Trigger types: `INTENT` (keywords match), `EXPLICIT` (user requests)
 - Example: `customer-service` handoffs to sales-agent on "价格/购买" keywords
+
+**Loop Pipeline** (`type: LOOP`):
+- Write-review-revise pattern with iterative refinement
+- Writer produces content, critic reviews, loop continues until quality threshold or max iterations
+- Example: `copywriter-refiner` → writer → critic → (optional revision)
+
+**StateGraph** (`type: STATE_GRAPH`):
+- Custom state machine with mixed deterministic and agent-driven transitions
+- Event-driven transitions (user actions) and condition-driven transitions (agent decisions)
+- Example: `order-fulfillment` → CREATED → SUBMITTED → REVIEWING → APPROVED → PAID → DONE
+
+**MsgHub RoundTable** (`type: MSG_HUB`):
+- Multi-round expert discussion with moderator synthesis
+- Each expert speaks in sequence across multiple rounds, seeing all previous messages
+- Example: `expert-roundtable` → architect, DBA, security-expert discuss, moderator summarizes
+
+**Subagents Sequential** (`type: SUBAGENT_SEQ`):
+- TaskOrchestrator pattern with sequential task handoff and {prevOutput} chaining
+- Each step receives previous step's output via template variables
+- Example: `report-generator` → research → analysis → report writing
+
+**Subagents Parallel** (`type: SUBAGENT_PAR`):
+- TaskDispatcher pattern with parallel task delegation and result aggregation
+- All sub-agents receive same input concurrently, results collected and combined
+- Example: `project-manager` → research, design, evaluation run in parallel
 
 **Configuration format:**
 ```yaml
@@ -235,12 +275,23 @@ src/main/java/com/skloda/agentscope/
 │   ├── AgentConfig.java              # Agent config entity
 │   ├── AgentConfigService.java       # Config loading and query service
 │   ├── AgentFactory.java             # Single agent creation from config
-│   ├── AgentType.java                # Enum: SINGLE, SEQUENTIAL, PARALLEL, ROUTING, HANDOFFS
+│   ├── AgentType.java                # Enum: SINGLE, SEQUENTIAL, PARALLEL, ROUTING, HANDOFFS, DEBATE, LOOP, STATE_GRAPH, MSG_HUB, SUBAGENT_SEQ, SUBAGENT_PAR
 │   ├── TriggerType.java              # Enum: INTENT, EXPLICIT (for handoff triggers)
 │   ├── SubAgentConfig.java           # Sub-agent configuration with description
 │   └── HandoffTrigger.java           # Handoff trigger rules (type, keywords, target)
+│   ├── LoopConfig.java               # Loop pipeline configuration
+│   ├── StateConfig.java              # StateGraph state configuration
+│   ├── StateTransition.java          # StateGraph transition definition
+│   └── MsgHubConfig.java             # MsgHub roundtable configuration
 ├── composite/
-│   └── CompositeAgentFactory.java    # Multi-agent composition factory (pipelines, routing, handoffs)
+│   └── CompositeAgentFactory.java    # Multi-agent composition factory (all 10 patterns)
+│   ├── pipeline/
+│   │   ├── LoopPipeline.java         # Write-review-revise pattern
+│   │   ├── RoundTablePipeline.java   # Expert roundtable discussion
+│   │   ├── TaskOrchestratorPipeline.java  # Sequential task delegation
+│   │   └── TaskDispatcherPipeline.java   # Parallel task dispatch
+│   └── graph/
+│       └── OrderFulfillmentGraph.java     # Custom state machine example
 ├── controller/
 │   ├── ChatController.java           # Reactive SSE chat + file upload
 │   └── KnowledgeController.java      # Knowledge base management API
@@ -254,9 +305,13 @@ src/main/java/com/skloda/agentscope/
 │   ├── SessionInfo.java              # Session metadata
 │   └── MultiModalMessage.java        # Multi-modal message wrapper
 ├── hook/
-│   └── ObservabilityHook.java        # Hook for agent lifecycle events
+│   └── ObservabilityHook.java        # Hook for agent lifecycle events (with P6 events)
 ├── runtime/
 │   ├── AgentRuntime.java             # Runtime container (Agent + Hook + Sink)
+│   ├── AgentRuntimeFactory.java      # Factory for all runtime types (10 patterns)
+│   ├── PipelineAgentRuntime.java     # Runtime for Pipeline-based agents
+│   ├── StateGraphRuntime.java        # Runtime for StateGraph agents
+│   └── MsgHubRuntime.java            # Runtime for MsgHub agents
 │   ├── AgentRuntimeFactory.java      # Factory for AgentRuntime instances
 │   └── PipelineAgentRuntime.java     # Runtime for sequential/parallel pipelines
 ├── config/
@@ -348,11 +403,35 @@ src/main/resources/
 - **support-agent**: General customer service
 - **sales-agent**: Sales consultation
 - **complaint-agent**: Complaint handling
+- **writer**: Copywriting and content refinement
+- **critic**: Content quality review and feedback
+- **moderator**: Discussion facilitation and synthesis
+- **architect**: System architecture and design review
+- **dba-expert**: Database and storage optimization
+- **security-expert**: Security and compliance assessment
+- **order-reviewer**: Order validation and approval
+- **payment-agent**: Payment processing
+- **shipping-agent**: Logistics and delivery
+- **researcher**: Topic research and investigation
+- **analyst**: Data analysis and insights
+- **report-writer**: Report generation
+- **pm-researcher**: Project feasibility research
+- **pm-designer**: Technical solution design
+- **pm-evaluator**: Risk assessment
 
 ### Multi-Agent Compositions
+**Phase 3 Patterns:**
 - **doc-analysis-pipeline** (SEQUENTIAL): Document parsing → info search
 - **smart-router** (ROUTING): Intelligently routes to doc/search/vision/sales experts
 - **customer-service** (HANDOFFS): Intent-based handoffs to support/sales/complaint agents
+- **debate-review** (DEBATE): Multi-expert parallel debate with judge synthesis
+
+**P6 Advanced Patterns:**
+- **copywriter-refiner** (LOOP): Write → review → revise loop until quality met
+- **order-fulfillment** (STATE_GRAPH): Order submission → review → payment → shipping flow
+- **expert-roundtable** (MSG_HUB): Multi-round expert discussion with moderator summary
+- **report-generator** (SUBAGENT_SEQ): Research → analysis → report writing pipeline
+- **project-manager** (SUBAGENT_PAR): Parallel research, design, and evaluation
 
 ## Adding a New Agent
 
@@ -366,10 +445,14 @@ src/main/resources/
 
 ### Multi-Agent Composition
 1. Create expert agents first (as single agents)
-2. Add composition agent with `type: SEQUENTIAL|PARALLEL|ROUTING|HANDOFFS`
+2. Add composition agent with `type: SEQUENTIAL|PARALLEL|ROUTING|HANDOFFS|DEBATE|LOOP|STATE_GRAPH|MSG_HUB|SUBAGENT_SEQ|SUBAGENT_PAR`
 3. Define `subAgents` list with `agentId` and `description`
 4. For HANDOFFS type, add `handoffTriggers` with `type`, `keywords`, and `target`
-5. Restart — composition agent appears in UI with sub-agent dispatch logic
+5. For LOOP type, add `loopConfig` with `maxIterations` and `exitCondition`
+6. For STATE_GRAPH type, add `states` list with name, agent, and transitions
+7. For MSG_HUB type, add `msgHubConfig` with `rounds` and `summaryRole`
+8. For SUBAGENT_SEQ/PAR type, add `taskTemplate` to each subAgent for task delegation
+9. Restart — composition agent appears in UI with sub-agent dispatch logic
 
 ## API Endpoints
 

@@ -243,21 +243,22 @@ Completed:
 - Tool filtering and groups are configurable from `agents.yml`.
 - New MCP tools can be added without writing Java integration code.
 
-### P6: Advanced Multi-Agent Patterns
+### P6: Advanced Multi-Agent Patterns ✅
 
 **Goal**: Demonstrate the remaining multi-agent collaboration patterns.
 
-**Recommended work**:
+**Implemented** (2026-05-09):
 
-- **Subagents orchestration**: Create `task-orchestrator` using Task/TaskOutput pattern. Scenario: "Research report generator" — orchestrator delegates research, analysis, and writing to specialized sub-agents, each running in isolation with its own context.
-- **MsgHub standalone demo**: Create `round-table` agent using MsgHub for group conversation. Scenario: "Expert round-table discussion" — multiple experts share messages and debate in a shared context, visible as a multi-agent conversation thread.
-- **Custom Workflow (StateGraph)**: Create `approval-workflow` using StateGraph. Scenario: "Document approval pipeline" — mixed deterministic (classify → validate) and agentic (analyze → review) steps with explicit state transitions.
-- **Loop Pipeline**: Create `refinement-loop` using loop pipeline. Scenario: "Iterative content refinement" — content goes through writer → critic → revision loop until quality threshold is met.
+- **Loop Pipeline** (`copywriter-refiner`): Write-review-revise pattern with writer → critic loop until quality threshold met.
+- **StateGraph** (`order-fulfillment`): Custom state machine with mixed deterministic (event-driven) and agentic (LLM-decision) transitions.
+- **MsgHub** (`expert-roundtable`): Multi-round expert discussion with moderator summary.
+- **Subagents Sequential** (`report-generator`): TaskOrchestratorPipeline with {prevOutput} chaining — research → analysis → report.
+- **Subagents Parallel** (`project-manager`): TaskDispatcherPipeline with parallel dispatch — research, design, evaluation concurrently.
 
 **Success criteria**:
 
-- All 10 multi-agent patterns from the AgentScope docs have at least one demo.
-- Each demo has a repeatable prompt and visible multi-agent orchestration in the debug panel.
+- ✅ All 10 multi-agent patterns have demos: Sequential, Parallel, Routing, Handoffs, Debate, Loop, StateGraph, MsgHub, Subagent-Sequential, Subagent-Parallel.
+- ✅ Each demo has repeatable prompts and visible multi-agent orchestration in debug panel (new P6 event handlers added).
 
 ### P7: Interoperability & Observability
 
@@ -328,9 +329,9 @@ Completed:
 
 - MCP StdIO transport demo.
 - MCP tool filtering and groups.
-- Subagents orchestration (Task/TaskOutput).
-- Custom Workflow (StateGraph).
-- Loop pipeline.
+- ~~Subagents orchestration (Task/TaskOutput).~~ ✅ Done: `report-generator` (SUBAGENT_SEQ), `project-manager` (SUBAGENT_PAR)
+- ~~Custom Workflow (StateGraph).~~ ✅ Done: `order-fulfillment` (STATE_GRAPH)
+- ~~Loop pipeline.~~ ✅ Done: `copywriter-refiner` (LOOP)
 
 ### Later (P7–P8)
 
