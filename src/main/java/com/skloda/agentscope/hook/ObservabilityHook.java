@@ -47,6 +47,22 @@ public class ObservabilityHook implements Hook {
     public static final String HANDOFF_COMPLETE = "handoff_complete";
     public static final String HANDOFF_ERROR = "handoff_error";
 
+    // P6 advanced pattern events
+    public static final String LOOP_START = "loop_start";
+    public static final String LOOP_END = "loop_end";
+    public static final String LOOP_ITERATION_RESULT = "loop_iteration_result";
+    public static final String GRAPH_TRANSITION = "graph_transition";
+    public static final String GRAPH_AGENT_CALL = "graph_agent_call";
+    public static final String ROUNDTABLE_START = "roundtable_start";
+    public static final String ROUND_START = "round_start";
+    public static final String ROUND_END = "round_end";
+    public static final String ROUND_MESSAGE = "round_message";
+    public static final String ROUNDTABLE_SUMMARY = "roundtable_summary";
+    public static final String TASK_DELEGATE = "task_delegate";
+    public static final String TASK_START = "task_start";
+    public static final String TASK_END = "task_end";
+    public static final String TASK_AGGREGATE = "task_aggregate";
+
     /** Per-session event consumer: (eventType, dataMap) */
     private final List<BiConsumer<String, Map<String, Object>>> consumers = Collections.synchronizedList(new ArrayList<>());
 
@@ -422,6 +438,125 @@ public class ObservabilityHook implements Hook {
                 "fromAgent", fromAgent,
                 "toAgent", toAgent,
                 "error", error,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    // ---- P6 Loop events ----
+
+    public void emitLoopStart(int iteration) {
+        emit(LOOP_START, Map.of(
+                "iteration", iteration,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitLoopEnd(int totalIterations, boolean finalApproved) {
+        emit(LOOP_END, Map.of(
+                "totalIterations", totalIterations,
+                "finalApproved", finalApproved,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitLoopIterationResult(int iteration, boolean approved, String feedback) {
+        emit(LOOP_ITERATION_RESULT, Map.of(
+                "iteration", iteration,
+                "approved", approved,
+                "feedback", feedback,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    // ---- P6 StateGraph events ----
+
+    public void emitGraphTransition(String fromState, String toState, String trigger) {
+        emit(GRAPH_TRANSITION, Map.of(
+                "fromState", fromState,
+                "toState", toState,
+                "trigger", trigger,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitGraphAgentCall(String state, String agent) {
+        emit(GRAPH_AGENT_CALL, Map.of(
+                "state", state,
+                "agent", agent,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    // ---- P6 MsgHub events ----
+
+    public void emitRoundtableStart(String pipelineId, List<String> participants, int rounds) {
+        emit(ROUNDTABLE_START, Map.of(
+                "pipelineId", pipelineId,
+                "participants", participants,
+                "rounds", rounds,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitRoundStart(int round) {
+        emit(ROUND_START, Map.of(
+                "round", round,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitRoundEnd(int round) {
+        emit(ROUND_END, Map.of(
+                "round", round,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitRoundMessage(String agentId, String content) {
+        emit(ROUND_MESSAGE, Map.of(
+                "agent", agentId,
+                "content", content,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitRoundtableSummary(String agentId, String content) {
+        emit(ROUNDTABLE_SUMMARY, Map.of(
+                "agent", agentId,
+                "content", content,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    // ---- P6 Subagent events ----
+
+    public void emitTaskDelegate(String from, String to, String task) {
+        emit(TASK_DELEGATE, Map.of(
+                "from", from,
+                "to", to,
+                "task", task,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitTaskStart(String agent) {
+        emit(TASK_START, Map.of(
+                "agent", agent,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitTaskEnd(String agent, String outputPreview) {
+        emit(TASK_END, Map.of(
+                "agent", agent,
+                "outputPreview", outputPreview,
+                "timestamp", System.currentTimeMillis()
+        ));
+    }
+
+    public void emitTaskAggregate(int totalTasks) {
+        emit(TASK_AGGREGATE, Map.of(
+                "totalTasks", totalTasks,
                 "timestamp", System.currentTimeMillis()
         ));
     }
