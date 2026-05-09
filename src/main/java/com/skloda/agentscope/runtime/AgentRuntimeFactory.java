@@ -4,6 +4,11 @@ import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.AgentConfigService;
 import com.skloda.agentscope.agent.AgentType;
 import com.skloda.agentscope.composite.CompositeAgentFactory;
+import com.skloda.agentscope.composite.graph.OrderFulfillmentGraph;
+import com.skloda.agentscope.composite.pipeline.LoopPipeline;
+import com.skloda.agentscope.composite.pipeline.RoundTablePipeline;
+import com.skloda.agentscope.composite.pipeline.TaskOrchestratorPipeline;
+import com.skloda.agentscope.composite.pipeline.TaskDispatcherPipeline;
 import com.skloda.agentscope.hook.ApprovalHook;
 import com.skloda.agentscope.hook.ObservabilityHook;
 import com.skloda.agentscope.service.ApprovalService;
@@ -45,6 +50,11 @@ public class AgentRuntimeFactory {
             case ROUTING -> createRoutingRuntime(agentId);
             case HANDOFFS -> createHandoffsRuntime(agentId);
             case DEBATE -> createDebateRuntime(agentId);
+            case LOOP -> createLoopRuntime(agentId);
+            case STATE_GRAPH -> createStateGraphRuntime(agentId);
+            case MSG_HUB -> createMsgHubRuntime(agentId);
+            case SUBAGENT_SEQ -> createSubagentSeqRuntime(agentId);
+            case SUBAGENT_PAR -> createSubagentParRuntime(agentId);
         };
     }
 
@@ -61,6 +71,11 @@ public class AgentRuntimeFactory {
             case ROUTING -> createRoutingRuntimeWithMemory(agentId, memory);
             case HANDOFFS -> createHandoffsRuntimeWithMemory(agentId, memory);
             case DEBATE -> createDebateRuntimeWithMemory(agentId, memory);
+            case LOOP -> createLoopRuntimeWithMemory(agentId, memory);
+            case STATE_GRAPH -> createStateGraphRuntimeWithMemory(agentId, memory);
+            case MSG_HUB -> createMsgHubRuntimeWithMemory(agentId, memory);
+            case SUBAGENT_SEQ -> createSubagentSeqRuntimeWithMemory(agentId, memory);
+            case SUBAGENT_PAR -> createSubagentParRuntimeWithMemory(agentId, memory);
         };
     }
 
@@ -133,6 +148,76 @@ public class AgentRuntimeFactory {
         ObservabilityHook hook = new ObservabilityHook();
         io.agentscope.core.pipeline.Pipeline<io.agentscope.core.message.Msg> pipeline =
                 compositeFactory.createDebateAgent(config, memory);
+        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
+    }
+
+    public PipelineAgentRuntime createLoopRuntime(String agentId) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        LoopPipeline pipeline = compositeFactory.createLoopAgent(config, null);
+        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
+    }
+
+    public PipelineAgentRuntime createLoopRuntimeWithMemory(String agentId, Memory memory) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        LoopPipeline pipeline = compositeFactory.createLoopAgent(config, memory);
+        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
+    }
+
+    public StateGraphRuntime createStateGraphRuntime(String agentId) {
+        ObservabilityHook hook = new ObservabilityHook();
+        OrderFulfillmentGraph graph = compositeFactory.createStateGraphAgent(
+                configService.getAgentConfig(agentId), null);
+        return new StateGraphRuntime(agentId, graph, hook);
+    }
+
+    public StateGraphRuntime createStateGraphRuntimeWithMemory(String agentId, Memory memory) {
+        ObservabilityHook hook = new ObservabilityHook();
+        OrderFulfillmentGraph graph = compositeFactory.createStateGraphAgent(
+                configService.getAgentConfig(agentId), memory);
+        return new StateGraphRuntime(agentId, graph, hook);
+    }
+
+    public MsgHubRuntime createMsgHubRuntime(String agentId) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        RoundTablePipeline pipeline = compositeFactory.createMsgHubAgent(config, null);
+        return new MsgHubRuntime(config.getAgentId(), pipeline, hook);
+    }
+
+    public MsgHubRuntime createMsgHubRuntimeWithMemory(String agentId, Memory memory) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        RoundTablePipeline pipeline = compositeFactory.createMsgHubAgent(config, memory);
+        return new MsgHubRuntime(config.getAgentId(), pipeline, hook);
+    }
+
+    public PipelineAgentRuntime createSubagentSeqRuntime(String agentId) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        TaskOrchestratorPipeline pipeline = compositeFactory.createSubagentSeqAgent(config, null);
+        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
+    }
+
+    public PipelineAgentRuntime createSubagentSeqRuntimeWithMemory(String agentId, Memory memory) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        TaskOrchestratorPipeline pipeline = compositeFactory.createSubagentSeqAgent(config, memory);
+        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
+    }
+
+    public PipelineAgentRuntime createSubagentParRuntime(String agentId) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        TaskDispatcherPipeline pipeline = compositeFactory.createSubagentParAgent(config, null);
+        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
+    }
+
+    public PipelineAgentRuntime createSubagentParRuntimeWithMemory(String agentId, Memory memory) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        TaskDispatcherPipeline pipeline = compositeFactory.createSubagentParAgent(config, memory);
         return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
     }
 
