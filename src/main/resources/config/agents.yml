@@ -1060,3 +1060,394 @@ agents:
         expectedBehavior: "乐观/批评/数据三角度分析，裁判给出 ROI 判断"
       - prompt: "评估策略：放弃现有客户管理系统，迁移到新平台"
         expectedBehavior: "多角度风险收益分析，裁判给出迁移建议"
+
+# ============================================================
+# P6: Advanced Multi-Agent Patterns
+# ============================================================
+
+# === P6: Loop Pipeline ===
+
+  - agentId: copywriter-refiner
+    category: collaboration
+    type: LOOP
+    name: 文案打磨
+    description: 写手撰写→评审把关→反复修改，直到文案满意
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    loopConfig:
+      maxIterations: 3
+      exitCondition: AUTO
+    subAgents:
+      - agentId: writer
+        role: WRITER
+      - agentId: critic
+        role: CRITIC
+    samplePrompts:
+      - prompt: 写一篇关于AI助手的产品介绍
+        expectedBehavior: 撰写→评审→修改，最多3轮
+      - prompt: 帮我润色这段话，让它更专业
+        expectedBehavior: "writer撰写，critic评审，迭代改进直到满意"
+
+# === P6: StateGraph ===
+
+  - agentId: order-fulfillment
+    category: collaboration
+    type: STATE_GRAPH
+    name: 订单履约
+    description: 模拟完整的订单履约流程（提交→审核→支付→发货）
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    states:
+      - name: CREATED
+        transitions:
+          - event: submit
+            target: SUBMITTED
+      - name: SUBMITTED
+        transitions:
+          - event: review
+            target: REVIEWING
+      - name: REVIEWING
+        agent: order-reviewer
+        transitions:
+          - condition: approved
+            target: APPROVED
+          - condition: rejected
+            target: REJECTED
+      - name: APPROVED
+        transitions:
+          - event: pay
+            target: PAYING
+      - name: PAYING
+        agent: payment-agent
+        transitions:
+          - condition: success
+            target: PAID
+          - condition: fail
+            target: PAY_FAILED
+      - name: PAY_FAILED
+        transitions:
+          - event: retry
+            target: PAYING
+      - name: PAID
+        transitions:
+          - event: ship
+            target: SHIPPING
+      - name: SHIPPING
+        agent: shipping-agent
+        transitions:
+          - condition: delivered
+            target: DONE
+          - condition: lost
+            target: LOST_IN_TRANSIT
+      - name: REJECTED
+        transitions: []
+      - name: DONE
+        transitions: []
+      - name: LOST_IN_TRANSIT
+        transitions: []
+    samplePrompts:
+      - prompt: 提交订单
+        expectedBehavior: 启动订单履约流程
+      - prompt: 我要买一个商品，金额10000元
+        expectedBehavior: "进入订单流程，等待审核"
+
+# === P6: MsgHub Roundtable ===
+
+  - agentId: expert-roundtable
+    category: collaboration
+    type: MSG_HUB
+    name: 专家圆桌评审
+    description: 多位专家对技术方案进行多轮讨论评审
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    msgHubConfig:
+      rounds: 2
+      summaryRole: MODERATOR
+    subAgents:
+      - agentId: moderator
+        role: MODERATOR
+      - agentId: architect
+        role: EXPERT
+      - agentId: dba-expert
+        role: EXPERT
+      - agentId: security-expert
+        role: EXPERT
+    samplePrompts:
+      - prompt: 评审方案：使用微服务架构重构现有单体应用，采用Spring Cloud + Kubernetes
+        expectedBehavior: 架构师、DBA、安全专家分别讨论，主持人总结
+      - prompt: 我们的技术方案是：前后端分离 + 微服务 + MySQL + Redis
+        expectedBehavior: "多专家多轮讨论，主持人给出综合评审报告"
+
+# === P6: Subagents Sequential ===
+
+  - agentId: report-generator
+    category: collaboration
+    type: SUBAGENT_SEQ
+    name: 报告生成流水线
+    description: 调研→分析→撰写，自动生成结构化报告
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    subAgents:
+      - agentId: researcher
+        role: RESEARCHER
+        taskTemplate: "请调研以下主题的背景信息和最新进展：{input}"
+      - agentId: analyst
+        role: ANALYST
+        taskTemplate: "基于以下调研结果进行深度分析：{prevOutput}"
+      - agentId: report-writer
+        role: WRITER
+        taskTemplate: "根据以下分析结果撰写结构化报告：{prevOutput}"
+    samplePrompts:
+      - prompt: 生成一份关于大语言模型在企业级应用中的现状与发展趋势的报告
+        expectedBehavior: 调研→分析→撰写三步生成报告
+      - prompt: 帮我研究并生成一份关于AI Agent技术的报告
+        expectedBehavior: "串行执行：调研员调研→分析师分析→报告撰写员撰写"
+
+# === P6: Subagents Parallel ===
+
+  - agentId: project-manager
+    category: collaboration
+    type: SUBAGENT_PAR
+    name: 项目经理委派
+    description: 将项目需求同时委派给调研、设计、评估三个专家
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    subAgents:
+      - agentId: pm-researcher
+        role: RESEARCHER
+        taskTemplate: "调研项目的技术可行性和市场情况：{input}"
+      - agentId: pm-designer
+        role: DESIGNER
+        taskTemplate: "设计项目的技术方案和架构：{input}"
+      - agentId: pm-evaluator
+        role: EVALUATOR
+        taskTemplate: "评估项目的风险和资源需求：{input}"
+    samplePrompts:
+      - prompt: 开发一个基于AI的智能客服系统
+        expectedBehavior: 调研、设计、评估三路并行
+      - prompt: 我想做一个AI Agent平台项目
+        expectedBehavior: "三个专家并行工作：调研可行性、设计方案、评估风险"
+
+# ============================================================
+# P6: Advanced Multi-Agent Pattern Sub-Agents
+# ============================================================
+
+# === Loop Pipeline sub-agents ===
+
+  - agentId: writer
+    category: expert
+    name: 文案写手
+    description: 负责撰写和修改文案内容
+    systemPrompt: |
+      你是一位专业的文案写手。你需要根据用户的需求撰写高质量的内容。
+      如果收到评审意见，请根据意见修改你的内容，保留核心内容同时改进不足之处。
+      直接输出文案内容，不要添加额外说明。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: false
+    samplePrompts:
+      - prompt: "写一篇关于AI助手的产品介绍"
+        expectedBehavior: "直接输出产品介绍文案，不添加额外说明"
+
+  - agentId: critic
+    category: expert
+    name: 文案评审
+    description: 负责评审文案质量
+    systemPrompt: |
+      你是一位严格的文案评审专家。评审以下内容时：
+      - 如果内容质量足够好，回复中包含【通过】
+      - 如果需要修改，给出具体的修改建议
+      评审要点：逻辑清晰、内容完整、语言流畅、符合需求。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: false
+    samplePrompts:
+      - prompt: "评审以下文案：AI助手可以帮助用户提高工作效率，简化日常任务。"
+        expectedBehavior: "给出评审意见，包含【通过】或修改建议"
+
+# === StateGraph sub-agents ===
+
+  - agentId: order-reviewer
+    category: expert
+    name: 订单审核员
+    description: 审核订单信息
+    systemPrompt: |
+      你是订单审核员。根据用户提供的订单信息判断是否通过审核。
+      审核标准：信息完整、金额合理、无异常。
+      用【决策:approved】表示通过，【决策:rejected】表示拒绝。
+      简要说明审核结果和原因。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: false
+    samplePrompts:
+      - prompt: "审核订单：金额10000元，商品为企业软件许可证"
+        expectedBehavior: "给出审核结果，包含【决策:approved】或【决策:rejected】"
+
+  - agentId: payment-agent
+    category: expert
+    name: 支付处理
+    description: 处理订单支付
+    systemPrompt: |
+      你是支付处理系统。模拟处理支付请求。
+      大部分情况支付成功，偶尔可能失败。
+      用【决策:success】表示支付成功，【决策:fail】表示支付失败。
+      简要说明支付处理结果。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: false
+    samplePrompts:
+      - prompt: "处理支付：金额10000元，支付方式支付宝"
+        expectedBehavior: "模拟支付处理，包含【决策:success】或【决策:fail】"
+
+  - agentId: shipping-agent
+    category: expert
+    name: 物流处理
+    description: 处理订单发货
+    systemPrompt: |
+      你是物流处理系统。模拟处理发货请求。
+      大部分情况发货成功，偶尔可能丢失。
+      用【决策:delivered】表示送达，【决策:lost】表示丢失。
+      简要说明物流处理结果。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: false
+    samplePrompts:
+      - prompt: "处理发货：地址北京市朝阳区，商品软件许可证"
+        expectedBehavior: "模拟物流处理，包含【决策:delivered】或【决策:lost】"
+
+# === MsgHub sub-agents ===
+
+  - agentId: moderator
+    category: expert
+    name: 评审主持人
+    description: 主持专家圆桌讨论并总结
+    systemPrompt: |
+      你是技术方案评审的主持人。你需要综合所有专家的意见，给出最终的评审报告。
+      报告应包括：各专家核心观点摘要、共识与分歧、最终建议。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: false
+    samplePrompts:
+      - prompt: "综合以下专家意见，给出评审报告：架构师建议微服务，DBA建议分库分表"
+        expectedBehavior: "综合专家意见，给出结构化评审报告"
+
+  - agentId: architect
+    category: expert
+    name: 架构师
+    description: 架构设计专家
+    systemPrompt: |
+      你是资深架构师。从系统架构、技术选型、可扩展性等角度评审技术方案。
+      给出具体的架构建议和潜在风险。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: false
+    samplePrompts:
+      - prompt: "评审方案：使用微服务架构重构现有单体应用"
+        expectedBehavior: "从架构角度给出专业建议和风险分析"
+
+  - agentId: dba-expert
+    category: expert
+    name: DBA专家
+    description: 数据库和存储专家
+    systemPrompt: |
+      你是数据库管理专家。从数据模型、存储方案、查询性能、数据安全等角度评审技术方案。
+      给出具体的数据库优化建议。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: false
+    samplePrompts:
+      - prompt: "评审方案的数据库设计：使用MySQL分库分表"
+        expectedBehavior: "从数据库角度给出专业建议和优化方案"
+
+  - agentId: security-expert
+    category: expert
+    name: 安全专家
+    description: 安全和合规专家
+    systemPrompt: |
+      你是信息安全专家。从安全架构、权限控制、数据保护、合规性等角度评审技术方案。
+      给出具体的安全改进建议。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: false
+    samplePrompts:
+      - prompt: "评审方案的安全设计：使用JWT认证和RBAC权限"
+        expectedBehavior: "从安全角度给出专业建议和改进方案"
+
+# === Subagent sub-agents ===
+
+  - agentId: researcher
+    category: expert
+    name: 调研员
+    description: 负责主题调研
+    systemPrompt: 你是专业调研员。根据给定主题进行深入调研，提供全面的背景信息和最新进展。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: false
+    samplePrompts:
+      - prompt: "调研主题：大语言模型在企业级应用中的现状"
+        expectedBehavior: "提供全面的背景信息和最新进展"
+
+  - agentId: analyst
+    category: expert
+    name: 分析师
+    description: 负责数据分析
+    systemPrompt: 你是数据分析专家。对给定的调研结果进行深度分析，提取关键洞察和趋势。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: false
+    samplePrompts:
+      - prompt: "分析以下调研结果，提取关键洞察和趋势"
+        expectedBehavior: "深度分析调研结果，提取关键洞察"
+
+  - agentId: report-writer
+    category: expert
+    name: 报告撰写员
+    description: 负责撰写最终报告
+    systemPrompt: 你是专业报告撰写员。根据给定的分析结果，撰写结构清晰、内容完整的最终报告。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: false
+    samplePrompts:
+      - prompt: "根据以下分析结果撰写结构化报告"
+        expectedBehavior: "撰写结构清晰、内容完整的报告"
+
+  - agentId: pm-researcher
+    category: expert
+    name: 项目调研员
+    description: 调研项目可行性
+    systemPrompt: 你是项目调研员。调研项目的技术可行性和市场情况，提供全面的可行性分析。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: false
+    samplePrompts:
+      - prompt: "调研项目的技术可行性和市场情况"
+        expectedBehavior: "提供全面的可行性分析"
+
+  - agentId: pm-designer
+    category: expert
+    name: 方案设计师
+    description: 设计技术方案
+    systemPrompt: 你是技术方案设计师。根据需求设计技术方案和系统架构，提供详细的设计文档。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: false
+    samplePrompts:
+      - prompt: "设计项目的技术方案和架构"
+        expectedBehavior: "提供详细的技术方案和架构设计"
+
+  - agentId: pm-evaluator
+    category: expert
+    name: 风险评估员
+    description: 评估项目风险
+    systemPrompt: 你是项目风险评估员。评估项目的风险和资源需求，提供全面的风险分析报告。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: false
+    samplePrompts:
+      - prompt: "评估项目的风险和资源需求"
+        expectedBehavior: "提供全面的风险分析报告"
