@@ -243,10 +243,20 @@ async function sendMessage() {
                             var tParams = payload.params || '{}';
                             var tParamsPreview = payload.paramsPreview || tParams.substring(0, 50);
                             var isSkill = payload.isSkill === true;
+                            var isRag = payload.name === 'retrieve_knowledge';
                             var tSkillName = payload.displayName || '';
 
                             if (enableThinking) {
-                                if (isSkill) {
+                                if (isRag) {
+                                    var ragQuery = '';
+                                    try {
+                                        var params = JSON.parse(payload.params || '{}');
+                                        ragQuery = params.query || '';
+                                    } catch(e) {
+                                        ragQuery = payload.paramsPreview || '';
+                                    }
+                                    updateThinkingBox('🔍 RAG检索: ' + ragQuery, fileInfo);
+                                } else if (isSkill) {
                                     updateThinkingBox('📖 Loading skill: ' + (tSkillName || '...'), fileInfo);
                                 } else {
                                     updateThinkingBox('⚡ ' + tName + '(' + tParamsPreview + ')', fileInfo);
@@ -256,10 +266,11 @@ async function sendMessage() {
                             if (currentRound) {
                                 currentRound.toolCallCount++;
                                 currentRound._currentToolStart = Date.now();
-                                var rowType = isSkill ? 'skill' : 'tool';
-                                var rowLabel = isSkill ? ('Skill → ' + (tSkillName || '')) : ('Tool → ' + tName);
+                                var rowType = isRag ? 'rag' : (isSkill ? 'skill' : 'tool');
+                                var rowLabel = isRag ? 'RAG → retrieve_knowledge' : (isSkill ? ('Skill → ' + (tSkillName || '')) : ('Tool → ' + tName));
                                 currentRound._currentToolRow = addTimelineRow(rowType, rowLabel, '...', 'running');
                                 currentRound._currentToolIsSkill = isSkill;
+                                currentRound._currentToolIsRag = isRag;
                                 updateRoundMetrics();
                             } else {
                                 console.warn('[tool_start] No currentRound available!', payload);
@@ -288,7 +299,16 @@ async function sendMessage() {
                                     var tmEl = tRow.querySelector('.rtl-metrics');
                                     var tsEl = tRow.querySelector('.rtl-status');
                                     var durStr = teDurMs >= 0 ? formatDuration(teDurMs) : '';
-                                    if (tmEl) tmEl.textContent = durStr;
+                                    if (tmEl) {
+                                        if (targetRound._currentToolIsRag && payload.isRagRetrieval) {
+                                            var ragInfo = (payload.ragHitCount || 0) + ' hits';
+                                            if (payload.ragScoreRange) ragInfo += ' (' + payload.ragScoreRange + ')';
+                                            tmEl.textContent = ragInfo;
+                                            tRow.title = 'Query: ' + (payload.ragQuery || '');
+                                        } else {
+                                            tmEl.textContent = durStr;
+                                        }
+                                    }
                                     if (tsEl) tsEl.textContent = teDurMs >= 0 ? '✓' : '✗';
                                     tRow.classList.remove('status-running');
                                     tRow.classList.add(teDurMs >= 0 ? 'status-ok' : 'status-fail');

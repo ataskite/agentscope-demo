@@ -169,6 +169,7 @@ function getTimelineIcon(type) {
         case 'llm': return '↻';
         case 'memory': return '◈';
         case 'skill': return '◉';
+        case 'rag': return '🔍';
         case 'tool': return '⚡';
         case 'error': return '⚠';
         default: return '·';

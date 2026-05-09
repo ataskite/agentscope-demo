@@ -481,3 +481,27 @@
     border-radius: 4px;
     margin-top: var(--space-xs);
 }
+
+/* ===== RAG RETRIEVAL ===== */
+.rtl-row.type-rag {
+    background: rgba(0, 240, 255, 0.05);
+    border-radius: 4px;
+    margin: 2px 0;
+    padding: var(--space-xs) 0;
+}
+
+.rtl-row.type-rag .rtl-icon {
+    color: var(--neon-cyan);
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.7), 0 0 15px rgba(0, 240, 255, 0.3);
+    font-size: 12px;
+}
+
+.rtl-row.type-rag .rtl-label {
+    color: var(--neon-cyan);
+    font-weight: 500;
+}
+
+.rtl-row.type-rag .rtl-metrics {
+    color: var(--neon-green);
+    font-size: 10px;
+}
