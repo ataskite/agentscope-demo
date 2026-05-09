@@ -5,6 +5,9 @@ import com.skloda.agentscope.agent.AgentConfigService;
 import com.skloda.agentscope.agent.AgentFactory;
 import com.skloda.agentscope.agent.AgentType;
 import com.skloda.agentscope.agent.HandoffTrigger;
+import com.skloda.agentscope.agent.LoopConfig;
+import com.skloda.agentscope.agent.MsgHubConfig;
+import com.skloda.agentscope.agent.StateConfig;
 import com.skloda.agentscope.agent.SubAgentConfig;
 import com.skloda.agentscope.agent.TriggerType;
 import io.agentscope.core.ReActAgent;
@@ -26,7 +29,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+
+import com.skloda.agentscope.composite.graph.OrderFulfillmentGraph;
+import com.skloda.agentscope.composite.pipeline.LoopPipeline;
+import com.skloda.agentscope.composite.pipeline.RoundTablePipeline;
+import com.skloda.agentscope.composite.pipeline.TaskDispatcherPipeline;
+import com.skloda.agentscope.composite.pipeline.TaskOrchestratorPipeline;
 
 /**
  * Factory for creating multi-agent compositions.
@@ -190,8 +201,99 @@ public class CompositeAgentFactory {
         return new DebatePipeline(debaters, judge);
     }
 
+    public LoopPipeline createLoopAgent(AgentConfig config, Memory memory) {
+        List<SubAgentConfig> subs = config.getSubAgents();
+        if (subs.size() < 2) {
+            throw new IllegalArgumentException("LOOP requires at least 2 sub-agents (writer + critic)");
+        }
+
+        AgentBase writer = findOrCreateAgent(subs.get(0), memory);
+        AgentBase critic = findOrCreateAgent(subs.get(1), memory);
+
+        LoopConfig loopConfig = config.getLoopConfig();
+        int maxIterations = loopConfig != null ? loopConfig.getMaxIterations() : 3;
+        boolean autoExit = loopConfig == null || "AUTO".equalsIgnoreCase(loopConfig.getExitCondition());
+
+        return new LoopPipeline(writer, critic, maxIterations, autoExit);
+    }
+
+    public OrderFulfillmentGraph createStateGraphAgent(AgentConfig config, Memory memory) {
+        List<StateConfig> states = config.getStates();
+        if (states == null || states.isEmpty()) {
+            throw new IllegalArgumentException("STATE_GRAPH requires states configuration");
+        }
+
+        Map<String, ReActAgent> stateAgents = new LinkedHashMap<>();
+        for (StateConfig state : states) {
+            if (state.getAgent() != null) {
+                AgentConfig agentConfig = configService.getAgentConfig(state.getAgent());
+                ReActAgent agent = (ReActAgent) singleAgentFactory.createAgent(agentConfig, memory);
+                stateAgents.put(state.getName(), agent);
+            }
+        }
+
+        return new OrderFulfillmentGraph(states, stateAgents);
+    }
+
+    public RoundTablePipeline createMsgHubAgent(AgentConfig config, Memory memory) {
+        List<SubAgentConfig> subs = config.getSubAgents();
+        if (subs.size() < 2) {
+            throw new IllegalArgumentException("MSG_HUB requires at least a moderator + experts");
+        }
+
+        AgentBase moderator = findOrCreateAgent(subs.get(0), memory);
+
+        List<AgentBase> experts = new ArrayList<>();
+        for (int i = 1; i < subs.size(); i++) {
+            experts.add(findOrCreateAgent(subs.get(i), memory));
+        }
+
+        MsgHubConfig msgHubConfig = config.getMsgHubConfig();
+        int rounds = msgHubConfig != null ? msgHubConfig.getRounds() : 3;
+
+        return new RoundTablePipeline(moderator, experts, rounds);
+    }
+
+    public TaskOrchestratorPipeline createSubagentSeqAgent(AgentConfig config, Memory memory) {
+        List<SubAgentConfig> subs = config.getSubAgents();
+        if (subs.isEmpty()) {
+            throw new IllegalArgumentException("SUBAGENT_SEQ requires at least 1 sub-agent");
+        }
+
+        List<AgentBase> agents = new ArrayList<>();
+        List<String> templates = new ArrayList<>();
+        List<String> ids = new ArrayList<>();
+
+        for (SubAgentConfig sub : subs) {
+            agents.add(findOrCreateAgent(sub, memory));
+            templates.add(sub.getTaskTemplate() != null ? sub.getTaskTemplate() : "{input}");
+            ids.add(sub.getAgentId());
+        }
+
+        return new TaskOrchestratorPipeline(agents, templates, ids);
+    }
+
+    public TaskDispatcherPipeline createSubagentParAgent(AgentConfig config, Memory memory) {
+        List<SubAgentConfig> subs = config.getSubAgents();
+        if (subs.isEmpty()) {
+            throw new IllegalArgumentException("SUBAGENT_PAR requires at least 1 sub-agent");
+        }
+
+        List<AgentBase> agents = new ArrayList<>();
+        List<String> templates = new ArrayList<>();
+        List<String> ids = new ArrayList<>();
+
+        for (SubAgentConfig sub : subs) {
+            agents.add(findOrCreateAgent(sub, memory));
+            templates.add(sub.getTaskTemplate() != null ? sub.getTaskTemplate() : "{input}");
+            ids.add(sub.getAgentId());
+        }
+
+        return new TaskDispatcherPipeline(agents, templates, ids);
+    }
+
     /**
-     * Create a routing agent that uses LLM to decide which sub-agent to dispatch to.
+     * Create a routing agent that uses uses LLM to decide which sub-agent to dispatch to.
      * Each sub-agent is registered as a SubAgentTool, and the router's system prompt
      * describes each sub-agent's capabilities for intelligent routing.
      */
@@ -478,5 +580,10 @@ public class CompositeAgentFactory {
         }
 
         return sb.toString();
+    }
+
+    private AgentBase findOrCreateAgent(SubAgentConfig subConfig, Memory memory) {
+        AgentConfig agentConfig = configService.getAgentConfig(subConfig.getAgentId());
+        return singleAgentFactory.createAgent(agentConfig, memory);
     }
 }
