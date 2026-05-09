@@ -6,7 +6,7 @@
 
 ## Progress Snapshot
 
-Last updated: 2026-05-07
+Last updated: 2026-05-09
 
 Completed:
 
@@ -22,6 +22,7 @@ Completed:
 - [x] Session persistence via AgentScope SessionManager.
 - [x] ObservabilityHook with timeline, metrics, thinking, and tool-call detail events.
 - [x] SSE streaming chat UI with real-time debug panel.
+- [x] P6 Advanced Multi-Agent Patterns: Loop, StateGraph, MsgHub, Subagents-Sequential, Subagents-Parallel. All 10 multi-agent patterns now have demos.
 
 Current TODO:
 
@@ -95,10 +96,11 @@ The demo should:
 | Supervisor (one tool per specialist) | ✅ | `super-supervisor` |
 | Debate (MsgHub + moderator) | ✅ | `debate-review` |
 | Agent as Tool (sub-agent invocation) | ✅ | SubAgentTool in routing/supervisor |
-| Subagents (Task/TaskOutput orchestration) | ❌ | Planned: orchestrator with sub-agent tasks |
+| Subagents (Task/TaskOutput orchestration) | ✅ | `report-generator` (Sequential), `project-manager` (Parallel) |
 | Skills (progressive disclosure) | ✅ | SKILL.md + `read_skill` via ToolRegistry |
-| MsgHub (group conversation) | 🔧 | Debate uses MsgHub pattern; need standalone demo |
-| Custom Workflow (StateGraph) | ❌ | Planned: mixed deterministic + agentic steps |
+| MsgHub (group conversation) | ✅ | `expert-roundtable` |
+| Loop Pipeline (iterative refinement) | ✅ | `copywriter-refiner` |
+| Custom Workflow (StateGraph) | ✅ | `order-fulfillment` |
 
 ### Tool Ecosystem
 
@@ -410,21 +412,23 @@ Completed:
 | 33 | MCP Tool Filtering | Selective tool enable/disable per agent | Config in `agents.yml` | P5 |
 | 34 | MCP Tool Groups | Grouped tool activation modes | `mcp-multi-mode` | P5 |
 | 35 | Higress Gateway | Semantic tool search via AI gateway | `higress-agent` | P5 |
-| 36 | Subagents | Orchestrator delegating to isolated sub-agents | `task-orchestrator` | P6 |
-| 37 | MsgHub Standalone | Group conversation round-table | `round-table` | P6 |
-| 38 | Custom Workflow | StateGraph mixed deterministic + agentic | `approval-workflow` | P6 |
-| 39 | Loop Pipeline | Iterative refinement until quality threshold | `refinement-loop` | P6 |
-| 40 | A2A Client | Call remote Agent2Agent services | `remote-caller` | P7 |
-| 41 | A2A Server | Expose local agents as A2A services | A2A starter config | P7 |
-| 42 | A2A Nacos | Nacos-based agent service discovery | `nacos-discovery` | P7 |
-| 43 | AG-UI | Frontend protocol compatibility endpoints | AG-UI controller | P7 |
-| 44 | Studio | AgentScope Studio visual debugging | StudioMessageHook | P7 |
-| 45 | JSONL Trace | Execution trace file export | JsonlTraceExporter | P7 |
-| 46 | OpenTelemetry | Distributed tracing integration | OTEL Tracer SPI | P7 |
-| 47 | CLI-Anything Wrapper | Agent capabilities as CLI commands | `agentscope` CLI binary | P8 |
-| 48 | HTTP API CLI Adapter | CLI → `/chat/send` SSE streaming | CLI adapter module | P8 |
-| 49 | OpenClaw SKILL.md | Per-agent skill descriptors for OpenClaw | `~/.openclaw/skills/` | P8 |
-| 50 | OpenClaw Skill Package | Installable skill: `openclaw skills install agentscope-demo` | Skill package | P8 |
+| 36 | Subagents Sequential | Orchestrator delegating with {prevOutput} chaining | `report-generator` | ✅ P6 |
+| 37 | Subagents Parallel | Parallel task dispatch with aggregation | `project-manager` | ✅ P6 |
+| 38 | MsgHub Standalone | Group conversation round-table | `expert-roundtable` | ✅ P6 |
+| 39 | Custom Workflow | StateGraph mixed deterministic + agentic | `order-fulfillment` | ✅ P6 |
+| 40 | Loop Pipeline | Iterative refinement until quality threshold | `copywriter-refiner` | ✅ P6 |
+| 40 | Loop Pipeline | Iterative refinement until quality threshold | `copywriter-refiner` | ✅ P6 |
+| 41 | A2A Client | Call remote Agent2Agent services | `remote-caller` | P7 |
+| 42 | A2A Server | Expose local agents as A2A services | A2A starter config | P7 |
+| 43 | A2A Nacos | Nacos-based agent service discovery | `nacos-discovery` | P7 |
+| 44 | AG-UI | Frontend protocol compatibility endpoints | AG-UI controller | P7 |
+| 45 | Studio | AgentScope Studio visual debugging | StudioMessageHook | P7 |
+| 46 | JSONL Trace | Execution trace file export | JsonlTraceExporter | P7 |
+| 47 | OpenTelemetry | Distributed tracing integration | OTEL Tracer SPI | P7 |
+| 48 | CLI-Anything Wrapper | Agent capabilities as CLI commands | `agentscope` CLI binary | P8 |
+| 49 | HTTP API CLI Adapter | CLI → `/chat/send` SSE streaming | CLI adapter module | P8 |
+| 50 | OpenClaw SKILL.md | Per-agent skill descriptors for OpenClaw | `~/.openclaw/skills/` | P8 |
+| 51 | OpenClaw Skill Package | Installable skill: `openclaw skills install agentscope-demo` | Skill package | P8 |
 
 ## 9. References
 
