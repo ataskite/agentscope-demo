@@ -32,6 +32,10 @@ servers:
   - name: demo-remote
     transport: SSE
     url: http://localhost:9090/sse
+    headers:
+      Authorization: "Bearer ${MCP_API_TOKEN:}"
+    queryParams:
+      version: v1
     timeout: 60
 
   - name: demo-api
@@ -45,9 +49,12 @@ Fields per server:
 - `transport`: `STDIO` | `SSE` | `HTTP`
 - `command`/`args`: StdIO only, subprocess launch
 - `url`: SSE/HTTP only, server endpoint
-- `headers`: SSE/HTTP optional, supports `${ENV_VAR:default}` placeholders
-- `timeout`: request timeout in seconds (optional)
-- `initTimeout`: initialization timeout in seconds (optional)
+- `headers`: SSE/HTTP optional, map of key-value pairs, supports `${ENV_VAR:default}` placeholders for values
+- `queryParams`: SSE/HTTP optional, map of key-value pairs appended to URL query string; individual params via `queryParam(k,v)`, batch via `queryParams(Map)`; merged with any params already in the URL (extra params take precedence)
+- `timeout`: request timeout in seconds (optional, applies to all transports)
+- `initTimeout`: initialization timeout in seconds (optional, applies to all transports)
+
+> **Note**: `headers` and `queryParams` only affect SSE/HTTP transports. For StdIO they are silently ignored.
 
 ### `agents.yml` additions
 
@@ -75,7 +82,7 @@ toolGroups:                              # tool group definitions
 
 | File | Responsibility |
 |---|---|
-| `mcp/McpServerConfig.java` | Single MCP server config entity (name, transport, command/args, url, headers, timeouts) |
+| `mcp/McpServerConfig.java` | Single MCP server config entity (name, transport, command/args, url, headers, queryParams, timeouts) |
 | `mcp/McpClientService.java` | MCP client lifecycle: `@PostConstruct` creates all clients, caches by name, `@PreDestroy` closes all. Provides `getClient(name)` |
 | `mcp/McpServerRef.java` | Agent config's MCP reference: server name, enableTools, disableTools, group |
 | `mcp/ToolGroupConfig.java` | Tool group definition: name, description, active |
@@ -94,8 +101,8 @@ toolGroups:                              # tool group definitions
 1. `@PostConstruct`: read `mcp-servers.yml`, iterate servers
 2. For each server: `McpClientBuilder.create(name)` → configure transport → `buildAsync().block()`
 3. StdIO: `.stdioTransport(command, args...)`
-4. SSE: `.sseTransport(url).header(k,v)...`
-5. HTTP: `.streamableHttpTransport(url).header(k,v)...`
+4. SSE: `.sseTransport(url).header(k,v).queryParam(k,v)...`
+5. HTTP: `.streamableHttpTransport(url).header(k,v).queryParam(k,v)...`
 6. Store in `Map<String, McpClientWrapper>`
 7. `@PreDestroy`: close all clients
 
@@ -173,6 +180,13 @@ Fallback: if `supergateway` is unavailable or Node.js is not installed, the SSE/
 ## Dependencies
 
 No new Maven dependencies needed. MCP client functionality is included in `agentscope-core` 1.0.12.
+
+## Out of Scope (Future)
+
+- **Elicitation**: AgentScope supports `asyncElicitation`/`syncElicitation` for interactive information collection during MCP tool calls. This requires UI integration (dialog prompts) and is deferred to a later phase.
+- **Higress AI Gateway**: Semantic tool search via Higress gateway (`HigressMcpClientBuilder`/`HigressToolkit`). Excluded per user decision.
+- **MCP client removal at runtime**: `toolkit.removeMcpClient(name)` for dynamic unregistration. Not needed for static config demo.
+- **Sync client mode**: `buildSync()` alternative. P5 uses `buildAsync().block()` exclusively as recommended by docs.
 
 ## Success Criteria
 
