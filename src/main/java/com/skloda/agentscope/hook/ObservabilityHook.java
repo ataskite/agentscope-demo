@@ -279,6 +279,18 @@ public class ObservabilityHook implements Hook {
             data.put("isSkill", true);
         }
 
+        // RAG retrieval detection
+        if ("retrieve_knowledge".equals(toolName)) {
+            data.put("isRagRetrieval", true);
+            String query = extractToolParam(toolUse.getInput() != null ? toolUse.getInput().toString() : "", "query");
+            data.put("ragQuery", query);
+            int[] hitScore = parseRagResultStats(resultText);
+            data.put("ragHitCount", hitScore[0]);
+            if (hitScore[1] >= 0 && hitScore[2] >= 0) {
+                data.put("ragScoreRange", String.format("%.2f-%.2f", hitScore[1] / 100.0, hitScore[2] / 100.0));
+            }
+        }
+
         log.info("[tool_end] {} durationMs={} success={}", toolName, durationMs, isSuccess);
         emit("tool_end", data);
     }
@@ -412,6 +424,59 @@ public class ObservabilityHook implements Hook {
                 "error", error,
                 "timestamp", System.currentTimeMillis()
         ));
+    }
+
+    /** Extract a parameter value from tool input string like "{query=some text, limit=5}" */
+    private String extractToolParam(String paramsStr, String paramName) {
+        if (paramsStr == null) return "";
+        String prefix = paramName + "=";
+        int idx = paramsStr.indexOf(prefix);
+        if (idx < 0) return "";
+        String sub = paramsStr.substring(idx + prefix.length());
+        int end = sub.indexOf(',');
+        if (end < 0) end = sub.indexOf('}');
+        if (end < 0) end = sub.length();
+        return sub.substring(0, end).trim();
+    }
+
+    /**
+     * Parse RAG result statistics from the retrieve_knowledge tool output.
+     * Returns [hitCount, minScore, maxScore]. Scores are in 0-100 range from AgentScope.
+     * If no scores found, returns [0, -1, -1].
+     */
+    private int[] parseRagResultStats(String resultText) {
+        if (resultText == null || resultText.isEmpty()) return new int[]{0, -1, -1};
+
+        int count = 0;
+        int minScore = Integer.MAX_VALUE;
+        int maxScore = Integer.MIN_VALUE;
+
+        // AgentScope returns relevance scores as integers or decimals in the result text
+        // Pattern: "relevance score: 85" or "score: 0.85" or "Relevance: 85%"
+        java.util.regex.Pattern scorePattern = java.util.regex.Pattern.compile(
+                "(?:relevance|score|相关性)\\s*[:：]?\\s*(\\d+)(?:\\.\\d+)?(?:%)?",
+                java.util.regex.Pattern.CASE_INSENSITIVE
+        );
+        java.util.regex.Matcher matcher = scorePattern.matcher(resultText);
+        while (matcher.find()) {
+            int score = Integer.parseInt(matcher.group(1));
+            // Normalize percentage-style scores (e.g., 85 means 85%)
+            if (score > 100) score = score / 10; // handle cases like 850 meaning 85%
+            minScore = Math.min(minScore, score);
+            maxScore = Math.max(maxScore, score);
+            count++;
+        }
+
+        // Fallback: count document entries if no scores found
+        if (count == 0) {
+            // Count lines starting with [1], [2], etc. or "Document" markers
+            java.util.regex.Pattern docPattern = java.util.regex.Pattern.compile("^\\s*\\[\\d+\\]", java.util.regex.Pattern.MULTILINE);
+            java.util.regex.Matcher docMatcher = docPattern.matcher(resultText);
+            while (docMatcher.find()) count++;
+            return new int[]{count, -1, -1};
+        }
+
+        return new int[]{count, minScore, maxScore};
     }
 
     // ---- Emit event to all consumers ----
