@@ -199,6 +199,42 @@ agents:
       - prompt: "如果知识库没有相关内容，请明确告诉我，不要编造答案"
         expectedBehavior: "展示无命中时的边界意识和可信回答"
 
+  - agentId: rag-agent
+    category: single
+    name: Agentic RAG 研究助手
+    description: 自主决定何时检索知识库的研究助手。与 rag-chat 的区别：rag-chat 自动检索所有问题，而本 Agent 会判断问题是否需要检索知识库。
+    systemPrompt: |
+      你是一个研究助手，擅长根据用户问题自主判断是否需要从知识库中检索信息。
+
+      判断规则：
+      - 当用户的问题涉及专业知识、技术细节、或特定文档内容时，使用 retrieve_knowledge 工具检索
+      - 当用户问的是常识性问题、日常闲聊、或通用编程知识时，直接回答，不需要检索
+      - 如果不确定是否需要检索，优先检索
+
+      检索到内容后，基于检索结果回答，并标注引用来源。
+      如果检索结果与问题不相关，说明知识库中没有相关信息，基于自身知识回答。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    autoContext: true
+    autoContextMsgThreshold: 30
+    autoContextLastKeep: 10
+    autoContextTokenRatio: 0.3
+    ragEnabled: true
+    ragMode: agentic
+    ragRetrieveLimit: 5
+    ragScoreThreshold: 0.3
+    skills: []
+    userTools: []
+    systemTools: []
+    samplePrompts:
+      - prompt: "你好，介绍一下你自己"
+        expectedBehavior: "不调用 retrieve_knowledge，直接回答"
+      - prompt: "知识库里有没有关于光模块技术的讨论？"
+        expectedBehavior: "调用 retrieve_knowledge 检索知识库，基于检索结果回答"
+      - prompt: "什么是 Java？"
+        expectedBehavior: "判断为常识问题，不检索知识库，直接回答"
+
   - agentId: vision-analyzer
     category: single
     name: Vision Analyzer
