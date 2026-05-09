@@ -59,6 +59,11 @@ public class AgentConfig {
     private Boolean parallel = false;
     private List<HandoffTrigger> handoffTriggers = new ArrayList<>();
 
+    // === P6 Advanced multi-agent fields ===
+    private LoopConfig loopConfig;
+    private List<StateConfig> states = new ArrayList<>();
+    private MsgHubConfig msgHubConfig;
+
     // === Showcase fields ===
     private List<SamplePrompt> samplePrompts = new ArrayList<>();
 

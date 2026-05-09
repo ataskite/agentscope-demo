@@ -9,9 +9,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class SubAgentConfig {
-    private String agentId;
-    private String description;
-    private String role;
-    private String taskTemplate;
+public class LoopConfig {
+    private int maxIterations = 3;
+    private String exitCondition = "AUTO";
 }

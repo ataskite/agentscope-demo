@@ -9,9 +9,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class SubAgentConfig {
-    private String agentId;
-    private String description;
-    private String role;
-    private String taskTemplate;
+public class StateTransition {
+    private String event;
+    private String condition;
+    private String target;
 }

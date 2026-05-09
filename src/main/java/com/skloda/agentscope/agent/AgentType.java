@@ -6,7 +6,12 @@ public enum AgentType {
     PARALLEL(false),
     ROUTING(false),
     HANDOFFS(false),
-    DEBATE(false);
+    DEBATE(false),
+    LOOP(false),
+    STATE_GRAPH(false),
+    MSG_HUB(false),
+    SUBAGENT_SEQ(false),
+    SUBAGENT_PAR(false);
 
     private final boolean isDefault;
 
