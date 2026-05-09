@@ -2,7 +2,7 @@ import './state.js?v=2.4';
 import { createSSEParser, uploadFile, fetchAgents, fetchSessions, createSession as createSessionApi, deleteSession as deleteSessionApi, fetchKnowledgeDocs, uploadKnowledgeDoc, removeKnowledgeDoc as removeKnowledgeDocApi, fetchSkillInfo, fetchToolInfo } from './api.js?v=2.5';
 import { renderMarkdown, escapeHtml, getTimestamp, formatDuration, scrollToBottom, createFileList } from './modules/utils.js?v=2.4';
 import { chatMessages, messageInput, sendBtn, chatEmpty, chatHeaderName, chatHeaderDesc, debugPanel, debugRounds, debugToggle, appendMessage, createThinkingBox, updateThinkingBox, collapseThinkingBox, completeThinkingBox, addAgentBubble, addAgentBubbleAfter, removeTypingIndicator, setStreamingState, showTypingIndicator, createAgentMessageWrapper } from './modules/ui.js?v=2.4';
-import { startRound, endRound, addTimelineRow, addTimelineRowForRound, clearDebug, toggleDebug, handlePipelineStart, handlePipelineStepStart, handlePipelineStepEnd, handleRoutingDecision, handleHandoffStart, updateRoundMetrics, updateRoundMetricsForRound } from './modules/debug.js?v=2.4';
+import { startRound, endRound, addTimelineRow, addTimelineRowForRound, clearDebug, toggleDebug, handlePipelineStart, handlePipelineStepStart, handlePipelineStepEnd, handleRoutingDecision, handleHandoffStart, updateRoundMetrics, updateRoundMetricsForRound, handleLoopStart, handleLoopEnd, handleLoopIterationResult, handleGraphTransition, handleRoundtableStart, handleRoundMessage, handleTaskDelegate, handleTaskEnd } from './modules/debug.js?v=2.6';
 import { loadAgents, selectAgent, showAgentConfig, showSkillInfo, showToolInfo } from './modules/agents.js?v=2.5';
 import { loadSessions, createNewSession, selectSession, deleteSession, clearSession as clearSessionFn } from './modules/session.js?v=2.5';
 import { loadKnowledgeDocs, uploadToKnowledge, removeKnowledgeDoc } from './modules/knowledge.js?v=2.4';
@@ -385,6 +385,66 @@ async function sendMessage() {
                             break;
                         case 'handoff_start':
                             handleHandoffStart(payload);
+                            break;
+
+                        // ===== P6 ADVANCED PATTERN EVENTS =====
+
+                        case 'loop_start':
+                            handleLoopStart(payload);
+                            break;
+                        case 'loop_end':
+                            handleLoopEnd(payload);
+                            break;
+                        case 'loop_iteration_result':
+                            handleLoopIterationResult(payload);
+                            break;
+                        case 'graph_transition':
+                            handleGraphTransition(payload);
+                            break;
+                        case 'graph_agent_call':
+                            if (currentRound) {
+                                addTimelineRow('phase', 'Agent @ ' + (payload.state || ''),
+                                    payload.agent || '', 'running');
+                            }
+                            break;
+                        case 'roundtable_start':
+                            handleRoundtableStart(payload);
+                            break;
+                        case 'round_start':
+                            if (currentRound) {
+                                addTimelineRow('phase', 'Round ' + (payload.round || '?'), '', 'running');
+                            }
+                            break;
+                        case 'round_end':
+                            if (currentRound) {
+                                addTimelineRow('phase', 'Round End', '', 'ok');
+                            }
+                            break;
+                        case 'round_message':
+                            handleRoundMessage(payload);
+                            break;
+                        case 'roundtable_summary':
+                            if (currentRound) {
+                                addTimelineRow('phase', 'Summary',
+                                    truncate(payload.content || '', 80), 'ok');
+                            }
+                            break;
+                        case 'task_delegate':
+                            handleTaskDelegate(payload);
+                            break;
+                        case 'task_start':
+                            if (currentRound) {
+                                addTimelineRow('phase', 'Task: ' + (payload.agent || ''), '...', 'running');
+                            }
+                            break;
+                        case 'task_end':
+                            handleTaskEnd(payload);
+                            break;
+                        case 'task_aggregate':
+                            if (currentRound) {
+                                addTimelineRow('phase', 'Aggregate',
+                                    (payload.totalTasks || 0) + ' tasks', 'ok');
+                            }
                             break;
 
                         // ===== HITL APPROVAL EVENT =====
@@ -770,6 +830,12 @@ function createStructuredDataCard(schemaClass, dataJson) {
         '<div class="structured-data-body">' + tableHtml + '</div>';
 
     return card;
+}
+
+/* ===== UTILITY FUNCTIONS ===== */
+function truncate(str, maxLen) {
+    if (!str) return '';
+    return str.length > maxLen ? str.substring(0, maxLen) + '...' : str;
 }
 
 /* ===== GLOBAL FUNCTIONS FOR ONCLICK ===== */

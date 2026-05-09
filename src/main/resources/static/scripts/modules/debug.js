@@ -404,3 +404,68 @@ export function handleHandoffStart(data) {
 
     scrollToBottom(debugRounds);
 }
+
+/* ===== P6 ADVANCED PATTERN EVENT HANDLERS ===== */
+
+export function handleLoopStart(data) {
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) return;
+    addTimelineRowForRound(targetRound, 'phase', 'Loop #' + (data.iteration || '?'), '', 'running');
+}
+
+export function handleLoopEnd(data) {
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) return;
+    var status = data.finalApproved ? 'ok' : 'fail';
+    addTimelineRowForRound(targetRound, 'phase', 'Loop End',
+        (data.totalIterations || 0) + ' iterations', status);
+}
+
+export function handleLoopIterationResult(data) {
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) return;
+    var status = data.approved ? 'ok' : 'fail';
+    var label = data.approved ? 'Approved' : 'Needs Revision';
+    addTimelineRowForRound(targetRound, data.approved ? 'phase' : 'phase',
+        'Iteration #' + (data.iteration || '?'), label, status);
+}
+
+export function handleGraphTransition(data) {
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) return;
+    addTimelineRowForRound(targetRound, 'phase', 'State',
+        (data.fromState || '') + ' → ' + (data.toState || ''), 'ok');
+}
+
+export function handleRoundtableStart(data) {
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) return;
+    addTimelineRowForRound(targetRound, 'phase', 'Roundtable',
+        (data.participants || []).join(', ') + ' | ' + (data.rounds || 0) + ' rounds', 'running');
+}
+
+export function handleRoundMessage(data) {
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) return;
+    addTimelineRowForRound(targetRound, 'phase', '💬 ' + (data.agent || ''),
+        truncate(data.content || '', 60), 'ok');
+}
+
+export function handleTaskDelegate(data) {
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) return;
+    addTimelineRowForRound(targetRound, 'phase', 'Task',
+        (data.from || '') + ' → ' + (data.to || ''), 'running');
+}
+
+export function handleTaskEnd(data) {
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) return;
+    addTimelineRowForRound(targetRound, 'phase', 'Task End',
+        (data.agent || '') + ': ' + truncate(data.outputPreview || '', 50), 'ok');
+}
+
+function truncate(str, maxLen) {
+    if (!str) return '';
+    return str.length > maxLen ? str.substring(0, maxLen) + '...' : str;
+}
