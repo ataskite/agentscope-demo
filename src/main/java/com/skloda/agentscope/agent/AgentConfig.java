@@ -1,5 +1,7 @@
 package com.skloda.agentscope.agent;
 
+import com.skloda.agentscope.mcp.McpServerRef;
+import com.skloda.agentscope.mcp.ToolGroupConfig;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -63,6 +65,10 @@ public class AgentConfig {
     private LoopConfig loopConfig;
     private List<StateConfig> states = new ArrayList<>();
     private MsgHubConfig msgHubConfig;
+
+    // === MCP fields ===
+    private List<McpServerRef> mcpServers = new ArrayList<>();
+    private List<ToolGroupConfig> toolGroups = new ArrayList<>();
 
     // === Showcase fields ===
     private List<SamplePrompt> samplePrompts = new ArrayList<>();

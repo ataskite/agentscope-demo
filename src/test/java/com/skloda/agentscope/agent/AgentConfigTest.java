@@ -1,5 +1,7 @@
 package com.skloda.agentscope.agent;
 
+import com.skloda.agentscope.mcp.McpServerRef;
+import com.skloda.agentscope.mcp.ToolGroupConfig;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -37,5 +39,42 @@ class AgentConfigTest {
         AgentConfig config = new AgentConfig();
         config.setRagMode("agentic");
         assertEquals("agentic", config.getRagMode());
+    }
+
+    @Test
+    void testMcpServersField() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("test-mcp");
+
+        List<McpServerRef> refs = List.of(
+            McpServerRef.builder()
+                .server("filesystem-local")
+                .enableTools(List.of("read_file"))
+                .build()
+        );
+
+        config.setMcpServers(refs);
+
+        assertEquals(1, config.getMcpServers().size());
+        assertEquals("filesystem-local", config.getMcpServers().get(0).getServer());
+    }
+
+    @Test
+    void testToolGroupsField() {
+        AgentConfig config = new AgentConfig();
+        config.setAgentId("test-groups");
+
+        List<ToolGroupConfig> groups = List.of(
+            ToolGroupConfig.builder()
+                .name("filesystem")
+                .description("文件操作工具")
+                .active(true)
+                .build()
+        );
+
+        config.setToolGroups(groups);
+
+        assertEquals(1, config.getToolGroups().size());
+        assertEquals("filesystem", config.getToolGroups().get(0).getName());
     }
 }
