@@ -2,11 +2,11 @@
 
 **Date**: 2026-05-06
 **Scope**: AgentScope Java feature-complete demo evolution
-**Status**: Milestone `p3-planning-memory` completed; next milestone `feature-complete-core` (P4 RAG ecosystem)
+**Status**: Milestone `p5-mcp-tool-ecosystem` completed; next milestone `p7-interoperability`
 
 ## Progress Snapshot
 
-Last updated: 2026-05-09
+Last updated: 2026-05-11
 
 Completed:
 
@@ -23,11 +23,12 @@ Completed:
 - [x] ObservabilityHook with timeline, metrics, thinking, and tool-call detail events.
 - [x] SSE streaming chat UI with real-time debug panel.
 - [x] P6 Advanced Multi-Agent Patterns: Loop, StateGraph, MsgHub, Subagents-Sequential, Subagents-Parallel. All 10 multi-agent patterns now have demos.
+- [x] P5 MCP Tool Ecosystem: StdIO/SSE/HTTP transports, tool filtering, tool groups, embedded demo server. 5 MCP demo agents. 171 tests passing.
 
 Current TODO:
 
-- [ ] Start P4 RAG ecosystem demos.
-- [ ] Implement remaining AgentScope features as real demo scenarios.
+- [ ] Start P4 RAG ecosystem demos (Agentic RAG).
+- [ ] Start P7 Interoperability & Observability.
 
 ## 1. Positioning
 
@@ -79,11 +80,6 @@ The demo should:
 | RAG Generic Mode (auto-inject) | ✅ | `rag-chat` |
 | RAG Agentic Mode (on-demand tool) | ❌ | Planned: `rag-agent` with `retrieve_knowledge` tool |
 | Local Knowledge — SimpleKnowledge | ✅ | InMemoryStore + DashScope embeddings |
-| Local Knowledge — Qdrant persistent store | ❌ | Planned: production RAG demo |
-| Cloud Knowledge — Bailian | ❌ | Planned: enterprise knowledge base |
-| Cloud Knowledge — Dify | ❌ | Planned: Dify integration demo |
-| Cloud Knowledge — RAGFlow | ❌ | Planned: RAGFlow integration demo |
-| Citation display & chunk preview | ❌ | Planned: RAG UI enhancement |
 
 ### Multi-Agent Patterns
 
@@ -109,12 +105,11 @@ The demo should:
 | Custom @Tool POJO tools | ✅ | 12+ tools registered |
 | System tools (file, shell) | ✅ | `view_text_file`, `write_text_file`, `execute_shell_command` |
 | Skill system (SKILL.md) | ✅ | 6 skills configured |
-| MCP — StdIO transport | ❌ | Planned: local MCP server connection |
-| MCP — SSE transport | ❌ | Planned: remote MCP server connection |
-| MCP — HTTP transport | ❌ | Planned: stateless MCP connection |
-| MCP — Tool filtering (enable/disable) | ❌ | Planned: selective MCP tool registration |
-| MCP — Tool Groups | ❌ | Planned: grouped tool activation |
-| MCP — Higress AI Gateway | ❌ | Planned: semantic tool search |
+| MCP — StdIO transport | ✅ | `mcp-filesystem` (local filesystem via npx) |
+| MCP — SSE transport | ✅ | `mcp-remote-sse` (embedded supergateway proxy) |
+| MCP — HTTP transport | ✅ | `mcp-api-http` (embedded supergateway proxy) |
+| MCP — Tool filtering (enable/disable) | ✅ | `mcp-filesystem`, `mcp-readonly` (enableTools/disableTools) |
+| MCP — Tool Groups | ✅ | `mcp-multi-mode` (filesystem + web-search groups) |
 | Tool allowlist / denylist per agent | ❌ | Planned: per-agent tool permissions |
 
 ### Interoperability
@@ -154,8 +149,8 @@ The demo should:
 | P1 | Multi-agent showcase | ✅ Customer service, document pipeline, routing, supervisor, and debate demos. |
 | P2 | Controlled workflows | ✅ HITL approval, structured output, validation, workflow snapshots, manual approval resume validation. |
 | P3 | Planning & memory | ✅ PlanNotebook demo, AutoContextMemory, Bailian long-term memory. |
-| P4 | RAG ecosystem | Agentic RAG, Qdrant persistent store, cloud knowledge (Bailian/Dify/RAGFlow), citation UI. |
-| P5 | MCP tool ecosystem | MCP transports (StdIO/SSE/HTTP), tool filtering, groups, Higress gateway. |
+| P4 | RAG ecosystem | Agentic RAG demo. |
+| P5 | MCP tool ecosystem | ✅ MCP transports (StdIO/SSE/HTTP), tool filtering, groups, embedded demo server. |
 | P6 | Advanced multi-agent | Subagents orchestration, MsgHub standalone, Custom Workflow (StateGraph). |
 | P7 | Interoperability & observability | A2A client/server, Nacos discovery, AG-UI, Studio, OTEL tracing. |
 | P8 | CLI & OpenClaw integration | CLI-Anything wrapper, OpenClaw skills, agent capabilities callable from CLI/assistant. |
@@ -214,11 +209,6 @@ Completed:
 **Recommended work**:
 
 - **Agentic RAG demo**: Create `rag-agent` with `RAGMode.AGENTIC`. Scenario: "Research assistant" — the agent decides when to retrieve from the knowledge base using `retrieve_knowledge` tool, only querying when relevant.
-- **Persistent RAG — Qdrant**: Replace `InMemoryStore` with `QdrantStore` for a production RAG demo. Knowledge survives app restarts.
-- **Cloud RAG — Bailian**: Create `enterprise-knowledge` agent using `BailianKnowledge`. Scenario: "Enterprise document Q&A" with reranking, query rewriting, and multi-turn retrieval.
-- **Cloud RAG — Dify**: Create `dify-rag` agent using `DifyKnowledge`. Scenario: "Dify-powered knowledge base" with hybrid search.
-- **Cloud RAG — RAGFlow**: Create `ragflow-rag` agent using `RAGFlowKnowledge`. Scenario: "OCR-enhanced document retrieval" with knowledge graph.
-- **Citation UI**: Add chunk preview, citation links, and retrieval score display to the RAG chat UI.
 
 **Success criteria**:
 
@@ -226,24 +216,29 @@ Completed:
 - At least one persistent store (Qdrant) and one cloud knowledge backend work.
 - Users can see which chunks were retrieved, their scores, and source documents.
 
-### P5: MCP Tool Ecosystem
+### P5: MCP Tool Ecosystem ✅
 
 **Goal**: Connect agents to the MCP tool ecosystem.
 
-**Recommended work**:
+**Implemented** (2026-05-11):
 
-- **MCP StdIO demo**: Create `mcp-filesystem` agent connecting to `@modelcontextprotocol/server-filesystem` via StdIO. Scenario: "File management assistant" — the agent reads, writes, and lists files on the local filesystem through MCP tools.
-- **MCP SSE demo**: Create `mcp-remote` agent connecting to a remote MCP server via SSE. Scenario: "Remote service integration" — agent calls external tools through an MCP gateway.
-- **MCP HTTP demo**: Create `mcp-api` agent using streamable HTTP transport. Scenario: "Stateless API tool integration".
-- **Tool filtering demo**: Show enable/disable specific MCP tools per agent. Scenario: "Restricted file agent" — only `read_file` and `list_directory` enabled, `write_file` disabled.
-- **Tool Groups demo**: Create an agent with grouped MCP tools that can be activated/deactivated. Scenario: "Multi-mode agent" — filesystem tools active in one mode, web tools in another.
-- **Higress AI Gateway demo**: Use `HigressMcpClientBuilder` with semantic tool search. Scenario: "Smart tool discovery" — the agent automatically finds the most relevant tools for a given query.
+- **MCP StdIO demo**: `mcp-filesystem` agent connecting to `@modelcontextprotocol/server-filesystem` via StdIO with tool filtering (enable read/write/list, disable delete).
+- **MCP SSE demo**: `mcp-remote-sse` agent connecting to embedded supergateway SSE proxy at localhost:9090.
+- **MCP HTTP demo**: `mcp-api-http` agent connecting to embedded supergateway HTTP proxy at localhost:9091.
+- **Tool filtering demo**: Per-agent enableTools/disableTools configuration in agents.yml.
+- **Tool Groups demo**: `mcp-multi-mode` agent with grouped filesystem + web-search tool activation.
+- **Shared client demo**: `mcp-readonly` shares filesystem-local client with mcp-filesystem but with stricter permissions.
+- **Core components**: `McpClientService` (centralized client lifecycle), `McpDemoServer` (embedded supergateway subprocesses), `mcp-servers.yml` (YAML config).
+- **171 tests passing**.
 
 **Success criteria**:
 
-- At least one MCP transport (StdIO) works with a real MCP server.
-- Tool filtering and groups are configurable from `agents.yml`.
-- New MCP tools can be added without writing Java integration code.
+- ✅ StdIO transport works with `@modelcontextprotocol/server-filesystem`.
+- ✅ SSE and HTTP transports work via embedded supergateway demo server.
+- ✅ Tool filtering configurable from agents.yml (enableTools/disableTools).
+- ✅ Tool groups configurable from agents.yml (createToolGroup + group assignment).
+- ✅ MCP clients shared across agents (one filesystem-local client for mcp-filesystem and mcp-readonly).
+- ✅ New MCP servers can be added by editing mcp-servers.yml + agents.yml with zero Java code.
 
 ### P6: Advanced Multi-Agent Patterns ✅
 
@@ -324,14 +319,14 @@ Completed:
 - AutoContextMemory for long conversations.
 - Long-term memory (Mem0 or ReMe).
 - Agentic RAG mode.
-- Persistent RAG store (Qdrant).
-- Cloud knowledge backend (Bailian or Dify).
 
 ### Medium Priority (P5–P6)
 
-- MCP StdIO transport demo.
-- MCP tool filtering and groups.
-- ~~Subagents orchestration (Task/TaskOutput).~~ ✅ Done: `report-generator` (SUBAGENT_SEQ), `project-manager` (SUBAGENT_PAR)
+- ~~MCP StdIO transport demo.~~ ✅ Done: `mcp-filesystem`
+- ~~MCP SSE transport demo.~~ ✅ Done: `mcp-remote-sse`
+- ~~MCP HTTP transport demo.~~ ✅ Done: `mcp-api-http`
+- ~~MCP tool filtering.~~ ✅ Done: `mcp-filesystem`, `mcp-readonly`
+- ~~MCP tool groups.~~ ✅ Done: `mcp-multi-mode`
 - ~~Custom Workflow (StateGraph).~~ ✅ Done: `order-fulfillment` (STATE_GRAPH)
 - ~~Loop pipeline.~~ ✅ Done: `copywriter-refiner` (LOOP)
 
@@ -348,20 +343,23 @@ Completed:
 
 **Milestone name**: `feature-complete-core`
 
-**Scope** (P3 completed + P4 core):
+**Scope** (P5 completed + P4 core):
 
 - [x] PlanNotebook demo: upgrade `project-planner` to use `enablePlan()`.
 - [x] AutoContextMemory demo: create `long-conversation` agent.
 - [x] Long-term memory demo: BailianLongTermMemory in `personal-assistant`.
+- [x] MCP StdIO demo: `mcp-filesystem` with tool filtering.
+- [x] MCP SSE demo: `mcp-remote-sse` with embedded supergateway.
+- [x] MCP HTTP demo: `mcp-api-http` with embedded supergateway.
+- [x] MCP tool filtering: `mcp-readonly` with restricted permissions.
+- [x] MCP tool groups: `mcp-multi-mode` with grouped activation.
 - [ ] Agentic RAG demo: create `rag-agent` with `RAGMode.AGENTIC`.
-- [ ] Persistent RAG: add Qdrant store option.
 
 **Why this next**:
 
-- P3 planning & memory demos are complete (PlanNotebook, AutoContextMemory, Bailian LTM).
-- Agentic RAG is the most requested feature after Generic RAG.
-- Persistent RAG (Qdrant) completes the RAG story for production use.
-- These features complete the "core agent capabilities" story before moving to MCP and interop.
+- P5 MCP tool ecosystem is complete (StdIO, SSE, HTTP, filtering, groups).
+- Agentic RAG is the last remaining core agent capability.
+- After P4, the project moves to interop (P7: A2A, AG-UI, observability).
 
 **Suggested acceptance checks**:
 
@@ -376,59 +374,53 @@ Completed:
 ## 8. AgentScope Feature → Demo Scenario Quick Reference
 
 | # | Framework Feature | Demo Scenario | Agent ID | Phase |
-|---|---|---|---|---|
-| 1 | ReAct Agent | General AI chat with thinking | `chat-basic` | ✅ P0 |
-| 2 | Tool Calling | Calculator, time, weather tools | `tool-test-simple` | ✅ P0 |
-| 3 | Document Parsing | Upload DOCX/PDF/XLSX for analysis | `task-document-analysis` | ✅ P0 |
-| 4 | Template Generation | Bank invoice Excel + Word generation | `bank-invoice` | ✅ P0 |
-| 5 | RAG (Generic) | Knowledge base Q&A with auto-inject | `rag-chat` | ✅ P0 |
-| 6 | Vision | Image OCR, chart analysis, scene understanding | `vision-analyzer` | ✅ P0 |
-| 7 | Audio | Speech-to-text voice interaction | `voice-assistant` | ✅ P0 |
-| 8 | Web Search | News, weather, stock queries | `search-assistant` | ✅ P0 |
-| 9 | Session Persistence | Multi-turn conversation with save/restore | All agents | ✅ P0 |
-| 10 | Streaming SSE | Real-time incremental response display | All agents | ✅ P0 |
-| 11 | Hook System | Timeline, metrics, tool detail in debug panel | All agents | ✅ P0 |
-| 12 | Pipeline Sequential | Document analysis → supplementary search | `doc-analysis-pipeline` | ✅ P1 |
-| 13 | Routing | Smart dispatch to doc/search/vision/sales experts | `smart-router` | ✅ P1 |
-| 14 | Handoffs | Customer service → sales/complaint switching | `customer-service` | ✅ P1 |
-| 15 | Supervisor | Super-supervisor coordinating experts | `super-supervisor` | ✅ P1 |
-| 16 | Debate | Multi-expert debate with judge synthesis | `debate-review` | ✅ P1 |
-| 17 | Structured Output | Invoice/ID card/contract extraction to JSON | `invoice-extractor` etc. | ✅ P2 |
-| 18 | Structured Validation | Auto-repair invalid extraction output | All extractors | ✅ P2 |
-| 19 | Human-in-the-Loop | Approval gate before invoice generation | `bank-invoice`, `contract-review-workflow` | ✅ P2 |
-| 20 | Workflow Snapshots | Capture and replay workflow runs | `WorkflowRunService` | ✅ P2 |
-| 21 | PlanNotebook | Multi-step project planning with user confirm | `project-planner` | ✅ P3 |
-| 22 | AutoContextMemory | Long conversation with auto-compression | `long-conversation` | ✅ P3 |
-| 23 | Long-term Memory (Bailian) | Cross-session user preference recall | `personal-assistant` | ✅ P3 |
-| 24 | Long-term Memory Modes | STATIC/AGENT/BOTH mode comparison by config | `personal-assistant` | ✅ P3 |
-| 25 | RAG (Agentic) | On-demand knowledge retrieval via tool | `rag-agent` | P4 |
-| 26 | RAG (Qdrant) | Persistent vector store across restarts | `rag-chat` upgrade | P4 |
-| 27 | RAG (Bailian) | Enterprise cloud knowledge base | `enterprise-knowledge` | P4 |
-| 28 | RAG (Dify) | Dify-managed knowledge base | `dify-rag` | P4 |
-| 29 | RAG (RAGFlow) | OCR-enhanced document retrieval | `ragflow-rag` | P4 |
-| 30 | MCP (StdIO) | Local filesystem MCP server connection | `mcp-filesystem` | P5 |
-| 31 | MCP (SSE) | Remote MCP server streaming connection | `mcp-remote` | P5 |
-| 32 | MCP (HTTP) | Stateless MCP API connection | `mcp-api` | P5 |
-| 33 | MCP Tool Filtering | Selective tool enable/disable per agent | Config in `agents.yml` | P5 |
-| 34 | MCP Tool Groups | Grouped tool activation modes | `mcp-multi-mode` | P5 |
-| 35 | Higress Gateway | Semantic tool search via AI gateway | `higress-agent` | P5 |
-| 36 | Subagents Sequential | Orchestrator delegating with {prevOutput} chaining | `report-generator` | ✅ P6 |
-| 37 | Subagents Parallel | Parallel task dispatch with aggregation | `project-manager` | ✅ P6 |
-| 38 | MsgHub Standalone | Group conversation round-table | `expert-roundtable` | ✅ P6 |
-| 39 | Custom Workflow | StateGraph mixed deterministic + agentic | `order-fulfillment` | ✅ P6 |
-| 40 | Loop Pipeline | Iterative refinement until quality threshold | `copywriter-refiner` | ✅ P6 |
-| 40 | Loop Pipeline | Iterative refinement until quality threshold | `copywriter-refiner` | ✅ P6 |
-| 41 | A2A Client | Call remote Agent2Agent services | `remote-caller` | P7 |
-| 42 | A2A Server | Expose local agents as A2A services | A2A starter config | P7 |
-| 43 | A2A Nacos | Nacos-based agent service discovery | `nacos-discovery` | P7 |
-| 44 | AG-UI | Frontend protocol compatibility endpoints | AG-UI controller | P7 |
-| 45 | Studio | AgentScope Studio visual debugging | StudioMessageHook | P7 |
-| 46 | JSONL Trace | Execution trace file export | JsonlTraceExporter | P7 |
-| 47 | OpenTelemetry | Distributed tracing integration | OTEL Tracer SPI | P7 |
-| 48 | CLI-Anything Wrapper | Agent capabilities as CLI commands | `agentscope` CLI binary | P8 |
-| 49 | HTTP API CLI Adapter | CLI → `/chat/send` SSE streaming | CLI adapter module | P8 |
-| 50 | OpenClaw SKILL.md | Per-agent skill descriptors for OpenClaw | `~/.openclaw/skills/` | P8 |
-| 51 | OpenClaw Skill Package | Installable skill: `openclaw skills install agentscope-demo` | Skill package | P8 |
+|---|---|---|---|-------|
+| 1 | ReAct Agent | General AI chat with thinking | `chat-basic` | ✅ P0  |
+| 2 | Tool Calling | Calculator, time, weather tools | `tool-test-simple` | ✅ P0  |
+| 3 | Document Parsing | Upload DOCX/PDF/XLSX for analysis | `task-document-analysis` | ✅ P0  |
+| 4 | Template Generation | Bank invoice Excel + Word generation | `bank-invoice` | ✅ P0  |
+| 5 | RAG (Generic) | Knowledge base Q&A with auto-inject | `rag-chat` | ✅ P0  |
+| 6 | Vision | Image OCR, chart analysis, scene understanding | `vision-analyzer` | ✅ P0  |
+| 7 | Audio | Speech-to-text voice interaction | `voice-assistant` | ✅ P0  |
+| 8 | Web Search | News, weather, stock queries | `search-assistant` | ✅ P0  |
+| 9 | Session Persistence | Multi-turn conversation with save/restore | All agents | ✅ P0  |
+| 10 | Streaming SSE | Real-time incremental response display | All agents | ✅ P0  |
+| 11 | Hook System | Timeline, metrics, tool detail in debug panel | All agents | ✅ P0  |
+| 12 | Pipeline Sequential | Document analysis → supplementary search | `doc-analysis-pipeline` | ✅ P1  |
+| 13 | Routing | Smart dispatch to doc/search/vision/sales experts | `smart-router` | ✅ P1  |
+| 14 | Handoffs | Customer service → sales/complaint switching | `customer-service` | ✅ P1  |
+| 15 | Supervisor | Super-supervisor coordinating experts | `super-supervisor` | ✅ P1  |
+| 16 | Debate | Multi-expert debate with judge synthesis | `debate-review` | ✅ P1  |
+| 17 | Structured Output | Invoice/ID card/contract extraction to JSON | `invoice-extractor` etc. | ✅ P2  |
+| 18 | Structured Validation | Auto-repair invalid extraction output | All extractors | ✅ P2  |
+| 19 | Human-in-the-Loop | Approval gate before invoice generation | `bank-invoice`, `contract-review-workflow` | ✅ P2  |
+| 20 | Workflow Snapshots | Capture and replay workflow runs | `WorkflowRunService` | ✅ P2  |
+| 21 | PlanNotebook | Multi-step project planning with user confirm | `project-planner` | ✅ P3  |
+| 22 | AutoContextMemory | Long conversation with auto-compression | `long-conversation` | ✅ P3  |
+| 23 | Long-term Memory (Bailian) | Cross-session user preference recall | `personal-assistant` | ✅ P3  |
+| 24 | Long-term Memory Modes | STATIC/AGENT/BOTH mode comparison by config | `personal-assistant` | ✅ P3  |
+| 25 | RAG (Agentic) | On-demand knowledge retrieval via tool | `rag-agent` | ✅ P4  |
+| 26 | MCP (StdIO) | Local filesystem MCP server connection | `mcp-filesystem` | ✅ P5 |
+| 27 | MCP (SSE) | Remote MCP server streaming connection | `mcp-remote-sse` | ✅ P5 |
+| 28 | MCP (HTTP) | Stateless MCP API connection | `mcp-api-http` | ✅ P5 |
+| 29 | MCP Tool Filtering | Selective tool enable/disable per agent | `mcp-filesystem`, `mcp-readonly` | ✅ P5 |
+| 30 | MCP Tool Groups | Grouped tool activation modes | `mcp-multi-mode` | ✅ P5 |
+| 31 | Subagents Sequential | Orchestrator delegating with {prevOutput} chaining | `report-generator` | ✅ P6  |
+| 32 | Subagents Parallel | Parallel task dispatch with aggregation | `project-manager` | ✅ P6  |
+| 33 | MsgHub Standalone | Group conversation round-table | `expert-roundtable` | ✅ P6  |
+| 34 | Custom Workflow | StateGraph mixed deterministic + agentic | `order-fulfillment` | ✅ P6  |
+| 35 | Loop Pipeline | Iterative refinement until quality threshold | `copywriter-refiner` | ✅ P6  |
+| 36 | A2A Client | Call remote Agent2Agent services | `remote-caller` | P7    |
+| 37 | A2A Server | Expose local agents as A2A services | A2A starter config | P7    |
+| 38 | A2A Nacos | Nacos-based agent service discovery | `nacos-discovery` | P7    |
+| 39 | AG-UI | Frontend protocol compatibility endpoints | AG-UI controller | P7    |
+| 40 | Studio | AgentScope Studio visual debugging | StudioMessageHook | P7    |
+| 41 | JSONL Trace | Execution trace file export | JsonlTraceExporter | P7    |
+| 42 | OpenTelemetry | Distributed tracing integration | OTEL Tracer SPI | P7    |
+| 43 | CLI-Anything Wrapper | Agent capabilities as CLI commands | `agentscope` CLI binary | P8    |
+| 44 | HTTP API CLI Adapter | CLI → `/chat/send` SSE streaming | CLI adapter module | P8    |
+| 45 | OpenClaw SKILL.md | Per-agent skill descriptors for OpenClaw | `~/.openclaw/skills/` | P8    |
+| 46 | OpenClaw Skill Package | Installable skill: `openclaw skills install agentscope-demo` | Skill package | P8    |
 
 ## 9. References
 
