@@ -1,5 +1,8 @@
 package com.skloda.agentscope.agent;
 
+import com.skloda.agentscope.mcp.McpClientService;
+import com.skloda.agentscope.mcp.McpServerRef;
+import com.skloda.agentscope.mcp.ToolGroupConfig;
 import com.skloda.agentscope.service.KnowledgeService;
 import com.skloda.agentscope.tool.ToolRegistry;
 import io.agentscope.core.ReActAgent;
@@ -40,12 +43,14 @@ public class AgentFactory {
     private final AgentConfigService configService;
     private final ToolRegistry toolRegistry;
     private final KnowledgeService knowledgeService;
+    private final McpClientService mcpClientService;
 
     public AgentFactory(AgentConfigService configService, ToolRegistry toolRegistry,
-                        KnowledgeService knowledgeService) {
+                        KnowledgeService knowledgeService, McpClientService mcpClientService) {
         this.configService = configService;
         this.toolRegistry = toolRegistry;
         this.knowledgeService = knowledgeService;
+        this.mcpClientService = mcpClientService;
     }
 
     /**
@@ -120,6 +125,9 @@ public class AgentFactory {
         }
 
         registerToolsAndSkills(builder, toolkit, config, agentId);
+
+        // Register MCP tools after local tools/skills are set up
+        registerMcpTools(config, toolkit);
 
         // Configure structured output if specified
         if (config.getStructuredOutputClass() != null && !config.getStructuredOutputClass().isBlank()) {
@@ -222,6 +230,62 @@ public class AgentFactory {
             builder.toolkit(toolkit).skillBox(skillBox);
         } else {
             builder.toolkit(toolkit);
+        }
+    }
+
+    /**
+     * Register MCP tools from configured MCP server references.
+     * Creates tool groups first, then registers each MCP client with optional
+     * filtering (enable/disable tools) and group assignment.
+     */
+    private void registerMcpTools(AgentConfig config, Toolkit toolkit) {
+        if (config.getMcpServers() == null || config.getMcpServers().isEmpty()) {
+            return;
+        }
+
+        log.info("Registering MCP tools for agent: {}", config.getAgentId());
+
+        // Create tool groups first
+        if (config.getToolGroups() != null && !config.getToolGroups().isEmpty()) {
+            for (ToolGroupConfig groupConfig : config.getToolGroups()) {
+                toolkit.createToolGroup(
+                    groupConfig.getName(),
+                    groupConfig.getDescription(),
+                    groupConfig.getActive() != null ? groupConfig.getActive() : true
+                );
+                log.debug("Created tool group: {} (active={})", groupConfig.getName(), groupConfig.getActive());
+            }
+        }
+
+        // Register MCP servers
+        for (McpServerRef ref : config.getMcpServers()) {
+            var clientOpt = mcpClientService.getClient(ref.getServer());
+            if (clientOpt.isEmpty()) {
+                log.warn("MCP client not found: {}, skipping", ref.getServer());
+                continue;
+            }
+
+            var client = clientOpt.get();
+            var registration = toolkit.registration().mcpClient(client);
+
+            // Apply tool filtering
+            if (ref.getEnableTools() != null && !ref.getEnableTools().isEmpty()) {
+                registration.enableTools(ref.getEnableTools());
+                log.debug("Enabled tools for {}: {}", ref.getServer(), ref.getEnableTools());
+            }
+            if (ref.getDisableTools() != null && !ref.getDisableTools().isEmpty()) {
+                registration.disableTools(ref.getDisableTools());
+                log.debug("Disabled tools for {}: {}", ref.getServer(), ref.getDisableTools());
+            }
+
+            // Apply tool group
+            if (ref.getGroup() != null) {
+                registration.group(ref.getGroup());
+                log.debug("Assigned {} to group: {}", ref.getServer(), ref.getGroup());
+            }
+
+            registration.apply();
+            log.info("Registered MCP tools from: {}", ref.getServer());
         }
     }
 
