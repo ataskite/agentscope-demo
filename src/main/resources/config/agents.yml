@@ -1451,3 +1451,116 @@ agents:
     samplePrompts:
       - prompt: "评估项目的风险和资源需求"
         expectedBehavior: "提供全面的风险分析报告"
+
+# ============================================================
+# P5: MCP Demo Agents
+# ============================================================
+
+  - agentId: mcp-filesystem
+    category: single
+    name: MCP File Manager
+    description: 文件管理助手，通过 MCP 协议操作本地文件系统
+    systemPrompt: |
+      你是一个文件管理助手。
+      你可以使用工具读取、写入和列出 /tmp 目录下的文件。
+      请注意：你没有删除文件的权限。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    mcpServers:
+      - server: filesystem-local
+        enableTools: ["read_file", "list_directory", "write_file"]
+        disableTools: ["delete_file"]
+    samplePrompts:
+      - prompt: "列出 /tmp 目录下的文件"
+        expectedBehavior: "调用 list_directory 工具，显示文件列表"
+      - prompt: "在 /tmp 下创建 test.txt 文件，内容是 hello world"
+        expectedBehavior: "调用 write_file 工具创建文件"
+      - prompt: "读取 /tmp/test.txt 的内容"
+        expectedBehavior: "调用 read_file 工具读取文件内容"
+
+  - agentId: mcp-remote-sse
+    category: single
+    name: MCP Remote SSE
+    description: 通过 SSE 传输调用远程 MCP 工具
+    systemPrompt: |
+      你是一个远程工具调用助手。
+      你可以通过 SSE 传输调用远程 MCP 服务器上的工具。
+      可用的工具包括：echo（回显消息）、add（加法计算）、sampleLLM（示例 LLM 调用）。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    mcpServers:
+      - server: demo-remote
+    samplePrompts:
+      - prompt: "调用 echo 工具，返回消息 'hello from SSE'"
+        expectedBehavior: "调用远程 echo 工具"
+      - prompt: "用 add 工具计算 3 + 5"
+        expectedBehavior: "调用远程 add 工具进行计算"
+
+  - agentId: mcp-api-http
+    category: single
+    name: MCP API HTTP
+    description: 通过 HTTP 传输调用 MCP API 工具
+    systemPrompt: |
+      你是一个 HTTP API 工具调用助手。
+      你可以通过 HTTP 传输调用 MCP API 工具。
+      可用的工具包括：echo（回显消息）、add（加法计算）。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    mcpServers:
+      - server: demo-api
+    samplePrompts:
+      - prompt: "通过 HTTP 传输调用 echo 工具"
+        expectedBehavior: "调用远程 echo 工具，使用 HTTP 传输"
+
+  - agentId: mcp-multi-mode
+    category: single
+    name: MCP Multi-Mode
+    description: 多模式助手，文件操作和网络搜索工具分组管理
+    systemPrompt: |
+      你是一个多模式助手，拥有文件操作和网络搜索两组工具。
+      文件操作工具用于读写本地文件，网络搜索工具用于远程调用。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    mcpServers:
+      - server: filesystem-local
+        enableTools: ["read_file", "list_directory"]
+        group: filesystem
+      - server: demo-remote
+        group: web-search
+    toolGroups:
+      - name: filesystem
+        description: "文件操作工具"
+        active: true
+      - name: web-search
+        description: "网络搜索工具"
+        active: true
+    samplePrompts:
+      - prompt: "查看 /tmp 目录有哪些文件"
+        expectedBehavior: "使用 filesystem 组的 list_directory 工具"
+      - prompt: "用 echo 工具返回一条消息"
+        expectedBehavior: "使用 web-search 组的 echo 工具"
+
+  - agentId: mcp-readonly
+    category: single
+    name: MCP Read-Only
+    description: 只读文件查看器，与 mcp-filesystem 共享 MCP 客户端但权限更严格
+    systemPrompt: |
+      你是一个只读文件查看助手。
+      你只能读取文件和列出目录，没有写入权限。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    mcpServers:
+      - server: filesystem-local
+        enableTools: ["read_file", "list_directory"]
+    samplePrompts:
+      - prompt: "列出 /tmp 目录下的文件"
+        expectedBehavior: "调用 list_directory 工具"
+      - prompt: "读取 /tmp/test.txt 的内容"
+        expectedBehavior: "调用 read_file 工具"
+      - prompt: "删除 /tmp/test.txt"
+        expectedBehavior: "拒绝执行，因为没有删除工具权限"
