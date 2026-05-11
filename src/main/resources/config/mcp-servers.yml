@@ -1,0 +1,21 @@
+servers:
+  - name: filesystem-local
+    transport: STDIO
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    timeout: 120
+    initTimeout: 30
+
+  - name: demo-remote
+    transport: SSE
+    url: http://localhost:9090/sse
+    headers:
+      Authorization: "Bearer ${MCP_API_TOKEN:}"
+    queryParams:
+      version: v1
+    timeout: 60
+
+  - name: demo-api
+    transport: HTTP
+    url: http://localhost:9091/mcp
+    timeout: 60

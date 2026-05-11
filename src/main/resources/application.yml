@@ -55,6 +55,15 @@ agentscope:
     split-strategy: PARAGRAPH
     auto-index-on-startup: true
 
+  # MCP (Model Context Protocol) Configuration
+  mcp:
+    enabled: true
+    demo:
+      enabled: true
+      sse-port: 9090
+      http-port: 9091
+      startup-timeout: 30
+
 # Logging Configuration
 logging:
   level:

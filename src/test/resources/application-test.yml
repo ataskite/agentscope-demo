@@ -1,0 +1,6 @@
+# Test profile — disable MCP to avoid requiring Node.js in CI
+agentscope:
+  mcp:
+    enabled: false
+    demo:
+      enabled: false
