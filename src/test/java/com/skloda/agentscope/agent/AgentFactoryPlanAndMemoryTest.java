@@ -1,5 +1,6 @@
 package com.skloda.agentscope.agent;
 
+import com.skloda.agentscope.mcp.McpClientService;
 import com.skloda.agentscope.service.KnowledgeService;
 import com.skloda.agentscope.tool.ToolRegistry;
 import io.agentscope.core.memory.autocontext.AutoContextHook;
@@ -25,11 +26,14 @@ class AgentFactoryPlanAndMemoryTest {
     @Mock
     private KnowledgeService knowledgeService;
 
+    @Mock
+    private McpClientService mcpClientService;
+
     private AgentFactory agentFactory;
 
     @BeforeEach
     void setUp() {
-        agentFactory = new AgentFactory(configService, toolRegistry, knowledgeService);
+        agentFactory = new AgentFactory(configService, toolRegistry, knowledgeService, mcpClientService);
         // Set apiKey via reflection since @Value isn't processed in unit tests
         try {
             var field = AgentFactory.class.getDeclaredField("apiKey");
