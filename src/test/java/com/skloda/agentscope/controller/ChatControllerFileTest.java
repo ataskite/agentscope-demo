@@ -120,4 +120,36 @@ class ChatControllerFileTest {
         assertEquals(200, response.getStatusCode().value());
         assertEquals("application/pdf", response.getHeaders().getContentType().toString());
     }
+
+    @Test
+    void downloadFileRejectsPathTraversalWithDotDot() {
+        ResponseEntity<Resource> response = controller.downloadFile("../../../etc/passwd");
+
+        assertEquals(400, response.getStatusCode().value());
+    }
+
+    @Test
+    void downloadFileRejectsPathTraversalMixed() {
+        ResponseEntity<Resource> response = controller.downloadFile("foo/../../etc/shadow");
+
+        assertEquals(400, response.getStatusCode().value());
+    }
+
+    @Test
+    void downloadFileRejectsPathTraversalEncoded() {
+        ResponseEntity<Resource> response = controller.downloadFile("..\\..\\windows\\system32\\config");
+
+        assertEquals(400, response.getStatusCode().value());
+    }
+
+    @Test
+    void downloadFileAcceptsValidUuidFileId() throws Exception {
+        Path uploadDir = tempDir.resolve("agentscope-uploads");
+        Files.createDirectories(uploadDir);
+        Files.write(uploadDir.resolve("550e8400-e29b-41d4-a716-446655440000.docx"), new byte[] {1, 2, 3});
+
+        ResponseEntity<Resource> response = controller.downloadFile("550e8400-e29b-41d4-a716-446655440000.docx");
+
+        assertEquals(200, response.getStatusCode().value());
+    }
 }

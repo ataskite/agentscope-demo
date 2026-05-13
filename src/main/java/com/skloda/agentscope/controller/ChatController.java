@@ -445,16 +445,28 @@ public class ChatController {
             return ResponseEntity.badRequest().build();
         }
 
+        if (fileId.contains("..")) {
+            return ResponseEntity.badRequest().build();
+        }
+
         try {
             Path uploadDir = Paths.get(System.getProperty("java.io.tmpdir"), "agentscope-uploads");
-            Path filePath = uploadDir.resolve(fileId);
+            Path normalizedUploadDir = uploadDir.normalize().toAbsolutePath();
+            Path filePath = normalizedUploadDir.resolve(fileId).normalize().toAbsolutePath();
+
+            if (!filePath.startsWith(normalizedUploadDir)) {
+                return ResponseEntity.badRequest().build();
+            }
 
             if (!filePath.toFile().exists() && !fileId.contains(".")) {
                 File[] matchingFiles = uploadDir.toFile().listFiles((dir, name) ->
                         name.startsWith(fileId) && (name.endsWith(".docx") || name.endsWith(".pdf") || name.endsWith(".xlsx"))
                 );
                 if (matchingFiles != null && matchingFiles.length > 0) {
-                    filePath = matchingFiles[0].toPath();
+                    filePath = matchingFiles[0].toPath().normalize().toAbsolutePath();
+                    if (!filePath.startsWith(normalizedUploadDir)) {
+                        return ResponseEntity.badRequest().build();
+                    }
                 }
             }
 
