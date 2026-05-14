@@ -8,6 +8,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
 import java.util.List;
 import java.util.Map;
 
@@ -49,7 +52,10 @@ public class WebSearchTool {
             );
 
             @SuppressWarnings("unchecked")
-            Map<String, Object> response = restTemplate.postForObject(url, requestBody, Map.class);
+            Map<String, Object> response = Mono.fromCallable(() ->
+                            restTemplate.postForObject(url, requestBody, Map.class))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .block();
 
             if (response == null) {
                 return "搜索失败：未获取到响应";
