@@ -17,7 +17,6 @@ import io.agentscope.core.message.ToolResultBlock;
 import io.agentscope.core.message.ToolUseBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -49,20 +48,23 @@ public class ChatController {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final String SSE_EVENT_NAME = "message";
 
-    @Autowired
-    private AgentService agentService;
+    private final AgentService agentService;
+    private final AgentConfigService agentConfigService;
+    private final SessionManagerService sessionManagerService;
+    private final ApprovalService approvalService;
+    private final ChatHistoryRepository chatHistoryRepository;
 
-    @Autowired
-    private AgentConfigService agentConfigService;
-
-    @Autowired
-    private SessionManagerService sessionManagerService;
-
-    @Autowired
-    private ApprovalService approvalService;
-
-    @Autowired
-    private ChatHistoryRepository chatHistoryRepository;
+    public ChatController(AgentService agentService,
+                          AgentConfigService agentConfigService,
+                          SessionManagerService sessionManagerService,
+                          ApprovalService approvalService,
+                          ChatHistoryRepository chatHistoryRepository) {
+        this.agentService = agentService;
+        this.agentConfigService = agentConfigService;
+        this.sessionManagerService = sessionManagerService;
+        this.approvalService = approvalService;
+        this.chatHistoryRepository = chatHistoryRepository;
+    }
 
     @GetMapping("/")
     public String chat() {
