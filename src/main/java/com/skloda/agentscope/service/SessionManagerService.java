@@ -147,10 +147,16 @@ public class SessionManagerService {
      * List all active in-memory sessions.
      */
     public List<SessionInfo> listSessions() {
-        Map<String, SessionInfo> sessions = new LinkedHashMap<>();
+        // Sort contexts by raw epoch millis (newest first) to avoid string-format granularity loss
+        List<Map.Entry<String, SessionContext>> sorted = activeSessions.entrySet().stream()
+                .sorted((a, b) -> Long.compare(b.getValue().getLastAccessedAt(), a.getValue().getLastAccessedAt()))
+                .toList();
 
-        activeSessions.forEach((sid, ctx) -> {
-            SessionInfo info = sessions.getOrDefault(sid, new SessionInfo());
+        List<SessionInfo> result = new ArrayList<>();
+        for (Map.Entry<String, SessionContext> entry : sorted) {
+            String sid = entry.getKey();
+            SessionContext ctx = entry.getValue();
+            SessionInfo info = new SessionInfo();
             info.setSessionId(sid);
             info.setAgentId(ctx.getAgentId());
             AgentConfig cfg = configService.findAgentConfig(ctx.getAgentId()).orElse(null);
@@ -161,16 +167,8 @@ public class SessionManagerService {
             }
             info.setMessageCount(msgCount);
             info.setLastAccessedAt(formatTime(ctx.getLastAccessedAt()));
-            sessions.put(sid, info);
-        });
-
-        // Sort by last accessed (newest first)
-        List<SessionInfo> result = new ArrayList<>(sessions.values());
-        result.sort((a, b) -> {
-            String ta = a.getLastAccessedAt() != null ? a.getLastAccessedAt() : "";
-            String tb = b.getLastAccessedAt() != null ? b.getLastAccessedAt() : "";
-            return tb.compareTo(ta);
-        });
+            result.add(info);
+        }
         return result;
     }
 
