@@ -17,7 +17,6 @@ import io.agentscope.core.message.ToolResultBlock;
 import io.agentscope.core.message.ToolUseBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -30,10 +29,12 @@ import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -49,20 +50,23 @@ public class ChatController {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final String SSE_EVENT_NAME = "message";
 
-    @Autowired
-    private AgentService agentService;
+    private final AgentService agentService;
+    private final AgentConfigService agentConfigService;
+    private final SessionManagerService sessionManagerService;
+    private final ApprovalService approvalService;
+    private final ChatHistoryRepository chatHistoryRepository;
 
-    @Autowired
-    private AgentConfigService agentConfigService;
-
-    @Autowired
-    private SessionManagerService sessionManagerService;
-
-    @Autowired
-    private ApprovalService approvalService;
-
-    @Autowired
-    private ChatHistoryRepository chatHistoryRepository;
+    public ChatController(AgentService agentService,
+                          AgentConfigService agentConfigService,
+                          SessionManagerService sessionManagerService,
+                          ApprovalService approvalService,
+                          ChatHistoryRepository chatHistoryRepository) {
+        this.agentService = agentService;
+        this.agentConfigService = agentConfigService;
+        this.sessionManagerService = sessionManagerService;
+        this.approvalService = approvalService;
+        this.chatHistoryRepository = chatHistoryRepository;
+    }
 
     @GetMapping("/")
     public String chat() {
@@ -412,9 +416,15 @@ public class ChatController {
             return Map.of("error", "Supported formats: .docx, .pdf, .xlsx, .jpg, .jpeg, .png, .gif, .webp, .wav, .mp3, .m4a");
         }
 
+        // Validate file content matches extension (magic bytes check)
+        String ext = lowerName.substring(lowerName.lastIndexOf('.'));
+        byte[] fileHeader = readFileHeader(file, 16);
+        if (!isValidFileSignature(ext, file.getContentType(), fileHeader)) {
+            return Map.of("error", "File content does not match its extension");
+        }
+
         try {
             String fileId = UUID.randomUUID().toString();
-            String ext = lowerName.substring(lowerName.lastIndexOf('.'));
             String savedName = fileId + ext;
             Path uploadDir = Paths.get(System.getProperty("java.io.tmpdir"), "agentscope-uploads");
             Files.createDirectories(uploadDir);
@@ -496,5 +506,43 @@ public class ChatController {
             log.error("Failed to download file: {}", fileId, e);
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    byte[] readFileHeader(MultipartFile file, int bytesToRead) {
+        try (InputStream is = file.getInputStream()) {
+            byte[] header = new byte[bytesToRead];
+            int read = is.read(header);
+            if (read <= 0) return new byte[0];
+            if (read < bytesToRead) return Arrays.copyOf(header, read);
+            return header;
+        } catch (Exception e) {
+            return new byte[0];
+        }
+    }
+
+    boolean isValidFileSignature(String extension, String contentType, byte[] header) {
+        if (header == null || header.length < 2) return false;
+        return switch (extension) {
+            case ".pdf" -> startsWith(header, new byte[]{0x25, 0x50, 0x44, 0x46});
+            case ".docx", ".xlsx" -> startsWith(header, new byte[]{0x50, 0x4B, 0x03, 0x04});
+            case ".jpg", ".jpeg" -> startsWith(header, new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF});
+            case ".png" -> startsWith(header, new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47});
+            case ".gif" -> startsWith(header, "GIF".getBytes());
+            case ".wav" -> startsWith(header, "RIFF".getBytes());
+            case ".mp3" -> startsWith(header, new byte[]{(byte) 0xFF, (byte) 0xFB})
+                        || startsWith(header, new byte[]{(byte) 0xFF, (byte) 0xF3})
+                        || startsWith(header, "ID3".getBytes());
+            case ".mp4", ".m4a" -> header.length >= 8
+                        && new String(header, 4, 4).equals("ftyp");
+            default -> true;
+        };
+    }
+
+    private boolean startsWith(byte[] data, byte[] prefix) {
+        if (data.length < prefix.length) return false;
+        for (int i = 0; i < prefix.length; i++) {
+            if (data[i] != prefix[i]) return false;
+        }
+        return true;
     }
 }

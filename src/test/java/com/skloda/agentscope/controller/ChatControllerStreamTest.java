@@ -19,7 +19,7 @@ class ChatControllerStreamTest {
 
     @Test
     void sendMessageCompletesWhenRuntimeEmitsDoneEvenIfRuntimeFluxStaysOpen() {
-        ChatController controller = new ChatController();
+        ChatController controller = new ChatController(null, null, null, null, null);
         AgentService agentService = new StubAgentService(Flux.concat(
                 Flux.just(Map.of("type", "text", "content", "hello")),
                 Flux.just(Map.of("type", "done")),

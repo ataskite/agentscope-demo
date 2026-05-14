@@ -259,11 +259,6 @@ public class AgentRuntime implements StreamingAgentRuntime {
         }
 
         // Normal completion
-        try {
-            Thread.sleep(100);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
         fluxSink.next(Map.of("type", "done"));
         fluxSink.complete();
     }

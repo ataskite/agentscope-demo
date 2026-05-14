@@ -29,7 +29,7 @@ class ChatControllerFileTest {
     void setUp() {
         originalTmpDir = System.getProperty("java.io.tmpdir");
         System.setProperty("java.io.tmpdir", tempDir.toString());
-        controller = new ChatController();
+        controller = new ChatController(null, null, null, null, null);
     }
 
     @AfterEach
@@ -58,8 +58,9 @@ class ChatControllerFileTest {
 
     @Test
     void uploadFileStoresDocumentAndReturnsMetadata() {
+        byte[] docxHeader = new byte[]{0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00};
         MockMultipartFile file = new MockMultipartFile("file", "contract.docx",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document", new byte[] {1, 2, 3});
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document", docxHeader);
 
         Map<String, String> result = controller.uploadFile(file);
 
@@ -72,8 +73,10 @@ class ChatControllerFileTest {
 
     @Test
     void uploadFileClassifiesImagesAndAudio() {
-        MockMultipartFile image = new MockMultipartFile("file", "photo.png", "image/png", new byte[] {1});
-        MockMultipartFile audio = new MockMultipartFile("file", "voice.mp3", "audio/mpeg", new byte[] {1});
+        byte[] pngHeader = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+        MockMultipartFile image = new MockMultipartFile("file", "photo.png", "image/png", pngHeader);
+        byte[] mp3Header = new byte[]{(byte) 0xFF, (byte) 0xFB, 0x50, 0x00};
+        MockMultipartFile audio = new MockMultipartFile("file", "voice.mp3", "audio/mpeg", mp3Header);
 
         assertEquals("image", controller.uploadFile(image).get("fileType"));
         assertEquals("audio", controller.uploadFile(audio).get("fileType"));

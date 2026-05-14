@@ -55,7 +55,7 @@ class ChatControllerSamplePromptTest {
     }
 
     private static ChatController controllerWithPrompt(String prompt) {
-        ChatController controller = new ChatController();
+        ChatController controller = new ChatController(null, null, null, null, null);
         ReflectionTestUtils.setField(controller, "agentConfigService", new StubAgentConfigService(prompt));
         return controller;
     }
