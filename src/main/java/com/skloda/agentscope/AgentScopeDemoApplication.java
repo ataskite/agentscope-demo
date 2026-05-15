@@ -4,23 +4,32 @@ import com.skloda.agentscope.service.KnowledgeProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.web.context.WebServerInitializedEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Component;
 
-/**
- * AgentScope Demo Application.
- */
 @SpringBootApplication
 @EnableConfigurationProperties(KnowledgeProperties.class)
 public class AgentScopeDemoApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(AgentScopeDemoApplication.class, args);
-        System.out.println("""
+    }
 
-                ================================================
-                AgentScope Demo Application Started!
+    @Component
+    static class StartupListener {
 
-                Open http://localhost:8080 in your browser.
-                ================================================
-                """);
+        @EventListener
+        public void onServerReady(WebServerInitializedEvent event) {
+            int port = event.getWebServer().getPort();
+            System.out.printf("""
+
+                    ================================================
+                    AgentScope Demo Application Started!
+
+                    Open http://localhost:%d in your browser.
+                    ================================================
+                    """, port);
+        }
     }
 }

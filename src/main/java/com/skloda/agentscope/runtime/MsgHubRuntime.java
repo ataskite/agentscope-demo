@@ -68,16 +68,17 @@ public class MsgHubRuntime implements StreamingAgentRuntime {
 
                 hook.emitPipelineEnd(pipelineName, 1, durationMs);
                 fluxSink.next(Map.of("type", "done"));
+                close();
                 fluxSink.complete();
             } catch (Exception e) {
                 fluxSink.next(Map.of("type", "error", "message", e.getMessage()));
+                close();
                 fluxSink.complete();
             }
         });
 
         return Flux.merge(this.sink.asFlux(), pipelineStream)
-                .doOnCancel(this::close)
-                .doOnComplete(this::close);
+                .doOnCancel(this::close);
     }
 
     @Override

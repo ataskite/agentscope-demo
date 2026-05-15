@@ -125,33 +125,27 @@ public class StructuredOutputAgentRuntime implements StreamingAgentRuntime {
                 }
 
                 fluxSink.next(Map.of("type", "done"));
+                close();
                 fluxSink.complete();
             } catch (ClassNotFoundException e) {
                 log.error("Schema class not found: {}", structuredOutputClassName, e);
                 fluxSink.next(Map.of("type", "error", "message",
                         "Schema class not found: " + structuredOutputClassName));
                 fluxSink.next(Map.of("type", "done"));
+                close();
                 fluxSink.complete();
             } catch (Exception e) {
                 log.error("Structured output error", e);
                 fluxSink.next(Map.of("type", "error", "message",
                         e.getMessage() != null ? e.getMessage() : "Unknown error"));
                 fluxSink.next(Map.of("type", "done"));
+                close();
                 fluxSink.complete();
             }
         });
 
         return Flux.merge(hookEvents, resultStream)
-                .doOnComplete(() -> {
-                    this.sink.tryEmitComplete();
-                    this.close();
-                })
-                .doOnCancel(this::close)
-                .doOnError(e -> {
-                    log.error("Structured output stream error", e);
-                    this.sink.tryEmitComplete();
-                    this.close();
-                });
+                .doOnCancel(this::close);
     }
 
     private void emitTextContent(Msg response, reactor.core.publisher.FluxSink<Map<String, Object>> fluxSink) {

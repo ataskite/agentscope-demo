@@ -78,21 +78,18 @@ public class PipelineAgentRuntime implements StreamingAgentRuntime {
 
                 hook.emitPipelineEnd(pipelineName, 1, durationMs);
                 sink.next(Map.of("type", "done"));
+                close();
                 sink.complete();
             } catch (Exception e) {
                 log.error("Pipeline execution error: {}", pipelineName, e);
                 sink.next(Map.of("type", "error", "message", e.getMessage()));
+                close();
                 sink.complete();
             }
         });
 
         return Flux.merge(this.sink.asFlux(), pipelineStream)
-                .doOnCancel(this::close)
-                .doOnComplete(this::close)
-                .doOnError(e -> {
-                    log.error("Pipeline stream error for: {}", pipelineName, e);
-                    this.close();
-                });
+                .doOnCancel(this::close);
     }
 
     /**
@@ -120,6 +117,7 @@ public class PipelineAgentRuntime implements StreamingAgentRuntime {
                                 error -> {
                                     log.error("Fanout stream error", error);
                                     sink.next(Map.of("type", "error", "message", error.getMessage()));
+                                    PipelineAgentRuntime.this.close();
                                     sink.complete();
                                 },
                                 () -> {
@@ -127,23 +125,20 @@ public class PipelineAgentRuntime implements StreamingAgentRuntime {
                                     hook.emitPipelineEnd(pipelineName, 1, durationMs);
                                     log.debug("Fanout stream completed for: {}", pipelineName);
                                     sink.next(Map.of("type", "done"));
+                                    PipelineAgentRuntime.this.close();
                                     sink.complete();
                                 }
                         );
             } catch (Exception e) {
                 log.error("Fanout pipeline setup error: {}", pipelineName, e);
                 sink.next(Map.of("type", "error", "message", e.getMessage()));
+                close();
                 sink.complete();
             }
         });
 
         return Flux.merge(hookEvents, pipelineStream)
-                .doOnCancel(this::close)
-                .doOnComplete(this::close)
-                .doOnError(e -> {
-                    log.error("Fanout stream error for: {}", pipelineName, e);
-                    this.close();
-                });
+                .doOnCancel(this::close);
     }
 
     private void emitTextFromMsg(Msg msg, FluxSink<Map<String, Object>> sink) {

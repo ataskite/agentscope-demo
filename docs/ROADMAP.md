@@ -110,7 +110,6 @@ The demo should:
 | MCP — HTTP transport | ✅ | `mcp-api-http` (embedded supergateway proxy) |
 | MCP — Tool filtering (enable/disable) | ✅ | `mcp-filesystem`, `mcp-readonly` (enableTools/disableTools) |
 | MCP — Tool Groups | ✅ | `mcp-multi-mode` (filesystem + web-search groups) |
-| Tool allowlist / denylist per agent | ❌ | Planned: per-agent tool permissions |
 
 ### Interoperability
 

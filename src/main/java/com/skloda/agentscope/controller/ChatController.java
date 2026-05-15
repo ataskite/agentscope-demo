@@ -419,7 +419,7 @@ public class ChatController {
         // Validate file content matches extension (magic bytes check)
         String ext = lowerName.substring(lowerName.lastIndexOf('.'));
         byte[] fileHeader = readFileHeader(file, 16);
-        if (!isValidFileSignature(ext, file.getContentType(), fileHeader)) {
+        if (!isValidFileSignature(ext, fileHeader)) {
             return Map.of("error", "File content does not match its extension");
         }
 
@@ -520,7 +520,7 @@ public class ChatController {
         }
     }
 
-    boolean isValidFileSignature(String extension, String contentType, byte[] header) {
+    boolean isValidFileSignature(String extension, byte[] header) {
         if (header == null || header.length < 2) return false;
         return switch (extension) {
             case ".pdf" -> startsWith(header, new byte[]{0x25, 0x50, 0x44, 0x46});
@@ -528,7 +528,8 @@ public class ChatController {
             case ".jpg", ".jpeg" -> startsWith(header, new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF});
             case ".png" -> startsWith(header, new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47});
             case ".gif" -> startsWith(header, "GIF".getBytes());
-            case ".wav" -> startsWith(header, "RIFF".getBytes());
+            case ".wav" -> startsWith(header, "RIFF".getBytes())
+                        && header.length >= 12 && new String(header, 8, 4).equals("WAVE");
             case ".mp3" -> startsWith(header, new byte[]{(byte) 0xFF, (byte) 0xFB})
                         || startsWith(header, new byte[]{(byte) 0xFF, (byte) 0xF3})
                         || startsWith(header, "ID3".getBytes());
