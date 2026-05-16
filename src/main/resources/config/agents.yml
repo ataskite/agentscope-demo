@@ -1564,3 +1564,34 @@ agents:
         expectedBehavior: "调用 read_file 工具"
       - prompt: "删除 /tmp/test.txt"
         expectedBehavior: "拒绝执行，因为没有删除工具权限"
+
+  # === Harness Demo: Complaint Reviewer ===
+  - agentId: complaint-reviewer
+    category: collaboration
+    type: HARNESS
+    name: 投诉复盘分析师
+    description: 基于事实链的投诉根因复盘与处置ROI测算平台。上传每日投诉数据，自动完成根因分析→趋势对比→策略优化→ROI测算。
+    modelName: qwen-max
+    streaming: true
+    enableThinking: false
+    harnessConfig:
+      workspace: "${user.home}/.agentscope/complaint-reviewer"
+      filesystemMode: LOCAL
+      compaction:
+        triggerMessages: 30
+        keepMessages: 10
+        flushBeforeCompact: true
+      subagents:
+        - name: root-cause-analyst
+          description: 根因分析师，基于投诉数据做事实链分析和根因分类
+        - name: trend-analyst
+          description: 趋势分析师，跨日对比投诉数据变化趋势和预警信号
+        - name: strategy-optimizer
+          description: 策略优化顾问，基于根因和趋势推荐优化策略
+        - name: roi-calculator
+          description: ROI 测算师，对不同策略做成本影响测算和模拟
+    samplePrompts:
+      - prompt: "分析今日投诉数据，做根因分析和ROI测算"
+        expectedBehavior: "触发完整分析链：根因分析→趋势对比→策略优化→ROI测算"
+      - prompt: "今天的费用类投诉有什么变化趋势？"
+        expectedBehavior: "基于历史记忆做跨日趋势对比"
