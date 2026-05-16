@@ -1,5 +1,8 @@
 package com.skloda.agentscope.service;
 
+import com.skloda.agentscope.agent.AgentConfig;
+import com.skloda.agentscope.agent.AgentType;
+import com.skloda.agentscope.harness.HarnessAgentService;
 import com.skloda.agentscope.model.ChatRequest;
 import com.skloda.agentscope.model.ChatMessage;
 import com.skloda.agentscope.model.MultiModalMessage;
@@ -30,22 +33,25 @@ public class AgentService {
     private final SessionManagerService sessionManagerService;
     private final WorkflowRunService workflowRunService;
     private final ChatHistoryRepository chatHistoryRepository;
+    private final HarnessAgentService harnessAgentService;
 
     @Autowired
     public AgentService(AgentRuntimeFactory runtimeFactory,
                         SessionManagerService sessionManagerService,
                         WorkflowRunService workflowRunService,
-                        ChatHistoryRepository chatHistoryRepository) {
+                        ChatHistoryRepository chatHistoryRepository,
+                        HarnessAgentService harnessAgentService) {
         this.runtimeFactory = runtimeFactory;
         this.sessionManagerService = sessionManagerService;
         this.workflowRunService = workflowRunService;
         this.chatHistoryRepository = chatHistoryRepository;
+        this.harnessAgentService = harnessAgentService;
     }
 
     public AgentService(AgentRuntimeFactory runtimeFactory,
                         SessionManagerService sessionManagerService,
                         WorkflowRunService workflowRunService) {
-        this(runtimeFactory, sessionManagerService, workflowRunService, new InMemoryChatHistoryRepository());
+        this(runtimeFactory, sessionManagerService, workflowRunService, new InMemoryChatHistoryRepository(), null);
     }
 
     public AgentService(AgentRuntimeFactory runtimeFactory,
@@ -72,6 +78,15 @@ public class AgentService {
                                                        List<ChatRequest.ImageFile> images,
                                                        ChatRequest.AudioFile audio) {
         Msg userMsg = buildUserMessage(message, filePath, fileName, images, audio);
+
+        // Route HARNESS type to HarnessAgentService
+        if (harnessAgentService != null) {
+            AgentConfig cfg = runtimeFactory.getConfigService().findAgentConfig(agentId).orElse(null);
+            if (cfg != null && cfg.getType() == AgentType.HARNESS) {
+                return harnessAgentService.createStreamFlux(agentId, message, filePath, fileName, sessionId);
+            }
+        }
+
         String runId = workflowRunService.startRun(agentId, sessionId,
                 buildInputPreview(message, filePath, fileName, images, audio));
 
