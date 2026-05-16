@@ -66,6 +66,9 @@ public class AgentConfig {
     private List<StateConfig> states = new ArrayList<>();
     private MsgHubConfig msgHubConfig;
 
+    // === Harness fields ===
+    private HarnessConfig harnessConfig;
+
     // === MCP fields ===
     private List<McpServerRef> mcpServers = new ArrayList<>();
     private List<ToolGroupConfig> toolGroups = new ArrayList<>();
