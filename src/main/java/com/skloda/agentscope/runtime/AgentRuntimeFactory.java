@@ -55,6 +55,7 @@ public class AgentRuntimeFactory {
             case MSG_HUB -> createMsgHubRuntime(agentId);
             case SUBAGENT_SEQ -> createSubagentSeqRuntime(agentId);
             case SUBAGENT_PAR -> createSubagentParRuntime(agentId);
+            case HARNESS -> createHarnessRuntime(agentId);
         };
     }
 
@@ -76,6 +77,7 @@ public class AgentRuntimeFactory {
             case MSG_HUB -> createMsgHubRuntimeWithMemory(agentId, memory);
             case SUBAGENT_SEQ -> createSubagentSeqRuntimeWithMemory(agentId, memory);
             case SUBAGENT_PAR -> createSubagentParRuntimeWithMemory(agentId, memory);
+            case HARNESS -> createHarnessRuntimeWithMemory(agentId, memory);
         };
     }
 
@@ -219,6 +221,16 @@ public class AgentRuntimeFactory {
         ObservabilityHook hook = new ObservabilityHook();
         TaskDispatcherPipeline pipeline = compositeFactory.createSubagentParAgent(config, memory);
         return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
+    }
+
+    public StreamingAgentRuntime createHarnessRuntime(String agentId) {
+        log.debug("HARNESS runtime not yet implemented, falling back to SINGLE for agent: {}", agentId);
+        return createSingleRuntime(agentId);
+    }
+
+    public StreamingAgentRuntime createHarnessRuntimeWithMemory(String agentId, Memory memory) {
+        log.debug("HARNESS runtime not yet implemented, falling back to SINGLE for agent: {}", agentId);
+        return createSingleRuntimeWithMemory(agentId, memory);
     }
 
     public CompositeAgentFactory getCompositeFactory() {

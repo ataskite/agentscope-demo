@@ -11,7 +11,8 @@ public enum AgentType {
     STATE_GRAPH(false),
     MSG_HUB(false),
     SUBAGENT_SEQ(false),
-    SUBAGENT_PAR(false);
+    SUBAGENT_PAR(false),
+    HARNESS(false);
 
     private final boolean isDefault;
 

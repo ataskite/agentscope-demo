@@ -40,6 +40,13 @@
             <version>${agentscope.version}</version>
         </dependency>
 
+        <!-- AgentScope Harness -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-harness</artifactId>
+            <version>${agentscope.version}</version>
+        </dependency>
+
         <!-- Spring Boot Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
