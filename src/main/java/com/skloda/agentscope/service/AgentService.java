@@ -50,6 +50,13 @@ public class AgentService {
 
     public AgentService(AgentRuntimeFactory runtimeFactory,
                         SessionManagerService sessionManagerService,
+                        WorkflowRunService workflowRunService,
+                        ChatHistoryRepository chatHistoryRepository) {
+        this(runtimeFactory, sessionManagerService, workflowRunService, chatHistoryRepository, null);
+    }
+
+    public AgentService(AgentRuntimeFactory runtimeFactory,
+                        SessionManagerService sessionManagerService,
                         WorkflowRunService workflowRunService) {
         this(runtimeFactory, sessionManagerService, workflowRunService, new InMemoryChatHistoryRepository(), null);
     }
