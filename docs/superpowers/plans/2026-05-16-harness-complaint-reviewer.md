@@ -63,7 +63,7 @@
 - Modify: `pom.xml:28-95`
 - Modify: `src/main/java/com/skloda/agentscope/agent/AgentType.java`
 
-- [ ] **Step 1: Add agentscope-harness dependency to pom.xml**
+- [x] **Step 1: Add agentscope-harness dependency to pom.xml**
 
 Add after the existing `agentscope-core` dependency block (after line 41):
 
@@ -76,7 +76,7 @@ Add after the existing `agentscope-core` dependency block (after line 41):
 </dependency>
 ```
 
-- [ ] **Step 2: Add HARNESS to AgentType enum**
+- [x] **Step 2: Add HARNESS to AgentType enum**
 
 Replace `src/main/java/com/skloda/agentscope/agent/AgentType.java` contents:
 
@@ -109,12 +109,12 @@ public enum AgentType {
 }
 ```
 
-- [ ] **Step 3: Verify compilation**
+- [x] **Step 3: Verify compilation**
 
 Run: `mvn compile -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pom.xml src/main/java/com/skloda/agentscope/agent/AgentType.java
@@ -129,7 +129,7 @@ git commit -m "feat: add agentscope-harness dependency and HARNESS agent type"
 - Create: `src/main/java/com/skloda/agentscope/agent/HarnessConfig.java`
 - Modify: `src/main/java/com/skloda/agentscope/agent/AgentConfig.java`
 
-- [ ] **Step 1: Create HarnessConfig POJO**
+- [x] **Step 1: Create HarnessConfig POJO**
 
 Create `src/main/java/com/skloda/agentscope/agent/HarnessConfig.java`:
 
@@ -168,7 +168,7 @@ public class HarnessConfig {
 }
 ```
 
-- [ ] **Step 2: Add harnessConfig field to AgentConfig**
+- [x] **Step 2: Add harnessConfig field to AgentConfig**
 
 Add after the `msgHubConfig` field (around line 68 in AgentConfig.java):
 
@@ -177,12 +177,12 @@ Add after the `msgHubConfig` field (around line 68 in AgentConfig.java):
 private HarnessConfig harnessConfig;
 ```
 
-- [ ] **Step 3: Verify compilation**
+- [x] **Step 3: Verify compilation**
 
 Run: `mvn compile -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/main/java/com/skloda/agentscope/agent/HarnessConfig.java src/main/java/com/skloda/agentscope/agent/AgentConfig.java
@@ -197,7 +197,7 @@ git commit -m "feat: add HarnessConfig POJO and harnessConfig field to AgentConf
 - Create: `src/main/java/com/skloda/agentscope/harness/WorkspaceInitializer.java`
 - Create: `src/test/java/com/skloda/agentscope/harness/WorkspaceInitializerTest.java`
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Create `src/test/java/com/skloda/agentscope/harness/WorkspaceInitializerTest.java`:
 
@@ -259,12 +259,12 @@ class WorkspaceInitializerTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `mvn test -pl . -Dtest=WorkspaceInitializerTest -q 2>&1 | tail -5`
 Expected: FAIL (class not found)
 
-- [ ] **Step 3: Implement WorkspaceInitializer**
+- [x] **Step 3: Implement WorkspaceInitializer**
 
 Create `src/main/java/com/skloda/agentscope/harness/WorkspaceInitializer.java`:
 
@@ -352,12 +352,12 @@ public class WorkspaceInitializer {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `mvn test -pl . -Dtest=WorkspaceInitializerTest -q 2>&1 | tail -5`
 Expected: Tests pass (they will pass even without template files — the method creates directories and skips missing resources)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/skloda/agentscope/harness/WorkspaceInitializer.java src/test/java/com/skloda/agentscope/harness/WorkspaceInitializerTest.java
@@ -372,7 +372,7 @@ git commit -m "feat: add WorkspaceInitializer for Harness workspace template cre
 - Create: `src/main/java/com/skloda/agentscope/harness/HarnessRuntime.java`
 - Create: `src/test/java/com/skloda/agentscope/harness/HarnessRuntimeTest.java`
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Create `src/test/java/com/skloda/agentscope/harness/HarnessRuntimeTest.java`:
 
@@ -414,12 +414,12 @@ class HarnessRuntimeTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `mvn test -pl . -Dtest=HarnessRuntimeTest -q 2>&1 | tail -5`
 Expected: FAIL
 
-- [ ] **Step 3: Implement HarnessRuntime**
+- [x] **Step 3: Implement HarnessRuntime**
 
 Create `src/main/java/com/skloda/agentscope/harness/HarnessRuntime.java`:
 
@@ -490,12 +490,12 @@ public class HarnessRuntime {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `mvn test -pl . -Dtest=HarnessRuntimeTest -q 2>&1 | tail -5`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/skloda/agentscope/harness/HarnessRuntime.java src/test/java/com/skloda/agentscope/harness/HarnessRuntimeTest.java
@@ -509,7 +509,7 @@ git commit -m "feat: add HarnessRuntime for converting HarnessAgent events to SS
 **Files:**
 - Create: `src/main/java/com/skloda/agentscope/harness/HarnessAgentFactory.java`
 
-- [ ] **Step 1: Implement HarnessAgentFactory**
+- [x] **Step 1: Implement HarnessAgentFactory**
 
 Create `src/main/java/com/skloda/agentscope/harness/HarnessAgentFactory.java`:
 
@@ -592,12 +592,12 @@ public class HarnessAgentFactory {
 }
 ```
 
-- [ ] **Step 2: Verify compilation**
+- [x] **Step 2: Verify compilation**
 
 Run: `mvn compile -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/main/java/com/skloda/agentscope/harness/HarnessAgentFactory.java
@@ -611,7 +611,7 @@ git commit -m "feat: add HarnessAgentFactory for building HarnessAgent from conf
 **Files:**
 - Create: `src/main/java/com/skloda/agentscope/harness/HarnessAgentService.java`
 
-- [ ] **Step 1: Implement HarnessAgentService**
+- [x] **Step 1: Implement HarnessAgentService**
 
 Create `src/main/java/com/skloda/agentscope/harness/HarnessAgentService.java`:
 
@@ -706,12 +706,12 @@ public class HarnessAgentService {
 }
 ```
 
-- [ ] **Step 2: Verify compilation**
+- [x] **Step 2: Verify compilation**
 
 Run: `mvn compile -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/main/java/com/skloda/agentscope/harness/HarnessAgentService.java
@@ -725,7 +725,7 @@ git commit -m "feat: add HarnessAgentService for lifecycle management and stream
 **Files:**
 - Modify: `src/main/java/com/skloda/agentscope/service/AgentService.java`
 
-- [ ] **Step 1: Add HarnessAgentService dependency and update constructor chain**
+- [x] **Step 1: Add HarnessAgentService dependency and update constructor chain**
 
 In `AgentService.java`, add the import and field:
 
@@ -768,7 +768,7 @@ public AgentService(AgentRuntimeFactory runtimeFactory,
 }
 ```
 
-- [ ] **Step 2: Add HARNESS routing in createStreamFlux**
+- [x] **Step 2: Add HARNESS routing in createStreamFlux**
 
 In the `createStreamFlux` method (the 7-parameter version), add HARNESS routing before the existing session/stateless logic. Insert after the `Msg userMsg = ...` line and before `String runId = ...`:
 
@@ -784,12 +784,12 @@ if (harnessAgentService != null) {
 
 The null check on `harnessAgentService` protects the convenience constructors used in tests. The `findAgentConfig` method returns `Optional` so it's safe even if agentId is unknown.
 
-- [ ] **Step 3: Verify compilation**
+- [x] **Step 3: Verify compilation**
 
 Run: `mvn compile -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/main/java/com/skloda/agentscope/service/AgentService.java
@@ -803,7 +803,7 @@ git commit -m "feat: route HARNESS agent type to HarnessAgentService in AgentSer
 **Files:**
 - Modify: `src/main/resources/config/agents.yml`
 
-- [ ] **Step 1: Append complaint-reviewer agent config**
+- [x] **Step 1: Append complaint-reviewer agent config**
 
 Append the following at the end of `agents.yml` (after the last agent entry):
 
@@ -840,12 +840,12 @@ Append the following at the end of `agents.yml` (after the last agent entry):
         expectedBehavior: "基于历史记忆做跨日趋势对比"
 ```
 
-- [ ] **Step 2: Verify YAML parses correctly**
+- [x] **Step 2: Verify YAML parses correctly**
 
 Run: `mvn compile -q`
 Expected: BUILD SUCCESS (AgentConfigService parses the YAML at startup)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/main/resources/config/agents.yml
@@ -861,7 +861,7 @@ git commit -m "feat: add complaint-reviewer Harness agent config to agents.yml"
 
 This task creates all the workspace template markdown files. These are the domain knowledge files that make the system understand complaint review analysis.
 
-- [ ] **Step 1: Create main workspace AGENTS.md**
+- [x] **Step 1: Create main workspace AGENTS.md**
 
 Create `src/main/resources/harness-templates/complaint-reviewer/AGENTS.md`:
 
@@ -893,7 +893,7 @@ Create `src/main/resources/harness-templates/complaint-reviewer/AGENTS.md`:
 - ROI 测算必须给出保守/中性/积极三个区间
 ```
 
-- [ ] **Step 2: Create knowledge files**
+- [x] **Step 2: Create knowledge files**
 
 Create `src/main/resources/harness-templates/complaint-reviewer/knowledge/complaint-taxonomy.md`:
 
@@ -977,7 +977,7 @@ Create `src/main/resources/harness-templates/complaint-reviewer/knowledge/action
 - 每类投诉必须有明确的处理时限承诺
 ```
 
-- [ ] **Step 3: Create subagent definition files**
+- [x] **Step 3: Create subagent definition files**
 
 Create `src/main/resources/harness-templates/complaint-reviewer/subagents/root-cause-analyst.md`:
 
@@ -1088,7 +1088,7 @@ workspace: "${user.home}/.agentscope/roi-calculator"
 - recommended_combo: 推荐策略组合及理由
 ```
 
-- [ ] **Step 4: Create subagent workspace files**
+- [x] **Step 4: Create subagent workspace files**
 
 Create the following files (all are short markdown files):
 
@@ -1305,17 +1305,17 @@ description: ROI 模拟测算方法论
 - 提升监管评级：影响业务准入和额度审批
 ```
 
-- [ ] **Step 5: Verify all template files are in place**
+- [x] **Step 5: Verify all template files are in place**
 
 Run: `find src/main/resources/harness-templates -name "*.md" | wc -l`
 Expected: 23 files
 
-- [ ] **Step 6: Verify compilation**
+- [x] **Step 6: Verify compilation**
 
 Run: `mvn compile -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/main/resources/harness-templates/
@@ -1328,12 +1328,12 @@ git commit -m "feat: add all workspace template files for complaint reviewer and
 
 **Files:** None new
 
-- [ ] **Step 1: Run unit tests**
+- [x] **Step 1: Run unit tests**
 
 Run: `mvn test -q 2>&1 | tail -20`
 Expected: All tests pass (including new HarnessRuntimeTest and WorkspaceInitializerTest)
 
-- [ ] **Step 2: Verify application starts**
+- [x] **Step 2: Verify application starts**
 
 Run: `DASHSCOPE_API_KEY=test mvn spring-boot:run -q &` then check logs for:
 - "Loaded X agent configurations" (should include complaint-reviewer)
@@ -1341,7 +1341,7 @@ Run: `DASHSCOPE_API_KEY=test mvn spring-boot:run -q &` then check logs for:
 
 Kill the process after verification.
 
-- [ ] **Step 3: Commit any fixes**
+- [x] **Step 3: Commit any fixes**
 
 If any fixes were needed during integration testing, commit them:
 
@@ -1356,11 +1356,11 @@ git commit -m "fix: integration fixes for Harness complaint reviewer"
 
 **Files:** None new
 
-- [ ] **Step 1: Start the application**
+- [x] **Step 1: Start the application**
 
 Run: `export DASHSCOPE_API_KEY=<your_key> && mvn spring-boot:run`
 
-- [ ] **Step 2: Open browser and verify**
+- [x] **Step 2: Open browser and verify**
 
 Open http://localhost:8080
 1. Verify "投诉复盘分析师" appears in the agent list
@@ -1371,7 +1371,7 @@ Open http://localhost:8080
    - Agent spawns sub-agents (look for agent_spawn in debug)
    - Final output is a structured daily report
 
-- [ ] **Step 3: Verify workspace persistence**
+- [x] **Step 3: Verify workspace persistence**
 
 Check `~/.agentscope/complaint-reviewer/`:
 - AGENTS.md exists
@@ -1384,7 +1384,7 @@ Check `~/.agentscope/root-cause-analyst/`:
 - AGENTS.md exists
 - skills/ and knowledge/ populated
 
-- [ ] **Step 4: Commit final state**
+- [x] **Step 4: Commit final state**
 
 ```bash
 git add -A
