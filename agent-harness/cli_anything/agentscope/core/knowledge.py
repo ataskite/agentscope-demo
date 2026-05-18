@@ -2,6 +2,7 @@
 
 from cli_anything.agentscope.utils.agentscope_backend import (
     list_knowledge_docs, upload_knowledge, remove_knowledge, search_knowledge,
+    get_knowledge_status,
 )
 
 
@@ -24,3 +25,7 @@ def search(
     base_url: str | None = None,
 ) -> dict:
     return search_knowledge(query, limit, threshold, base_url)
+
+
+def status(base_url: str | None = None) -> dict:
+    return get_knowledge_status(base_url)

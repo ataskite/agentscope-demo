@@ -206,6 +206,98 @@ class TestSkillToolInfo(unittest.TestCase):
         self.assertEqual(result["name"], "parse_docx")
 
 
+class TestAgentMessages(unittest.TestCase):
+    @patch("cli_anything.agentscope.utils.agentscope_backend.requests.get")
+    def test_get_agent_messages(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = [
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi there!"},
+        ]
+        mock_resp.raise_for_status.return_value = None
+        mock_get.return_value = mock_resp
+
+        msgs = backend.get_agent_messages("chat-basic", "http://test:8080")
+        self.assertEqual(len(msgs), 2)
+        self.assertEqual(msgs[0]["role"], "user")
+
+    @patch("cli_anything.agentscope.utils.agentscope_backend.requests.get")
+    def test_get_sample_prompt(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "agentId": "chat-basic",
+            "index": 0,
+            "prompt": "Hello, who are you?",
+            "expectedBehavior": "Agent introduces itself",
+        }
+        mock_resp.raise_for_status.return_value = None
+        mock_get.return_value = mock_resp
+
+        result = backend.get_sample_prompt("chat-basic", 0, "http://test:8080")
+        self.assertEqual(result["prompt"], "Hello, who are you?")
+        self.assertEqual(result["index"], 0)
+
+
+class TestApproveMessage(unittest.TestCase):
+    @patch("cli_anything.agentscope.utils.agentscope_backend.requests.post")
+    def test_approve_message(self, mock_post):
+        sse_lines = [
+            "event:message",
+            'data:{"type":"text","content":"Approved and continuing..."}',
+            "event:message",
+            'data:{"type":"done","content":""}',
+        ]
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.iter_lines.return_value = iter(sse_lines)
+        mock_post.return_value = mock_resp
+
+        events = backend.approve_message("appr-123", approved=True, base_url="http://test:8080")
+        self.assertEqual(len(events), 2)
+        self.assertEqual(events[0]["content"], "Approved and continuing...")
+
+        # Verify payload
+        call_args = mock_post.call_args
+        payload = call_args[1]["json"]
+        self.assertEqual(payload["approvalId"], "appr-123")
+        self.assertTrue(payload["approved"])
+
+    @patch("cli_anything.agentscope.utils.agentscope_backend.requests.post")
+    def test_reject_message_with_reason(self, mock_post):
+        sse_lines = [
+            "event:message",
+            'data:{"type":"done","content":""}',
+        ]
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.iter_lines.return_value = iter(sse_lines)
+        mock_post.return_value = mock_resp
+
+        events = backend.approve_message(
+            "appr-456", approved=False, reason="Unsafe", base_url="http://test:8080"
+        )
+        payload = mock_post.call_args[1]["json"]
+        self.assertFalse(payload["approved"])
+        self.assertEqual(payload["reason"], "Unsafe")
+
+
+class TestKnowledgeStatus(unittest.TestCase):
+    @patch("cli_anything.agentscope.utils.agentscope_backend.requests.get")
+    def test_knowledge_status(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "indexed": True,
+            "documentCount": 5,
+            "status": "ready",
+        }
+        mock_resp.raise_for_status.return_value = None
+        mock_get.return_value = mock_resp
+
+        result = backend.get_knowledge_status("http://test:8080")
+        self.assertTrue(result["indexed"])
+        self.assertEqual(result["documentCount"], 5)
+
+
 class TestChatExtractText(unittest.TestCase):
     def test_extract_text_empty(self):
         self.assertEqual(chat.extract_text([]), "")
@@ -247,6 +339,28 @@ class TestChatExtractDebug(unittest.TestCase):
 
     def test_extract_debug_empty(self):
         self.assertEqual(chat.extract_debug([]), [])
+
+    def test_extract_debug_multi_agent_events(self):
+        events = [
+            {"type": "loop_start", "content": {"iteration": 1}},
+            {"type": "loop_end", "content": {"totalIterations": 3}},
+            {"type": "graph_transition", "content": {"from": "A", "to": "B"}},
+            {"type": "roundtable_start", "content": {"participants": 3}},
+            {"type": "round_message", "content": {"agent": "expert1"}},
+            {"type": "task_delegate", "content": {"from": "orch", "to": "worker"}},
+            {"type": "approval_request", "content": {"approvalId": "xyz"}},
+            {"type": "text", "content": "regular text"},
+        ]
+        debug = chat.extract_debug(events)
+        types = [e["type"] for e in debug]
+        self.assertIn("loop_start", types)
+        self.assertIn("loop_end", types)
+        self.assertIn("graph_transition", types)
+        self.assertIn("roundtable_start", types)
+        self.assertIn("round_message", types)
+        self.assertIn("task_delegate", types)
+        self.assertIn("approval_request", types)
+        self.assertNotIn("text", types)
 
 
 class TestChatExtractMetrics(unittest.TestCase):

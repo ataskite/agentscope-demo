@@ -241,3 +241,71 @@ def get_tool_info(tool_name: str, base_url: str | None = None) -> dict:
     r = requests.get(url, timeout=10)
     r.raise_for_status()
     return r.json()
+
+
+def get_agent_messages(agent_id: str, base_url: str | None = None) -> list[dict]:
+    url = (base_url or get_base_url()) + f"/api/agents/{agent_id}/messages"
+    r = requests.get(url, timeout=10)
+    r.raise_for_status()
+    return r.json()
+
+
+def get_sample_prompt(agent_id: str, index: int, base_url: str | None = None) -> dict:
+    url = (base_url or get_base_url()) + f"/api/agents/{agent_id}/sample-prompts/{index}"
+    r = requests.get(url, timeout=10)
+    r.raise_for_status()
+    return r.json()
+
+
+def approve_message(
+    approval_id: str,
+    approved: bool,
+    reason: str | None = None,
+    modified_params: dict | None = None,
+    session_id: str | None = None,
+    base_url: str | None = None,
+) -> list[dict]:
+    url = (base_url or get_base_url()) + "/chat/approve"
+    payload = {
+        "approvalId": approval_id,
+        "approved": approved,
+    }
+    if reason:
+        payload["reason"] = reason
+    if modified_params:
+        payload["modifiedParams"] = modified_params
+    if session_id:
+        payload["sessionId"] = session_id
+
+    r = requests.post(url, json=payload, stream=True, timeout=120)
+    r.raise_for_status()
+    r.encoding = "utf-8"
+
+    events = []
+    current_event_type = "message"
+
+    for line in r.iter_lines(decode_unicode=True):
+        if line is None:
+            continue
+        if line.startswith("event:"):
+            current_event_type = line.split(":", 1)[1].strip()
+        elif line.startswith("data:"):
+            data_str = line.split(":", 1)[1].strip()
+            try:
+                event = json.loads(data_str)
+            except json.JSONDecodeError:
+                event = {"type": "raw", "content": data_str}
+            event.setdefault("type", current_event_type)
+            events.append(event)
+            if event.get("type") == "done":
+                r.close()
+                return events
+
+    return events
+
+
+def get_knowledge_status(base_url: str | None = None) -> dict:
+    url = (base_url or get_base_url()) + "/api/knowledge/status"
+    r = requests.get(url, timeout=10)
+    r.raise_for_status()
+    return r.json()

@@ -167,6 +167,90 @@ def agent_info(ctx, agent_id):
             _skin.status("System Tools", ", ".join(a["systemTools"]))
 
 
+@agent.command("messages")
+@click.argument("agent_id")
+@click.pass_context
+def agent_messages(ctx, agent_id):
+    """List chat history for an agent."""
+    from cli_anything.agentscope.core import agent as agent_mod
+    try:
+        msgs = agent_mod.messages(agent_id)
+    except Exception as e:
+        _handle_error(e)
+        return
+    if ctx.obj["json"]:
+        _json_out(msgs)
+    else:
+        if not msgs:
+            _skin.info("No messages found.")
+            return
+        for m in msgs:
+            role = m.get("role", "unknown")
+            content = m.get("content", "")
+            preview = content[:100] + "..." if len(content) > 100 else content
+            _skin.status(role, preview)
+
+
+@agent.command("sample-prompt")
+@click.argument("agent_id")
+@click.argument("index", type=int)
+@click.pass_context
+def agent_sample_prompt(ctx, agent_id, index):
+    """Get a sample prompt for an agent by index."""
+    from cli_anything.agentscope.core import agent as agent_mod
+    try:
+        result = agent_mod.sample_prompt(agent_id, index)
+    except Exception as e:
+        _handle_error(e)
+        return
+    if ctx.obj["json"]:
+        _json_out(result)
+    else:
+        _skin.section(f"Sample Prompt #{index}")
+        _skin.status("Agent", result.get("agentId", agent_id))
+        click.echo(result.get("prompt", ""))
+        if result.get("expectedBehavior"):
+            _skin.status("Expected", result["expectedBehavior"])
+
+
+@agent.command("skill-info")
+@click.argument("skill_name")
+@click.pass_context
+def agent_skill_info(ctx, skill_name):
+    """Show skill details."""
+    from cli_anything.agentscope.core import agent as agent_mod
+    try:
+        result = agent_mod.skill_info(skill_name)
+    except Exception as e:
+        _handle_error(e)
+        return
+    if ctx.obj["json"]:
+        _json_out(result)
+    else:
+        _skin.section(f"Skill: {skill_name}")
+        for k, v in result.items():
+            _skin.status(k, str(v)[:200])
+
+
+@agent.command("tool-info")
+@click.argument("tool_name")
+@click.pass_context
+def agent_tool_info(ctx, tool_name):
+    """Show tool details."""
+    from cli_anything.agentscope.core import agent as agent_mod
+    try:
+        result = agent_mod.tool_info(tool_name)
+    except Exception as e:
+        _handle_error(e)
+        return
+    if ctx.obj["json"]:
+        _json_out(result)
+    else:
+        _skin.section(f"Tool: {tool_name}")
+        for k, v in result.items():
+            _skin.status(k, str(v)[:200])
+
+
 # ── Session commands ───────────────────────────────────────────────────
 
 @cli.group("session")
@@ -326,6 +410,36 @@ def chat_metrics(ctx, message, agent_id, session_id):
                 _skin.status("Duration", f"{ae.get('duration_ms', 0):.0f}ms")
 
 
+@chat.command("approve")
+@click.argument("approval_id")
+@click.option("--reject", "approved", is_flag=True, default=False, help="Reject instead of approve")
+@click.option("--reason", "-r", default=None, help="Reason for rejection")
+@click.option("--session-id", "-s", default=None, help="Session ID")
+@click.pass_context
+def chat_approve(ctx, approval_id, approved, reason, session_id):
+    """Approve or reject a pending HITL approval request."""
+    from cli_anything.agentscope.core import chat as chat_mod
+    sid = session_id or _current_session_id
+    try:
+        events = chat_mod.approve(
+            approval_id=approval_id,
+            approved=not approved,
+            reason=reason,
+            session_id=sid,
+        )
+        text = chat_mod.extract_text(events)
+    except Exception as e:
+        _handle_error(e)
+        return
+    if ctx.obj["json"]:
+        _json_out({"text": text, "events": events})
+    else:
+        action = "rejected" if approved else "approved"
+        _skin.success(f"Request {action}: {approval_id}")
+        if text:
+            click.echo(text)
+
+
 # ── Knowledge commands ─────────────────────────────────────────────────
 
 @cli.group("knowledge")
@@ -410,6 +524,24 @@ def knowledge_search(ctx, query, limit, threshold):
         _skin.status("Results", str(result.get("count", 0)))
         for i, r in enumerate(result.get("results", []), 1):
             _skin.status(f"  {i}", f"[{r.get('score', 'N/A')}] {r.get('content', '')[:120]}")
+
+
+@knowledge.command("status")
+@click.pass_context
+def knowledge_status(ctx):
+    """Show knowledge base indexing status."""
+    from cli_anything.agentscope.core import knowledge as knowledge_mod
+    try:
+        result = knowledge_mod.status()
+    except Exception as e:
+        _handle_error(e)
+        return
+    if ctx.obj["json"]:
+        _json_out(result)
+    else:
+        _skin.section("Knowledge Base Status")
+        for k, v in result.items():
+            _skin.status(k, str(v))
 
 
 # ── Upload commands ────────────────────────────────────────────────────
@@ -514,15 +646,20 @@ def repl(ctx, agent_id):
                 "agent list": "List all agents",
                 "agent use <id>": "Switch active agent",
                 "agent info <id>": "Show agent details",
+                "agent messages <id>": "Show agent chat history",
+                "agent skill-info <name>": "Show skill details",
+                "agent tool-info <name>": "Show tool details",
                 "session list": "List sessions",
                 "session create [agent]": "Create new session",
                 "session use <id>": "Set active session",
                 "session delete <id>": "Delete a session",
                 "chat <message>": "Send message (streaming)",
                 "chat! <message>": "Send message (batch, with metrics)",
+                "chat approve <id> [--reject]": "Approve/reject HITL request",
                 "knowledge list": "List indexed docs",
                 "knowledge upload <path>": "Upload doc to knowledge base",
                 "knowledge search <query>": "Search knowledge base",
+                "knowledge status": "Show indexing status",
                 "upload <path>": "Upload file to server",
                 "server status": "Check server health",
             })
@@ -536,6 +673,11 @@ def repl(ctx, agent_id):
                 continue
             stream = cmd == "chat"
             _repl_chat(arg, stream)
+        elif cmd == "approve":
+            if not arg:
+                _skin.warning("Usage: approve <approval_id> [--reject] [--reason <text>]")
+                continue
+            _repl_approve(arg)
         elif cmd == "knowledge":
             _repl_knowledge(arg)
         elif cmd == "upload":
@@ -576,8 +718,37 @@ def _repl_agent(arg):
             _skin.status("Description", a.get("description", ""))
         except Exception as e:
             _skin.error(str(e))
+    elif parts[0] == "messages" and len(parts) > 1:
+        try:
+            msgs = agent_mod.messages(parts[1])
+            if not msgs:
+                _skin.info("No messages found.")
+                return
+            for m in msgs:
+                role = m.get("role", "unknown")
+                content = m.get("content", "")
+                preview = content[:100] + "..." if len(content) > 100 else content
+                _skin.status(role, preview)
+        except Exception as e:
+            _skin.error(str(e))
+    elif parts[0] == "skill-info" and len(parts) > 1:
+        try:
+            result = agent_mod.skill_info(parts[1])
+            _skin.section(f"Skill: {parts[1]}")
+            for k, v in result.items():
+                _skin.status(k, str(v)[:200])
+        except Exception as e:
+            _skin.error(str(e))
+    elif parts[0] == "tool-info" and len(parts) > 1:
+        try:
+            result = agent_mod.tool_info(parts[1])
+            _skin.section(f"Tool: {parts[1]}")
+            for k, v in result.items():
+                _skin.status(k, str(v)[:200])
+        except Exception as e:
+            _skin.error(str(e))
     else:
-        _skin.warning("Usage: agent [list|use <id>|info <id>]")
+        _skin.warning("Usage: agent [list|use <id>|info <id>|messages <id>|skill-info <name>|tool-info <name>]")
 
 
 def _repl_session(arg):
@@ -676,8 +847,16 @@ def _repl_knowledge(arg):
                 click.echo(f"    {r.get('content', '')[:200]}")
         except Exception as e:
             _skin.error(str(e))
+    elif parts[0] == "status":
+        try:
+            result = knowledge_mod.status()
+            _skin.section("Knowledge Base Status")
+            for k, v in result.items():
+                _skin.status(k, str(v))
+        except Exception as e:
+            _skin.error(str(e))
     else:
-        _skin.warning("Usage: knowledge [list|upload <path>|search <query>]")
+        _skin.warning("Usage: knowledge [list|upload <path>|search <query>|status]")
 
 
 def _repl_upload(arg):
@@ -686,6 +865,28 @@ def _repl_upload(arg):
         result = upload_mod.upload(arg)
         _skin.success(f"Uploaded: {result.get('fileName', '')} (type: {result.get('fileType', '')})")
         _skin.status("Path", result.get("filePath", ""))
+    except Exception as e:
+        _skin.error(str(e))
+
+
+def _repl_approve(arg):
+    from cli_anything.agentscope.core import chat as chat_mod
+    parts = arg.split()
+    if not parts:
+        _skin.warning("Usage: approve <approval_id> [--reject]")
+        return
+    approval_id = parts[0]
+    reject = "--reject" in parts
+    try:
+        events = chat_mod.approve(
+            approval_id=approval_id,
+            approved=not reject,
+        )
+        text = chat_mod.extract_text(events)
+        action = "rejected" if reject else "approved"
+        _skin.success(f"Request {action}: {approval_id}")
+        if text:
+            click.echo(text)
     except Exception as e:
         _skin.error(str(e))
 

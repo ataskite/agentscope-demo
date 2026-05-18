@@ -1,11 +1,11 @@
 ---
 name: "cli-anything-agentscope"
-description: "CLI harness for AgentScope Demo — agent chat, session management, knowledge base, and file operations"
+description: "CLI harness for AgentScope Demo — agent chat, session management, knowledge base, file operations, and HITL approval"
 ---
 
 # cli-anything-agentscope
 
-Command-line interface for the AgentScope Demo server. Provides agent chat, session management, knowledge base, and file upload/download operations.
+Command-line interface for the AgentScope Demo server. Provides agent chat, session management, knowledge base, file upload/download operations, and human-in-the-loop (HITL) approval flows.
 
 ## Prerequisites
 
@@ -44,6 +44,10 @@ pip install cli-anything-agentscope
 |---------|-------------|
 | `agent list` | List all available agents |
 | `agent info <agent_id>` | Show detailed agent configuration |
+| `agent messages <agent_id>` | List chat history for an agent |
+| `agent sample-prompt <agent_id> <index>` | Get sample prompt by index |
+| `agent skill-info <skill_name>` | Show skill details |
+| `agent tool-info <tool_name>` | Show tool details |
 
 ### session — Session management
 
@@ -60,12 +64,14 @@ pip install cli-anything-agentscope
 |---------|-------------|
 | `chat send <message> [-a AGENT_ID] [-s SESSION_ID] [--file PATH] [--stream/--no-stream]` | Send message |
 | `chat metrics <message>` | Send message and show debug metrics |
+| `chat approve <approval_id> [--reject] [--reason TEXT]` | Approve/reject HITL request |
 
 ### knowledge — Knowledge base management
 
 | Command | Description |
 |---------|-------------|
 | `knowledge list` | List indexed documents |
+| `knowledge status` | Show indexing status |
 | `knowledge upload <file_path>` | Upload document to knowledge base |
 | `knowledge remove <file_name>` | Remove document from knowledge base |
 | `knowledge search <query> [-n LIMIT] [-t THRESHOLD]` | Search knowledge base |
@@ -88,9 +94,10 @@ $ cli-anything-agentscope
 REPL commands:
 - `chat <message>` — Send message (streaming)
 - `chat! <message>` — Send message with metrics
-- `agent list|use <id>|info <id>`
+- `approve <approval_id> [--reject]` — Approve/reject HITL request
+- `agent list|use <id>|info <id>|messages <id>|skill-info <name>|tool-info <name>`
 - `session list|create [agent]|use <id>|delete <id>`
-- `knowledge list|upload <path>|search <query>`
+- `knowledge list|upload <path>|search <query>|status`
 - `upload <path>`
 - `server status`
 - `help` — Show available commands
@@ -118,8 +125,18 @@ cli-anything-agentscope --json chat send -s <session_id> "Hello"
 cli-anything-agentscope --json knowledge upload report.pdf
 cli-anything-agentscope --json knowledge search "quarterly revenue"
 
+# Check knowledge indexing status
+cli-anything-agentscope --json knowledge status
+
 # Upload a file
 cli-anything-agentscope --json upload file document.docx
+
+# Get agent chat history
+cli-anything-agentscope --json agent messages chat-basic
+
+# Get skill/tool details
+cli-anything-agentscope --json agent skill-info docx
+cli-anything-agentscope --json agent tool-info parse_docx
 ```
 
 ### Agent-specific usage patterns
@@ -131,11 +148,18 @@ cli-anything-agentscope chat send -a tool-test-simple "What time is it?"
 # Use vision agent with an image
 cli-anything-agentscope chat send -a vision-analyzer --file photo.jpg "Describe this image"
 
-# Multi-agent pipeline
+# Multi-agent pipeline (sequential)
 cli-anything-agentscope --json agent info doc-analysis-pipeline
 
-# Bank invoice generation
-cli-anything-agentscope chat send -a bank-invoice "Generate invoice for 张三丰, loan amount 500000"
+# Routing agent
+cli-anything-agentscope --json agent info smart-router
+
+# Loop pattern (write-review-revise)
+cli-anything-agentscope chat send -a copywriter-refiner "Write a product description"
+
+# HITL approval
+cli-anything-agentscope chat approve <approval_id>
+cli-anything-agentscope chat approve <approval_id> --reject --reason "Unsafe operation"
 ```
 
 ## JSON Output Format
@@ -144,7 +168,7 @@ All commands support `--json` for machine-readable output:
 
 ```json
 // server status
-{"status": "ok", "url": "http://localhost:8080", "agent_count": 19}
+{"status": "ok", "url": "http://localhost:8080", "agent_count": 30}
 
 // agent list
 [{"agentId": "chat-basic", "name": "Basic Chat", "type": "SINGLE", ...}]
@@ -154,6 +178,9 @@ All commands support `--json` for machine-readable output:
 
 // knowledge search
 {"query": "...", "count": 2, "results": [{"content": "...", "score": "0.85"}]}
+
+// chat approve
+{"text": "response after approval", "events": [...]}
 ```
 
 ## Error Handling

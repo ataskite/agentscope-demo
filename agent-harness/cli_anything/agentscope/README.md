@@ -1,6 +1,6 @@
 # cli-anything-agentscope
 
-CLI harness for the AgentScope Demo server. Provides command-line and REPL access to agent chat, session management, knowledge base, and file operations.
+CLI harness for the AgentScope Demo server. Provides command-line and REPL access to agent chat, session management, knowledge base, HITL approval, and file operations.
 
 ## Prerequisites
 
@@ -70,10 +70,10 @@ CLI_ANYTHING_FORCE_INSTALLED=1 python -m pytest cli_anything/agentscope/tests/ -
 | Group | Commands |
 |-------|----------|
 | `server` | `status`, `info` |
-| `agent` | `list`, `info <id>` |
+| `agent` | `list`, `info <id>`, `messages <id>`, `sample-prompt <id> <index>`, `skill-info <name>`, `tool-info <name>` |
 | `session` | `list`, `create`, `delete <id>`, `use <id>` |
-| `chat` | `send <msg>`, `metrics <msg>` |
-| `knowledge` | `list`, `upload <path>`, `remove <name>`, `search <query>` |
+| `chat` | `send <msg>`, `metrics <msg>`, `approve <id> [--reject]` |
+| `knowledge` | `list`, `status`, `upload <path>`, `remove <name>`, `search <query>` |
 | `upload` | `file <path>`, `download <id> -o <path>` |
 
 All commands support `--json` for machine-readable output.

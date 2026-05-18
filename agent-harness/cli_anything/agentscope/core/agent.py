@@ -1,6 +1,9 @@
 """Agent listing and info."""
 
-from cli_anything.agentscope.utils.agentscope_backend import list_agents, get_agent, get_skill_info, get_tool_info
+from cli_anything.agentscope.utils.agentscope_backend import (
+    list_agents, get_agent, get_skill_info, get_tool_info,
+    get_agent_messages, get_sample_prompt,
+)
 
 
 def list_all(base_url: str | None = None) -> list[dict]:
@@ -17,3 +20,11 @@ def skill_info(skill_name: str, base_url: str | None = None) -> dict:
 
 def tool_info(tool_name: str, base_url: str | None = None) -> dict:
     return get_tool_info(tool_name, base_url)
+
+
+def messages(agent_id: str, base_url: str | None = None) -> list[dict]:
+    return get_agent_messages(agent_id, base_url)
+
+
+def sample_prompt(agent_id: str, index: int, base_url: str | None = None) -> dict:
+    return get_sample_prompt(agent_id, index, base_url)

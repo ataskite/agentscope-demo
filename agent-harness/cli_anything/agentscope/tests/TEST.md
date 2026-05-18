@@ -4,14 +4,15 @@
 
 | File | Type | Planned Count |
 |------|------|---------------|
-| `test_core.py` | Unit tests (synthetic, no server) | ~25 |
-| `test_full_e2e.py` | E2E tests (requires running server) | ~15 |
+| `test_core.py` | Unit tests (synthetic, no server) | ~40 |
+| `test_full_e2e.py` | E2E tests (requires running server) | ~20 |
 
 ## Unit Test Plan
 
 ### `utils/agentscope_backend.py` (mock HTTP)
 - `test_get_base_url_default` — default URL from env
 - `test_get_base_url_custom` — custom URL from env var
+- `test_get_base_url_custom_strips_slash` — trailing slash stripped
 - `test_server_status_ok` — mock 200 response
 - `test_server_status_offline` — mock connection error
 - `test_list_agents` — mock agent list
@@ -19,19 +20,27 @@
 - `test_list_sessions` — mock session list
 - `test_create_session` — mock session creation
 - `test_delete_session` — mock session deletion
+- `test_send_message_basic` — mock SSE stream
 - `test_upload_file` — mock file upload
 - `test_list_knowledge_docs` — mock doc list
-- `test_upload_knowledge` — mock knowledge upload
 - `test_remove_knowledge` — mock knowledge removal
 - `test_search_knowledge` — mock knowledge search
 - `test_get_skill_info` — mock skill info
 - `test_get_tool_info` — mock tool info
+- `test_get_agent_messages` — mock agent messages endpoint
+- `test_get_sample_prompt` — mock sample prompt endpoint
+- `test_approve_message` — mock approve SSE stream
+- `test_reject_message_with_reason` — mock reject with reason
+- `test_knowledge_status` — mock knowledge status
 
 ### `core/chat.py` (pure functions)
 - `test_extract_text_empty` — empty events
 - `test_extract_text_basic` — single text event
 - `test_extract_text_multiple` — multiple text events
+- `test_extract_text_no_text_events` — no text events
 - `test_extract_debug` — filters debug events
+- `test_extract_debug_empty` — empty events
+- `test_extract_debug_multi_agent_events` — new P6 event types (loop, graph, roundtable, task, approval)
 - `test_extract_metrics` — aggregates token counts
 - `test_extract_metrics_empty` — no events
 
@@ -47,6 +56,8 @@
 ### Agent operations
 - `test_list_agents` — list all agents, verify structure
 - `test_get_agent` — get specific agent, verify fields
+- `test_agent_messages` — get chat history for an agent
+- `test_agent_sample_prompt` — get sample prompt by index
 
 ### Session operations
 - `test_session_lifecycle` — create → list → delete
@@ -60,6 +71,7 @@
 ### Knowledge operations
 - `test_knowledge_list` — list docs (may be empty)
 - `test_knowledge_upload_and_search` — upload doc, search, remove
+- `test_knowledge_status` — check indexing status
 
 ### File operations
 - `test_file_upload` — upload a test file
@@ -114,55 +126,42 @@ cli_anything/agentscope/tests/test_core.py::TestKnowledge::test_remove_knowledge
 cli_anything/agentscope/tests/test_core.py::TestKnowledge::test_search_knowledge PASSED
 cli_anything/agentscope/tests/test_core.py::TestSkillToolInfo::test_get_skill_info PASSED
 cli_anything/agentscope/tests/test_core.py::TestSkillToolInfo::test_get_tool_info PASSED
+cli_anything/agentscope/tests/test_core.py::TestAgentMessages::test_get_agent_messages PASSED
+cli_anything/agentscope/tests/test_core.py::TestAgentMessages::test_get_sample_prompt PASSED
+cli_anything/agentscope/tests/test_core.py::TestApproveMessage::test_approve_message PASSED
+cli_anything/agentscope/tests/test_core.py::TestApproveMessage::test_reject_message_with_reason PASSED
+cli_anything/agentscope/tests/test_core.py::TestKnowledgeStatus::test_knowledge_status PASSED
 cli_anything/agentscope/tests/test_core.py::TestChatExtractText::test_extract_text_empty PASSED
 cli_anything/agentscope/tests/test_core.py::TestChatExtractText::test_extract_text_multiple PASSED
 cli_anything/agentscope/tests/test_core.py::TestChatExtractText::test_extract_text_no_text_events PASSED
 cli_anything/agentscope/tests/test_core.py::TestChatExtractText::test_extract_text_single PASSED
 cli_anything/agentscope/tests/test_core.py::TestChatExtractDebug::test_extract_debug PASSED
 cli_anything/agentscope/tests/test_core.py::TestChatExtractDebug::test_extract_debug_empty PASSED
+cli_anything/agentscope/tests/test_core.py::TestChatExtractDebug::test_extract_debug_multi_agent_events PASSED
 cli_anything/agentscope/tests/test_core.py::TestChatExtractMetrics::test_extract_metrics PASSED
 cli_anything/agentscope/tests/test_core.py::TestChatExtractMetrics::test_extract_metrics_empty PASSED
 cli_anything/agentscope/tests/test_core.py::TestProjectDelegates::test_project_info PASSED
 cli_anything/agentscope/tests/test_core.py::TestProjectDelegates::test_project_status PASSED
 
-27 passed in 0.77s
+33 passed in 0.14s
 ```
 
 ### E2E Tests (test_full_e2e.py)
 
-```
-cli_anything/agentscope/tests/test_full_e2e.py::TestServerStatus::test_status SKIPPED (server not running)
-cli_anything/agentscope/tests/test_full_e2e.py::TestAgentOperations::test_get_agent SKIPPED
-cli_anything/agentscope/tests/test_full_e2e.py::TestAgentOperations::test_list_agents SKIPPED
-cli_anything/agentscope/tests/test_full_e2e.py::TestSessionLifecycle::test_create_list_delete SKIPPED
-cli_anything/agentscope/tests/test_full_e2e.py::TestChatSend::test_send_text_batch SKIPPED
-cli_anything/agentscope/tests/test_full_e2e.py::TestChatSend::test_send_text_streaming SKIPPED
-cli_anything/agentscope/tests/test_full_e2e.py::TestChatSend::test_send_with_session SKIPPED
-cli_anything/agentscope/tests/test_full_e2e.py::TestKnowledgeOps::test_knowledge_upload_search_remove SKIPPED
-cli_anything/agentscope/tests/test_full_e2e.py::TestFileUpload::test_upload_file SKIPPED
-cli_anything/agentscope/tests/test_full_e2e.py::TestCLISubprocess::test_agent_list_json SKIPPED
-cli_anything/agentscope/tests/test_full_e2e.py::TestCLISubprocess::test_chat_send_json SKIPPED
-cli_anything/agentscope/tests/test_full_e2e.py::TestCLISubprocess::test_help PASSED
-cli_anything/agentscope/tests/test_full_e2e.py::TestCLISubprocess::test_server_status_json SKIPPED
-cli_anything/agentscope/tests/test_full_e2e.py::TestCLISubprocess::test_session_lifecycle_json SKIPPED
-cli_anything/agentscope/tests/test_full_e2e.py::TestWorkflowChatSession::test_full_session_workflow SKIPPED
-
-1 passed, 14 skipped in 28.41s
-```
-
-E2E tests require a running AgentScope Demo server. Start with `mvn spring-boot:run`.
+*(E2E tests require a running AgentScope Demo server. Start with `mvn spring-boot:run`)*
 
 ### Summary
 
-| Category | Total | Passed | Skipped |
-|----------|-------|--------|---------|
-| Unit tests | 27 | 27 | 0 |
-| E2E tests | 15 | 1 | 14 (server offline) |
-| **Total** | **42** | **28** | **14** |
+| Category | Total | Passed | Status |
+|----------|-------|--------|--------|
+| Unit tests | 33 | 33 | All pass |
+| E2E tests | ~15 | — | Requires server |
 
 ### Coverage Notes
 
-- All HTTP backend functions have mock-based unit tests
-- All chat event extraction functions have pure unit tests
+- All HTTP backend functions have mock-based unit tests (22 backend tests)
+- All chat event extraction functions have pure unit tests (9 chat tests)
+- New endpoint coverage: agent messages, sample prompts, approve/reject, knowledge status
+- Multi-agent debug event types (loop, graph, roundtable, task, approval) covered
 - E2E tests cover full server workflow but require a running server
 - CLI subprocess tests verify installed command works via `_resolve_cli()`

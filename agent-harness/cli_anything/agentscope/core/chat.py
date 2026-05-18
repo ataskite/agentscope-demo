@@ -2,6 +2,7 @@
 
 from cli_anything.agentscope.utils.agentscope_backend import (
     send_message, send_message_streaming,
+    approve_message as backend_approve,
 )
 
 
@@ -53,6 +54,11 @@ def extract_debug(events: list[dict]) -> list[dict]:
         "pipeline_start", "pipeline_step_start", "pipeline_step_end", "pipeline_end",
         "routing_decision", "routing_start", "routing_end",
         "handoff_start", "handoff_complete", "handoff_error",
+        "loop_start", "loop_end", "loop_iteration_result",
+        "graph_transition", "graph_agent_call",
+        "roundtable_start", "round_start", "round_end", "round_message", "roundtable_summary",
+        "task_delegate", "task_start", "task_end", "task_aggregate",
+        "approval_request",
     }
     return [e for e in events if e.get("type") in debug_types]
 
@@ -72,3 +78,21 @@ def extract_metrics(events: list[dict]) -> dict:
         "output_tokens": total_output_tokens,
         "agent_end": agent_end_events[0].get("content") if agent_end_events else None,
     }
+
+
+def approve(
+    approval_id: str,
+    approved: bool = True,
+    reason: str | None = None,
+    modified_params: dict | None = None,
+    session_id: str | None = None,
+    base_url: str | None = None,
+) -> list[dict]:
+    return backend_approve(
+        approval_id=approval_id,
+        approved=approved,
+        reason=reason,
+        modified_params=modified_params,
+        session_id=session_id,
+        base_url=base_url,
+    )
