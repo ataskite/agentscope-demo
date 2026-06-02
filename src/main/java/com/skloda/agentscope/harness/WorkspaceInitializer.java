@@ -75,7 +75,26 @@ public class WorkspaceInitializer {
                 "roi-calculator/AGENTS.md",
                 "roi-calculator/skills/roi-simulation/SKILL.md",
                 "roi-calculator/knowledge/cost-model.md",
-                "roi-calculator/knowledge/benefit-model.md"
+                "roi-calculator/knowledge/benefit-model.md",
+                "finance-intel-tracker/AGENTS.md",
+                "finance-intel-tracker/knowledge/finance-domains.md",
+                "finance-intel-tracker/knowledge/data-sources.md",
+                "finance-intel-tracker/subagents/intel-collector.md",
+                "finance-intel-tracker/subagents/finance-trend-analyst.md",
+                "finance-intel-tracker/subagents/intel-report-writer.md",
+                "intel-collector/AGENTS.md",
+                "intel-collector/skills/keyword-extraction/SKILL.md",
+                "intel-collector/skills/data-fetch/SKILL.md",
+                "intel-collector/knowledge/search-strategy.md",
+                "intel-collector/knowledge/data-sources.md",
+                "finance-trend-analyst/AGENTS.md",
+                "finance-trend-analyst/skills/trend-signal-detection/SKILL.md",
+                "finance-trend-analyst/skills/cross-period-comparison/SKILL.md",
+                "finance-trend-analyst/knowledge/trend-framework.md",
+                "finance-trend-analyst/knowledge/indicator-glossary.md",
+                "intel-report-writer/AGENTS.md",
+                "intel-report-writer/skills/briefing-generation/SKILL.md",
+                "intel-report-writer/knowledge/report-template.md"
         ).stream()
                 .map(name -> TEMPLATES_PREFIX + name)
                 .filter(name -> name.startsWith(resourcePath + "/") || name.equals(resourcePath))
