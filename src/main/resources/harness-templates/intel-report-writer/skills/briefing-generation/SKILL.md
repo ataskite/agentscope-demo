@@ -53,7 +53,7 @@ description: 按标准模板生成金融情报简报
 
 - **{YYYY-MM-DD}**：{事件描述}
 - **{YYYY-MM-DD}**：{事件描述}
-- **{YYYY-MM-DD}**：{event description}
+- **{YYYY-MM-DD}**：{事件描述}
 
 ## 五、数据摘要
 
