@@ -1595,3 +1595,35 @@ agents:
         expectedBehavior: "触发完整分析链：根因分析→趋势对比→策略优化→ROI测算"
       - prompt: "今天的费用类投诉有什么变化趋势？"
         expectedBehavior: "基于历史记忆做跨日趋势对比"
+
+  # === Harness Demo: Finance Intelligence Tracker ===
+  - agentId: finance-intel-tracker
+    category: intelligence
+    type: HARNESS
+    name: 金融情报追踪助手
+    description: |
+      自动采集金融行业动态，发现趋势信号，生成分析简报。
+      支持银行、证券、保险、基金、信托等子领域情报追踪。
+      具备自我进化能力，可自动学习新技能和孵化新子 Agent。
+    modelName: qwen-max
+    streaming: true
+    enableThinking: false
+    harnessConfig:
+      workspace: "${user.home}/.agentscope/finance-intel-tracker"
+      filesystemMode: LOCAL
+      compaction:
+        triggerMessages: 30
+        keepMessages: 10
+        flushBeforeCompact: true
+      subagents:
+        - name: intel-collector
+          description: 情报采集员，使用 Web 搜索和 Shell 拉取数据，具备搜索策略自我进化能力
+        - name: finance-trend-analyst
+          description: 趋势分析师，对比历史数据发现趋势信号，维护双层记忆，可自定义检测逻辑
+        - name: intel-report-writer
+          description: 报告撰写员，生成结构化情报简报，可根据反馈调整报告格式
+    samplePrompts:
+      - "分析近期银行理财监管政策变化"
+      - "关注保险资金运用新规动态"
+      - "证券行业风控指引有什么更新"
+      - "基金销售新规对行业的影响"
