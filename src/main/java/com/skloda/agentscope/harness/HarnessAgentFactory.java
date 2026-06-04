@@ -5,6 +5,7 @@ import com.skloda.agentscope.agent.HarnessConfig;
 import io.agentscope.core.model.DashScopeChatModel;
 import io.agentscope.core.model.Model;
 import io.agentscope.harness.agent.HarnessAgent;
+import io.agentscope.harness.agent.filesystem.spec.LocalFilesystemSpec;
 import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +51,11 @@ public class HarnessAgentFactory {
                 .model(model)
                 .workspace(workspace);
 
+        if (harnessConfig.isBuilderMode()) {
+            builder.filesystem(new LocalFilesystemSpec());
+            log.info("Agent '{}' using BUILDER mode with LocalFilesystemSpec", config.getAgentId());
+        }
+
         // 5. Configure compaction
         if (harnessConfig.getCompaction() != null) {
             HarnessConfig.CompactionConfig cc = harnessConfig.getCompaction();
@@ -61,7 +67,8 @@ public class HarnessAgentFactory {
         }
 
         HarnessAgent agent = builder.build();
-        log.info("HarnessAgent '{}' built with workspace={}", config.getAgentId(), workspace);
+        log.info("HarnessAgent '{}' built with workspace={}, mode={}", config.getAgentId(), workspace,
+                harnessConfig.isBuilderMode() ? "BUILDER" : "CLAW");
         return agent;
     }
 
