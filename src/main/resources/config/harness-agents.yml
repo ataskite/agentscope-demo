@@ -61,7 +61,11 @@ agents:
         - name: intel-report-writer
           description: 报告撰写员，生成结构化情报简报，可根据反馈调整报告格式
     samplePrompts:
-      - "分析近期银行理财监管政策变化"
-      - "关注保险资金运用新规动态"
-      - "证券行业风控指引有什么更新"
-      - "基金销售新规对行业的影响"
+      - prompt: "分析近期银行理财监管政策变化"
+        expectedBehavior: "触发情报采集→趋势分析→报告生成全流程"
+      - prompt: "关注保险资金运用新规动态"
+        expectedBehavior: "自动搜索保险行业政策并生成简报"
+      - prompt: "证券行业风控指引有什么更新"
+        expectedBehavior: "追踪证券行业最新风控政策变化"
+      - prompt: "基金销售新规对行业的影响"
+        expectedBehavior: "分析基金销售新规并评估行业影响"
