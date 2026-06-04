@@ -32,4 +32,18 @@ class HarnessRuntimeTest {
         Map<String, Object> result = HarnessRuntime.convertEvent(event);
         assertEquals("raw_event", result.get("type"));
     }
+
+    @Test
+    void harnessConfigDefaultsToClawMode() {
+        com.skloda.agentscope.agent.HarnessConfig config = new com.skloda.agentscope.agent.HarnessConfig();
+        assertFalse(config.isBuilderMode());
+        assertEquals("CLAW", config.getExecutionMode());
+    }
+
+    @Test
+    void harnessConfigBuilderMode() {
+        com.skloda.agentscope.agent.HarnessConfig config = new com.skloda.agentscope.agent.HarnessConfig();
+        config.setExecutionMode("BUILDER");
+        assertTrue(config.isBuilderMode());
+    }
 }
