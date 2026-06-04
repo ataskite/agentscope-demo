@@ -8,6 +8,7 @@ const CATEGORIES = [
     { key: 'single',        label: '单体Agent',      icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>', color: 'cyan'    },
     { key: 'expert',        label: '专家Agent',      icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg>', color: 'green'   },
     { key: 'collaboration', label: '多智能体协作',   icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="12" y1="8" x2="5" y2="16"/><line x1="12" y1="8" x2="19" y2="16"/><line x1="5" y1="19" x2="19" y2="19"/></svg>', color: 'magenta' },
+    { key: 'intelligence',  label: '情报追踪',      icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>', color: 'orange'  },
 ];
 
 /* ===== LOAD AGENTS ===== */
@@ -71,7 +72,9 @@ export async function loadAgents() {
                     '<button class="agent-card-info-btn" onclick="event.stopPropagation(); showAgentConfig(\'' + agent.agentId + '\')" title="View config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>' +
                     '<div class="agent-card-icon">' + namespace.substring(0, 2) + '</div>' +
                     '<div class="agent-card-info">' +
-                        '<div class="agent-card-name">' + escapeHtml(agent.name) + '</div>' +
+                        '<div class="agent-card-name">' + escapeHtml(agent.name) +
+                            (agent.harnessConfig && agent.harnessConfig.executionMode === 'BUILDER' ? ' <span class="agent-badge builder">Builder</span>' : '') +
+                        '</div>' +
                         '<div class="agent-card-desc">' + escapeHtml(agent.description) + '</div>' +
                     '</div>';
 
@@ -151,6 +154,13 @@ export async function selectAgent(agentId) {
 
     document.getElementById('chatHeaderName').textContent = agents[agentId].name;
     document.getElementById('chatHeaderDesc').textContent = agents[agentId].desc;
+
+    // Show/hide Builder user selector
+    var builderSelector = document.getElementById('builderUserSelector');
+    if (builderSelector) {
+        var isBuilder = agents[agentId] && agents[agentId].config && agents[agentId].config.harnessConfig && agents[agentId].config.harnessConfig.executionMode === 'BUILDER';
+        builderSelector.style.display = isBuilder ? 'flex' : 'none';
+    }
 
     // Show sample prompts if available
     showSamplePrompts(agentId);

@@ -82,7 +82,8 @@ async function sendMessage() {
             message: message,
             filePath: fileInfo ? fileInfo.filePath : null,
             fileName: fileInfo ? fileInfo.fileName : null,
-            sessionId: currentSessionId || null
+            sessionId: currentSessionId || null,
+            userId: window.builderUserId || null
         };
 
         // Add images if any

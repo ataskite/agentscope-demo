@@ -16,7 +16,8 @@ const state = window.__agentScopeState || (window.__agentScopeState = {
     currentThinkingBox: null,
     currentAgentMessageWrapper: null,
     thinkingContent: '',
-    currentFileInfo: null
+    currentFileInfo: null,
+    builderUserId: 'demo-user'
 });
 
 let currentAgent = state.currentAgent;
@@ -134,6 +135,11 @@ defineWindowStateProperty('thinkingContent', {
 defineWindowStateProperty('currentFileInfo', {
     get: function() { return state.currentFileInfo; },
     set: function(val) { state.currentFileInfo = val; currentFileInfo = val; }
+});
+
+defineWindowStateProperty('builderUserId', {
+    get: function() { return state.builderUserId; },
+    set: function(val) { state.builderUserId = val; }
 });
 
 // Export for use in other modules (optional, for transparency)

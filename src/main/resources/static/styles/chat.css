@@ -327,3 +327,37 @@
     opacity: 0;
     cursor: pointer;
 }
+
+.builder-user-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    background: rgba(255, 165, 0, 0.08);
+    border: 1px solid rgba(255, 165, 0, 0.2);
+    border-radius: 6px;
+    margin-bottom: 6px;
+}
+.builder-user-selector label {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+.builder-user-selector select {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 13px;
+}
+.agent-badge.builder {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(255, 165, 0, 0.15);
+    color: #ff9500;
+    border: 1px solid rgba(255, 165, 0, 0.3);
+    vertical-align: middle;
+    margin-left: 4px;
+}
