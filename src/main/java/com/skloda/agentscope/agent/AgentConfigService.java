@@ -30,35 +30,46 @@ public class AgentConfigService {
     private final Map<String, String> skillDescriptions = new HashMap<>();
 
     @Value("classpath:config/agents.yml")
-    private Resource configFile;
+    private Resource mainConfigFile;
+
+    @Value("classpath:config/harness-agents.yml")
+    private Resource harnessConfigFile;
 
     @Autowired
     private ToolRegistry toolRegistry;
 
     @PostConstruct
     public void init() {
-        try (InputStream is = configFile.getInputStream()) {
-            Yaml yaml = new Yaml(new Constructor(AgentsWrapper.class, new LoaderOptions()));
-            AgentsWrapper wrapper = yaml.load(is);
-
-            for (AgentConfig config : wrapper.getAgents()) {
-                if (config.getAgentId() == null || config.getAgentId().isBlank()) {
-                    log.warn("Skipping agent config with missing agentId");
-                    continue;
-                }
-                if (configMap.containsKey(config.getAgentId())) {
-                    log.warn("Duplicate agentId: {}, using first occurrence", config.getAgentId());
-                    continue;
-                }
-                configMap.put(config.getAgentId(), config);
-                allAgents.add(config);
-                log.info("Loaded agent config: {} ({})", config.getName(), config.getAgentId());
-            }
-
-            log.info("Loaded {} agent configurations", allAgents.size());
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to load agents.yml configuration", e);
+        List<Resource> configFiles = new ArrayList<>();
+        configFiles.add(mainConfigFile);
+        if (harnessConfigFile != null && harnessConfigFile.exists()) {
+            configFiles.add(harnessConfigFile);
         }
+
+        Yaml yaml = new Yaml(new Constructor(AgentsWrapper.class, new LoaderOptions()));
+        for (Resource res : configFiles) {
+            try (InputStream is = res.getInputStream()) {
+                AgentsWrapper wrapper = yaml.load(is);
+
+                for (AgentConfig config : wrapper.getAgents()) {
+                    if (config.getAgentId() == null || config.getAgentId().isBlank()) {
+                        log.warn("Skipping agent config with missing agentId");
+                        continue;
+                    }
+                    if (configMap.containsKey(config.getAgentId())) {
+                        log.warn("Duplicate agentId: {}, using first occurrence", config.getAgentId());
+                        continue;
+                    }
+                    configMap.put(config.getAgentId(), config);
+                    allAgents.add(config);
+                    log.info("Loaded agent config: {} ({})", config.getName(), config.getAgentId());
+                }
+            } catch (Exception e) {
+                throw new IllegalStateException("Failed to load agent config from " + res, e);
+            }
+        }
+
+        log.info("Loaded {} agent configurations", allAgents.size());
 
         // Load skill descriptions
         loadSkillDescriptions();
