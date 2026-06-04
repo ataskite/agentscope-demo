@@ -12,8 +12,14 @@ public class HarnessConfig {
 
     private String workspace;
     private String filesystemMode = "LOCAL";
+    private String executionMode = "CLAW";
+    private String isolationScope = "USER";
     private CompactionConfig compaction;
     private List<SubAgentRef> subagents = new ArrayList<>();
+
+    public boolean isBuilderMode() {
+        return "BUILDER".equalsIgnoreCase(executionMode);
+    }
 
     @Setter
     @Getter
