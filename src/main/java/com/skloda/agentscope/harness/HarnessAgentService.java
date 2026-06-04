@@ -33,7 +33,8 @@ public class HarnessAgentService {
 
     public Flux<Map<String, Object>> createStreamFlux(String agentId, String message,
                                                        String filePath, String fileName,
-                                                       String sessionId) {
+                                                       String sessionId,
+                                                       String userId) {
         try {
             HarnessAgent agent = getOrCreateAgent(agentId);
 
@@ -43,9 +44,10 @@ public class HarnessAgentService {
                     .content(TextBlock.builder().text(actualMessage).build())
                     .build();
 
+            String effectiveUserId = (userId != null && !userId.isBlank()) ? userId : "demo-user";
             RuntimeContext ctx = RuntimeContext.builder()
                     .sessionId(sessionId != null ? sessionId : "default")
-                    .userId("demo-user")
+                    .userId(effectiveUserId)
                     .build();
 
             HarnessRuntime runtime = new HarnessRuntime(agent);

@@ -10,6 +10,15 @@ public class ChatRequest {
     private String filePath;
     private String fileName;
     private String sessionId;
+    private String userId;
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
 
     // Multi-modal support
     private java.util.List<ImageFile> images;

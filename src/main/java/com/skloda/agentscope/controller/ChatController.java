@@ -137,7 +137,8 @@ public class ChatController {
                         request.getFilePath(), request.getFileName(),
                         sessionId,
                         request.getImages(),
-                        request.getAudio())
+                        request.getAudio(),
+                        request.getUserId())
                 .takeUntil(this::isDoneEvent)
                 .map(this::sseEvent)
                 .onErrorResume(e -> {
@@ -337,6 +338,7 @@ public class ChatController {
         target.setStructuredOutputClass(source.getStructuredOutputClass());
         target.setStructuredOutputReminder(source.getStructuredOutputReminder());
         target.setType(source.getType());
+        target.setHarnessConfig(source.getHarnessConfig());
         target.setSubAgents(new ArrayList<>(source.getSubAgents()));
         target.setParallel(source.getParallel());
         target.setHandoffTriggers(new ArrayList<>(source.getHandoffTriggers()));

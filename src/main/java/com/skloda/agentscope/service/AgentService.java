@@ -84,13 +84,22 @@ public class AgentService {
                                                        String sessionId,
                                                        List<ChatRequest.ImageFile> images,
                                                        ChatRequest.AudioFile audio) {
+        return createStreamFlux(agentId, message, filePath, fileName, sessionId, images, audio, null);
+    }
+
+    public Flux<Map<String, Object>> createStreamFlux(String agentId, String message,
+                                                       String filePath, String fileName,
+                                                       String sessionId,
+                                                       List<ChatRequest.ImageFile> images,
+                                                       ChatRequest.AudioFile audio,
+                                                       String userId) {
         Msg userMsg = buildUserMessage(message, filePath, fileName, images, audio);
 
         // Route HARNESS type to HarnessAgentService
         if (harnessAgentService != null) {
             AgentConfig cfg = runtimeFactory.getConfigService().findAgentConfig(agentId).orElse(null);
             if (cfg != null && cfg.getType() == AgentType.HARNESS) {
-                return harnessAgentService.createStreamFlux(agentId, message, filePath, fileName, sessionId);
+                return harnessAgentService.createStreamFlux(agentId, message, filePath, fileName, sessionId, userId);
             }
         }
 
