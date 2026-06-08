@@ -27,13 +27,24 @@ public class HarnessRuntime {
     public Flux<Map<String, Object>> stream(Msg userMsg, RuntimeContext ctx) {
         return agent.stream(userMsg, ctx)
                 .map(HarnessRuntime::convertEvent)
-                .doOnNext(event -> log.debug("[harness] event: {}", event.get("type")));
+                .doOnNext(event -> log.debug("[harness] event: {}", event.get("type")))
+                .concatWith(Flux.just(Map.of("type", "done")));
     }
 
     static Map<String, Object> convertEvent(Event event) {
         EventType type = event.getType();
         Msg msg = event.getMessage();
 
+        // Map REASONING events to text for frontend display
+        if (type == EventType.REASONING && msg != null && msg.getContent() != null) {
+            for (ContentBlock block : msg.getContent()) {
+                if (block instanceof TextBlock tb && tb.getText() != null && !tb.getText().isEmpty()) {
+                    return Map.of("type", "text", "content", tb.getText());
+                }
+            }
+        }
+
+        // Map AGENT_RESULT events to text
         if (type == EventType.AGENT_RESULT && msg != null && msg.getContent() != null) {
             StringBuilder text = new StringBuilder();
             for (ContentBlock block : msg.getContent()) {
@@ -46,18 +57,16 @@ public class HarnessRuntime {
             }
         }
 
-        // Generic event passthrough
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("type", "raw_event");
-        result.put("eventType", type != null ? type.name() : "UNKNOWN");
+        // For other event types, extract text content and map to text
         if (msg != null && msg.getContent() != null) {
             for (ContentBlock block : msg.getContent()) {
-                if (block instanceof TextBlock tb) {
-                    result.put("content", tb.getText());
-                    break;
+                if (block instanceof TextBlock tb && tb.getText() != null && !tb.getText().isEmpty()) {
+                    return Map.of("type", "text", "content", tb.getText());
                 }
             }
         }
-        return result;
+
+        // Empty event to avoid breaking the stream
+        return Map.of("type", "empty");
     }
 }
