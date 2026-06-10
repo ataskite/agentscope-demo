@@ -76,6 +76,9 @@ public class AgentConfig {
     // === Showcase fields ===
     private List<SamplePrompt> samplePrompts = new ArrayList<>();
 
+    // === Middleware fields ===
+    private List<String> middlewares = new ArrayList<>();
+
     @Setter
     @Getter
     public static class LongTermMemoryConfig {
