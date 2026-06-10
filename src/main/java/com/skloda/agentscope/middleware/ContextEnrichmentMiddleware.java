@@ -9,7 +9,7 @@ import reactor.core.publisher.Mono;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-public class ContextEnrichmentMiddleware extends MiddlewareBase {
+public class ContextEnrichmentMiddleware implements MiddlewareBase {
 
     private static final Logger log = LoggerFactory.getLogger(ContextEnrichmentMiddleware.class);
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");

@@ -9,8 +9,9 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
+import java.util.function.Function;
 
-public class AuditLoggingMiddleware extends MiddlewareBase {
+public class AuditLoggingMiddleware implements MiddlewareBase {
 
     private static final Logger log = LoggerFactory.getLogger(AuditLoggingMiddleware.class);
 

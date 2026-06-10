@@ -12,7 +12,7 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.function.Function;
 
-public class RateLimitMiddleware extends MiddlewareBase {
+public class RateLimitMiddleware implements MiddlewareBase {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitMiddleware.class);
 
