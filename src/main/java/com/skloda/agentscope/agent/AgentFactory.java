@@ -1,5 +1,6 @@
 package com.skloda.agentscope.agent;
 
+import com.skloda.agentscope.middleware.MiddlewareRegistry;
 import com.skloda.agentscope.mcp.McpClientService;
 import com.skloda.agentscope.mcp.McpServerRef;
 import com.skloda.agentscope.mcp.ToolGroupConfig;
@@ -8,20 +9,21 @@ import com.skloda.agentscope.tool.ToolRegistry;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.formatter.dashscope.DashScopeChatFormatter;
 import io.agentscope.core.hook.Hook;
-import io.agentscope.core.memory.InMemoryMemory;
+import io.agentscope.core.middleware.MiddlewareBase;
 import io.agentscope.core.memory.LongTermMemory;
 import io.agentscope.core.memory.LongTermMemoryMode;
-import io.agentscope.core.memory.Memory;
+import io.agentscope.core.memory.LongTermMemoryMode;
 import io.agentscope.core.memory.bailian.BailianLongTermMemory;
-import io.agentscope.core.memory.autocontext.AutoContextHook;
-import io.agentscope.core.memory.autocontext.AutoContextConfig;
-import io.agentscope.core.memory.autocontext.AutoContextMemory;
 import io.agentscope.core.model.DashScopeChatModel;
 import io.agentscope.core.model.StructuredOutputReminder;
 import io.agentscope.core.rag.RAGMode;
 import io.agentscope.core.rag.model.RetrieveConfig;
+import io.agentscope.core.session.InMemorySession;
+import io.agentscope.core.session.Session;
 import io.agentscope.core.skill.SkillBox;
 import io.agentscope.core.skill.repository.ClasspathSkillRepository;
+import io.agentscope.core.state.SessionKey;
+import io.agentscope.core.state.SimpleSessionKey;
 import io.agentscope.core.tool.Toolkit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,55 +46,40 @@ public class AgentFactory {
     private final ToolRegistry toolRegistry;
     private final KnowledgeService knowledgeService;
     private final McpClientService mcpClientService;
+    private final MiddlewareRegistry middlewareRegistry;
 
     public AgentFactory(AgentConfigService configService, ToolRegistry toolRegistry,
-                        KnowledgeService knowledgeService, McpClientService mcpClientService) {
+                        KnowledgeService knowledgeService, McpClientService mcpClientService,
+                        MiddlewareRegistry middlewareRegistry) {
         this.configService = configService;
         this.toolRegistry = toolRegistry;
         this.knowledgeService = knowledgeService;
         this.mcpClientService = mcpClientService;
+        this.middlewareRegistry = middlewareRegistry;
     }
 
     /**
-     * Create memory based on agent config (AutoContextMemory or InMemoryMemory).
+     * Create a session for a persistent session (2.0 replaces Memory with Session).
      */
-    public Memory createMemory(String agentId) {
-        AgentConfig config = configService.getAgentConfig(agentId);
-
-        if (config.isAutoContext()) {
-            log.info("Creating AutoContextMemory for agent: {}", agentId);
-            AutoContextConfig acConfig = AutoContextConfig.builder()
-                    .msgThreshold(config.getAutoContextMsgThreshold())
-                    .lastKeep(config.getAutoContextLastKeep())
-                    .tokenRatio(config.getAutoContextTokenRatio())
-                    .build();
-
-            DashScopeChatModel memoryModel = DashScopeChatModel.builder()
-                    .apiKey(apiKey)
-                    .modelName(config.getModelName())
-                    .build();
-
-            return new AutoContextMemory(acConfig, memoryModel);
-        }
-
-        return new InMemoryMemory();
+    public Session createSession() {
+        return new InMemorySession();
     }
 
     /**
-     * Create agent for a persistent session (with externally created memory + hooks).
+     * Create agent for a persistent session (with shared session + hooks).
      */
-    public ReActAgent createAgentForSession(String agentId, Memory memory, Hook... hooks) {
-        return buildAgent(agentId, memory, hooks);
+    public ReActAgent createAgentForSession(String agentId, Session session, Hook... hooks) {
+        return buildAgent(agentId, session, hooks);
     }
 
     /**
-     * Create agent with optional hooks (stateless, creates fresh InMemoryMemory each time).
+     * Create agent with optional hooks (stateless, creates fresh Session each time).
      */
     public ReActAgent createAgent(String agentId, Hook... hooks) {
-        return buildAgent(agentId, new InMemoryMemory(), hooks);
+        return buildAgent(agentId, new InMemorySession(), hooks);
     }
 
-    private ReActAgent buildAgent(String agentId, Memory memory, Hook... hooks) {
+    private ReActAgent buildAgent(String agentId, Session session, Hook... hooks) {
         AgentConfig config = configService.getAgentConfig(agentId);
         log.info("Creating agent: {} ({})", config.getName(), agentId);
 
@@ -108,7 +95,8 @@ public class AgentFactory {
                 .name(config.getName())
                 .sysPrompt(config.getSystemPrompt())
                 .model(model)
-                .memory(memory);
+                .session(session)
+                .sessionKey(SimpleSessionKey.of(agentId));
 
         // Enable PlanNotebook if configured
         if (config.isPlanEnabled()) {
@@ -117,12 +105,6 @@ public class AgentFactory {
         }
 
         Toolkit toolkit = new Toolkit();
-
-        // AutoContextHook registers context_reload and triggers compression before reasoning.
-        if (memory instanceof AutoContextMemory) {
-            builder.hook(new AutoContextHook());
-            log.info("  Enabled AutoContextHook for agent: {}", agentId);
-        }
 
         registerToolsAndSkills(builder, toolkit, config, agentId);
 
@@ -169,9 +151,18 @@ public class AgentFactory {
             log.info("  Registered {} hooks for agent: {}", hooks.length, agentId);
         }
 
-        // Enable pending tool recovery to handle orphaned tool calls gracefully.
-        // This is important for sub-agents in multi-agent compositions where tool calls
-        // may fail or be interrupted, preventing IllegalStateException.
+        // Register middlewares if configured
+        if (config.getMiddlewares() != null && !config.getMiddlewares().isEmpty()) {
+            List<MiddlewareBase> middlewares = config.getMiddlewares().stream()
+                    .map(middlewareRegistry::create)
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
+            if (!middlewares.isEmpty()) {
+                builder.middlewares(middlewares);
+                log.info("  Registered {} middlewares for agent: {}", middlewares.size(), agentId);
+            }
+        }
+
         builder.enablePendingToolRecovery(true);
 
         return builder.build();
@@ -179,13 +170,8 @@ public class AgentFactory {
 
     private void registerToolsAndSkills(ReActAgent.Builder builder, Toolkit toolkit,
                                          AgentConfig config, String agentId) {
-        // Collect tool names covered by skills to avoid double registration.
-        // SkillBox registers tools into inactive groups — if the same tool is also
-        // registered directly (ungrouped, active), isActiveTool checks the inactive
-        // group first and rejects the call with "Unauthorized tool call".
         Set<String> skillToolNames = new HashSet<>();
 
-        // Register skills FIRST so we know which tools they cover
         SkillBox skillBox = null;
         if (!config.getSkills().isEmpty()) {
             skillBox = new SkillBox(toolkit);
@@ -196,7 +182,6 @@ public class AgentFactory {
                                 .skill(repo.getSkill(skillName))
                                 .tool(toolRegistry.getTool(skillName))
                                 .apply();
-                        // Track which @Tool function names this skill covers
                         skillToolNames.addAll(toolRegistry.getToolNamesForClass(skillName));
                         log.info("  Registered skill: {} for agent: {}", skillName, agentId);
                     } else {
@@ -208,7 +193,6 @@ public class AgentFactory {
             }
         }
 
-        // Register user tools, skipping those already covered by skills
         List<String> userToolsFiltered = config.getUserTools().stream()
                 .filter(name -> !skillToolNames.contains(name))
                 .toList();
@@ -220,7 +204,6 @@ public class AgentFactory {
             log.info("  Skipped user tools already covered by skills: {} (agent: {})", skillToolNames, agentId);
         }
 
-        // Register system tools (deduplicated — one instance per class)
         for (Object toolInstance : toolRegistry.getDeduplicatedInstances(config.getSystemTools())) {
             toolkit.registerTool(toolInstance);
             log.info("  Registered system tool class: {} for agent: {}", toolInstance.getClass().getSimpleName(), agentId);
@@ -233,11 +216,6 @@ public class AgentFactory {
         }
     }
 
-    /**
-     * Register MCP tools from configured MCP server references.
-     * Creates tool groups first, then registers each MCP client with optional
-     * filtering (enable/disable tools) and group assignment.
-     */
     private void registerMcpTools(AgentConfig config, Toolkit toolkit) {
         if (config.getMcpServers() == null || config.getMcpServers().isEmpty()) {
             return;
@@ -245,7 +223,6 @@ public class AgentFactory {
 
         log.info("Registering MCP tools for agent: {}", config.getAgentId());
 
-        // Create tool groups first
         if (config.getToolGroups() != null && !config.getToolGroups().isEmpty()) {
             for (ToolGroupConfig groupConfig : config.getToolGroups()) {
                 toolkit.createToolGroup(
@@ -257,7 +234,6 @@ public class AgentFactory {
             }
         }
 
-        // Register MCP servers
         for (McpServerRef ref : config.getMcpServers()) {
             var clientOpt = mcpClientService.getClient(ref.getServer());
             if (clientOpt.isEmpty()) {
@@ -268,7 +244,6 @@ public class AgentFactory {
             var client = clientOpt.get();
             var registration = toolkit.registration().mcpClient(client);
 
-            // Apply tool filtering
             if (ref.getEnableTools() != null && !ref.getEnableTools().isEmpty()) {
                 registration.enableTools(ref.getEnableTools());
                 log.debug("Enabled tools for {}: {}", ref.getServer(), ref.getEnableTools());
@@ -278,7 +253,6 @@ public class AgentFactory {
                 log.debug("Disabled tools for {}: {}", ref.getServer(), ref.getDisableTools());
             }
 
-            // Apply tool group
             if (ref.getGroup() != null) {
                 registration.group(ref.getGroup());
                 log.debug("Assigned {} to group: {}", ref.getServer(), ref.getGroup());
