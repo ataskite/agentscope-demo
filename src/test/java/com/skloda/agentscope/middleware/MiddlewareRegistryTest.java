@@ -37,6 +37,19 @@ class MiddlewareRegistryTest {
         assertTrue(registry.getRegisteredNames().contains("a"));
     }
 
+    @Test
+    void autoRegistrationCreatesAllMiddlewares() {
+        MiddlewareRegistry registry = new MiddlewareRegistry();
+        registry.register("audit-logging", AuditLoggingMiddleware::new);
+        registry.register("rate-limit", RateLimitMiddleware::new);
+        registry.register("context-enrichment", ContextEnrichmentMiddleware::new);
+
+        assertNotNull(registry.create("audit-logging"));
+        assertNotNull(registry.create("rate-limit"));
+        assertNotNull(registry.create("context-enrichment"));
+        assertEquals(3, registry.getRegisteredNames().size());
+    }
+
     static class StubMiddleware implements MiddlewareBase {
         @Override
         public Flux<AgentEvent> onAgent(Agent agent, AgentInput input, Function<AgentInput, Flux<AgentEvent>> next) {
