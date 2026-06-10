@@ -5,10 +5,10 @@ import { agents } from '../state.js?v=2.4';
 
 /* ===== CATEGORY DEFINITIONS ===== */
 const CATEGORIES = [
-    { key: 'single',        label: '单体Agent',      icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>', color: 'cyan'    },
-    { key: 'expert',        label: '专家Agent',      icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg>', color: 'green'   },
-    { key: 'collaboration', label: '多智能体协作',   icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="12" y1="8" x2="5" y2="16"/><line x1="12" y1="8" x2="19" y2="16"/><line x1="5" y1="19" x2="19" y2="19"/></svg>', color: 'magenta' },
-    { key: 'intelligence',  label: '情报追踪',      icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>', color: 'orange'  },
+    { key: 'single',        label: 'Single Agent',       icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>', color: 'cyan'    },
+    { key: 'expert',        label: 'Expert Agent',       icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg>', color: 'green'   },
+    { key: 'collaboration', label: 'Multi-Agent',        icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="12" y1="8" x2="5" y2="16"/><line x1="12" y1="8" x2="19" y2="16"/><line x1="5" y1="19" x2="19" y2="19"/></svg>', color: 'magenta' },
+    { key: 'harness',       label: 'Harness Agent',      icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 12h10"/><path d="M12 7v10"/><circle cx="12" cy="12" r="3"/></svg>', color: 'orange'  },
 ];
 
 /* ===== LOAD AGENTS ===== */
@@ -73,7 +73,7 @@ export async function loadAgents() {
                     '<div class="agent-card-icon">' + namespace.substring(0, 2) + '</div>' +
                     '<div class="agent-card-info">' +
                         '<div class="agent-card-name">' + escapeHtml(agent.name) +
-                            (agent.harnessConfig && agent.harnessConfig.executionMode === 'BUILDER' ? ' <span class="agent-badge builder">Builder</span>' : '') +
+                            (agent.harnessConfig ? ' <span class="agent-badge ' + (agent.harnessConfig.executionMode === 'BUILDER' ? 'builder' : 'claw') + '">' + (agent.harnessConfig.executionMode === 'BUILDER' ? 'Builder' : 'Claw') + '</span>' : '') +
                         '</div>' +
                         '<div class="agent-card-desc">' + escapeHtml(agent.description) + '</div>' +
                     '</div>';
@@ -155,11 +155,25 @@ export async function selectAgent(agentId) {
     document.getElementById('chatHeaderName').textContent = agents[agentId].name;
     document.getElementById('chatHeaderDesc').textContent = agents[agentId].desc;
 
-    // Show/hide Builder user selector
+    // Show/hide Harness controls (mode toggle + user selector)
+    var harnessControls = document.getElementById('harnessControls');
     var builderSelector = document.getElementById('builderUserSelector');
-    if (builderSelector) {
-        var isBuilder = agents[agentId] && agents[agentId].config && agents[agentId].config.harnessConfig && agents[agentId].config.harnessConfig.executionMode === 'BUILDER';
-        builderSelector.style.display = isBuilder ? 'flex' : 'none';
+    var isHarness = agents[agentId] && agents[agentId].config && agents[agentId].config.type === 'HARNESS';
+    if (harnessControls) {
+        harnessControls.style.display = isHarness ? 'flex' : 'none';
+    }
+    // Default to the agent's configured mode
+    if (isHarness && agents[agentId].config.harnessConfig) {
+        var defaultMode = agents[agentId].config.harnessConfig.executionMode || 'CLAW';
+        window.harnessMode = defaultMode;
+        // Update toggle buttons
+        document.querySelectorAll('.mode-btn').forEach(function(btn) {
+            btn.classList.toggle('active', btn.dataset.mode === defaultMode);
+        });
+        // Show/hide user selector based on default mode
+        if (builderSelector) {
+            builderSelector.style.display = defaultMode === 'BUILDER' ? 'flex' : 'none';
+        }
     }
 
     // Show sample prompts if available
@@ -575,3 +589,14 @@ function showImagePreviews() {
 window.showAgentConfig = showAgentConfig;
 window.showSkillInfo = showSkillInfo;
 window.showToolInfo = showToolInfo;
+
+window.setHarnessMode = function(mode) {
+    window.harnessMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+    var builderSelector = document.getElementById('builderUserSelector');
+    if (builderSelector) {
+        builderSelector.style.display = mode === 'BUILDER' ? 'flex' : 'none';
+    }
+};

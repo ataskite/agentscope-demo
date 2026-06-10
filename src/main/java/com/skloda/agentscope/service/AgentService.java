@@ -93,13 +93,23 @@ public class AgentService {
                                                        List<ChatRequest.ImageFile> images,
                                                        ChatRequest.AudioFile audio,
                                                        String userId) {
+        return createStreamFlux(agentId, message, filePath, fileName, sessionId, images, audio, userId, null);
+    }
+
+    public Flux<Map<String, Object>> createStreamFlux(String agentId, String message,
+                                                       String filePath, String fileName,
+                                                       String sessionId,
+                                                       List<ChatRequest.ImageFile> images,
+                                                       ChatRequest.AudioFile audio,
+                                                       String userId,
+                                                       String executionMode) {
         Msg userMsg = buildUserMessage(message, filePath, fileName, images, audio);
 
         // Route HARNESS type to HarnessAgentService
         if (harnessAgentService != null) {
             AgentConfig cfg = runtimeFactory.getConfigService().findAgentConfig(agentId).orElse(null);
             if (cfg != null && cfg.getType() == AgentType.HARNESS) {
-                return harnessAgentService.createStreamFlux(agentId, message, filePath, fileName, sessionId, userId);
+                return harnessAgentService.createStreamFlux(agentId, message, filePath, fileName, sessionId, userId, executionMode);
             }
         }
 
@@ -125,15 +135,13 @@ public class AgentService {
         SessionManagerService.SessionContext ctx =
                 sessionManagerService.getOrCreateSession(sessionId, agentId);
 
-        // The actual sessionId might be new (if input was null)
         String effectiveSessionId = ctx.getSessionId();
 
-        // Create runtime with shared memory — new agent per request, memory persists
-        StreamingAgentRuntime runtime = runtimeFactory.createRuntimeWithMemory(agentId, ctx.getMemory());
+        // Create runtime with shared session — new agent per request, session persists
+        StreamingAgentRuntime runtime = runtimeFactory.createRuntimeWithSession(agentId, ctx.getSession());
 
         return runtime.stream(userMsg)
                 .doFinally(signal -> {
-                    // Save session after each interaction
                     sessionManagerService.saveSession(effectiveSessionId);
                     log.debug("Session {} saved after stream completion ({})", effectiveSessionId, signal);
                 });

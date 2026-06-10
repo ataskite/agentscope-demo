@@ -5,17 +5,12 @@ import com.skloda.agentscope.agent.AgentConfigService;
 import com.skloda.agentscope.agent.AgentType;
 import com.skloda.agentscope.composite.CompositeAgentFactory;
 import com.skloda.agentscope.composite.graph.OrderFulfillmentGraph;
-import com.skloda.agentscope.composite.pipeline.LoopPipeline;
-import com.skloda.agentscope.composite.pipeline.RoundTablePipeline;
-import com.skloda.agentscope.composite.pipeline.TaskOrchestratorPipeline;
-import com.skloda.agentscope.composite.pipeline.TaskDispatcherPipeline;
 import com.skloda.agentscope.hook.ApprovalHook;
 import com.skloda.agentscope.hook.ObservabilityHook;
 import com.skloda.agentscope.service.ApprovalService;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.memory.Memory;
-import io.agentscope.core.pipeline.FanoutPipeline;
-import io.agentscope.core.pipeline.SequentialPipeline;
+import io.agentscope.core.session.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -45,20 +40,23 @@ public class AgentRuntimeFactory {
 
         return switch (type) {
             case SINGLE -> createSingleRuntime(agentId);
-            case SEQUENTIAL -> createSequentialRuntime(agentId);
-            case PARALLEL -> createParallelRuntime(agentId);
             case ROUTING -> createRoutingRuntime(agentId);
             case HANDOFFS -> createHandoffsRuntime(agentId);
-            case DEBATE -> createDebateRuntime(agentId);
-            case LOOP -> createLoopRuntime(agentId);
             case STATE_GRAPH -> createStateGraphRuntime(agentId);
-            case MSG_HUB -> createMsgHubRuntime(agentId);
-            case SUBAGENT_SEQ -> createSubagentSeqRuntime(agentId);
-            case SUBAGENT_PAR -> createSubagentParRuntime(agentId);
             case HARNESS -> createHarnessRuntime(agentId);
+            // Pipeline-dependent patterns disabled for 2.0 migration
+            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, MSG_HUB, SUBAGENT_SEQ, SUBAGENT_PAR ->
+                throw new UnsupportedOperationException(
+                    "Pattern " + type + " is disabled during AgentScope 2.0 migration (pipeline package removed). " +
+                    "Will be reimplemented using 2.0 subagent/middleware API.");
         };
     }
 
+    /**
+     * @deprecated Use {@link #createRuntimeWithSession(String, Session)} instead.
+     *             Memory-based creation will be removed once 2.0 migration is complete.
+     */
+    @Deprecated
     public StreamingAgentRuntime createRuntimeWithMemory(String agentId, Memory memory) {
         log.debug("Creating AgentRuntime with shared memory for agent: {}", agentId);
 
@@ -67,160 +65,78 @@ public class AgentRuntimeFactory {
 
         return switch (type) {
             case SINGLE -> createSingleRuntimeWithMemory(agentId, memory);
-            case SEQUENTIAL -> createSequentialRuntimeWithMemory(agentId, memory);
-            case PARALLEL -> createParallelRuntimeWithMemory(agentId, memory);
             case ROUTING -> createRoutingRuntimeWithMemory(agentId, memory);
             case HANDOFFS -> createHandoffsRuntimeWithMemory(agentId, memory);
-            case DEBATE -> createDebateRuntimeWithMemory(agentId, memory);
-            case LOOP -> createLoopRuntimeWithMemory(agentId, memory);
             case STATE_GRAPH -> createStateGraphRuntimeWithMemory(agentId, memory);
-            case MSG_HUB -> createMsgHubRuntimeWithMemory(agentId, memory);
-            case SUBAGENT_SEQ -> createSubagentSeqRuntimeWithMemory(agentId, memory);
-            case SUBAGENT_PAR -> createSubagentParRuntimeWithMemory(agentId, memory);
             case HARNESS -> createHarnessRuntimeWithMemory(agentId, memory);
+            // Pipeline-dependent patterns disabled for 2.0 migration
+            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, MSG_HUB, SUBAGENT_SEQ, SUBAGENT_PAR ->
+                throw new UnsupportedOperationException(
+                    "Pattern " + type + " is disabled during AgentScope 2.0 migration (pipeline package removed). " +
+                    "Will be reimplemented using 2.0 subagent/middleware API.");
         };
     }
 
-    public PipelineAgentRuntime createSequentialRuntime(String agentId) {
-        AgentConfig config = configService.getAgentConfig(agentId);
-        ObservabilityHook hook = new ObservabilityHook();
-        SequentialPipeline pipeline = compositeFactory.createSequentialAgent(config, null);
-        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
-    }
+    public StreamingAgentRuntime createRuntimeWithSession(String agentId, Session session) {
+        log.debug("Creating AgentRuntime with shared session for agent: {}", agentId);
 
-    public PipelineAgentRuntime createSequentialRuntimeWithMemory(String agentId, Memory memory) {
         AgentConfig config = configService.getAgentConfig(agentId);
-        ObservabilityHook hook = new ObservabilityHook();
-        SequentialPipeline pipeline = compositeFactory.createSequentialAgent(config, memory);
-        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
-    }
+        AgentType type = config.getType() != null ? config.getType() : AgentType.SINGLE;
 
-    public PipelineAgentRuntime createParallelRuntime(String agentId) {
-        AgentConfig config = configService.getAgentConfig(agentId);
-        ObservabilityHook hook = new ObservabilityHook();
-        FanoutPipeline pipeline = compositeFactory.createParallelAgent(config, null);
-        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
-    }
-
-    public PipelineAgentRuntime createParallelRuntimeWithMemory(String agentId, Memory memory) {
-        AgentConfig config = configService.getAgentConfig(agentId);
-        ObservabilityHook hook = new ObservabilityHook();
-        FanoutPipeline pipeline = compositeFactory.createParallelAgent(config, memory);
-        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
+        return switch (type) {
+            case SINGLE -> createSingleRuntimeWithSession(agentId, session);
+            case ROUTING -> createRoutingRuntimeWithSession(agentId, session);
+            case HANDOFFS -> createHandoffsRuntimeWithSession(agentId, session);
+            case STATE_GRAPH -> createStateGraphRuntimeWithSession(agentId, session);
+            case HARNESS -> createHarnessRuntimeWithSession(agentId, session);
+            // Pipeline-dependent patterns disabled for 2.0 migration
+            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, MSG_HUB, SUBAGENT_SEQ, SUBAGENT_PAR ->
+                throw new UnsupportedOperationException(
+                    "Pattern " + type + " is disabled during AgentScope 2.0 migration (pipeline package removed). " +
+                    "Will be reimplemented using 2.0 subagent/middleware API.");
+        };
     }
 
     public AgentRuntime createRoutingRuntime(String agentId) {
         ObservabilityHook hook = new ObservabilityHook();
         ReActAgent agent = compositeFactory.createRoutingAgent(
-                configService.getAgentConfig(agentId), null, hook);
+                configService.getAgentConfig(agentId), (Session) null, hook);
         return new AgentRuntime(agent, hook);
     }
 
     public AgentRuntime createRoutingRuntimeWithMemory(String agentId, Memory memory) {
         ObservabilityHook hook = new ObservabilityHook();
         ReActAgent agent = compositeFactory.createRoutingAgent(
-                configService.getAgentConfig(agentId), memory, hook);
+                configService.getAgentConfig(agentId), (Session) null, hook);
         return new AgentRuntime(agent, hook);
     }
 
     public AgentRuntime createHandoffsRuntime(String agentId) {
         ObservabilityHook hook = new ObservabilityHook();
         ReActAgent agent = compositeFactory.createHandoffsAgent(
-                configService.getAgentConfig(agentId), null, hook);
+                configService.getAgentConfig(agentId), (Session) null, hook);
         return new AgentRuntime(agent, hook);
     }
 
     public AgentRuntime createHandoffsRuntimeWithMemory(String agentId, Memory memory) {
         ObservabilityHook hook = new ObservabilityHook();
         ReActAgent agent = compositeFactory.createHandoffsAgent(
-                configService.getAgentConfig(agentId), memory, hook);
+                configService.getAgentConfig(agentId), (Session) null, hook);
         return new AgentRuntime(agent, hook);
-    }
-
-    public PipelineAgentRuntime createDebateRuntime(String agentId) {
-        AgentConfig config = configService.getAgentConfig(agentId);
-        ObservabilityHook hook = new ObservabilityHook();
-        io.agentscope.core.pipeline.Pipeline<io.agentscope.core.message.Msg> pipeline =
-                compositeFactory.createDebateAgent(config, null);
-        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
-    }
-
-    public PipelineAgentRuntime createDebateRuntimeWithMemory(String agentId, Memory memory) {
-        AgentConfig config = configService.getAgentConfig(agentId);
-        ObservabilityHook hook = new ObservabilityHook();
-        io.agentscope.core.pipeline.Pipeline<io.agentscope.core.message.Msg> pipeline =
-                compositeFactory.createDebateAgent(config, memory);
-        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
-    }
-
-    public PipelineAgentRuntime createLoopRuntime(String agentId) {
-        AgentConfig config = configService.getAgentConfig(agentId);
-        ObservabilityHook hook = new ObservabilityHook();
-        LoopPipeline pipeline = compositeFactory.createLoopAgent(config, null);
-        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
-    }
-
-    public PipelineAgentRuntime createLoopRuntimeWithMemory(String agentId, Memory memory) {
-        AgentConfig config = configService.getAgentConfig(agentId);
-        ObservabilityHook hook = new ObservabilityHook();
-        LoopPipeline pipeline = compositeFactory.createLoopAgent(config, memory);
-        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
     }
 
     public StateGraphRuntime createStateGraphRuntime(String agentId) {
         ObservabilityHook hook = new ObservabilityHook();
         OrderFulfillmentGraph graph = compositeFactory.createStateGraphAgent(
-                configService.getAgentConfig(agentId), null);
+                configService.getAgentConfig(agentId), (Session) null);
         return new StateGraphRuntime(agentId, graph, hook);
     }
 
     public StateGraphRuntime createStateGraphRuntimeWithMemory(String agentId, Memory memory) {
         ObservabilityHook hook = new ObservabilityHook();
         OrderFulfillmentGraph graph = compositeFactory.createStateGraphAgent(
-                configService.getAgentConfig(agentId), memory);
+                configService.getAgentConfig(agentId), (Session) null);
         return new StateGraphRuntime(agentId, graph, hook);
-    }
-
-    public MsgHubRuntime createMsgHubRuntime(String agentId) {
-        AgentConfig config = configService.getAgentConfig(agentId);
-        ObservabilityHook hook = new ObservabilityHook();
-        RoundTablePipeline pipeline = compositeFactory.createMsgHubAgent(config, null);
-        return new MsgHubRuntime(config.getAgentId(), pipeline, hook);
-    }
-
-    public MsgHubRuntime createMsgHubRuntimeWithMemory(String agentId, Memory memory) {
-        AgentConfig config = configService.getAgentConfig(agentId);
-        ObservabilityHook hook = new ObservabilityHook();
-        RoundTablePipeline pipeline = compositeFactory.createMsgHubAgent(config, memory);
-        return new MsgHubRuntime(config.getAgentId(), pipeline, hook);
-    }
-
-    public PipelineAgentRuntime createSubagentSeqRuntime(String agentId) {
-        AgentConfig config = configService.getAgentConfig(agentId);
-        ObservabilityHook hook = new ObservabilityHook();
-        TaskOrchestratorPipeline pipeline = compositeFactory.createSubagentSeqAgent(config, null);
-        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
-    }
-
-    public PipelineAgentRuntime createSubagentSeqRuntimeWithMemory(String agentId, Memory memory) {
-        AgentConfig config = configService.getAgentConfig(agentId);
-        ObservabilityHook hook = new ObservabilityHook();
-        TaskOrchestratorPipeline pipeline = compositeFactory.createSubagentSeqAgent(config, memory);
-        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
-    }
-
-    public PipelineAgentRuntime createSubagentParRuntime(String agentId) {
-        AgentConfig config = configService.getAgentConfig(agentId);
-        ObservabilityHook hook = new ObservabilityHook();
-        TaskDispatcherPipeline pipeline = compositeFactory.createSubagentParAgent(config, null);
-        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
-    }
-
-    public PipelineAgentRuntime createSubagentParRuntimeWithMemory(String agentId, Memory memory) {
-        AgentConfig config = configService.getAgentConfig(agentId);
-        ObservabilityHook hook = new ObservabilityHook();
-        TaskDispatcherPipeline pipeline = compositeFactory.createSubagentParAgent(config, memory);
-        return new PipelineAgentRuntime(config.getAgentId(), pipeline, hook);
     }
 
     public StreamingAgentRuntime createHarnessRuntime(String agentId) {
@@ -232,6 +148,51 @@ public class AgentRuntimeFactory {
         log.debug("HARNESS runtime not yet implemented, falling back to SINGLE for agent: {}", agentId);
         return createSingleRuntimeWithMemory(agentId, memory);
     }
+
+    // ---- Session-based runtime helpers (AgentScope 2.0) ----
+
+    private StreamingAgentRuntime createSingleRuntimeWithSession(String agentId, Session session) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        ApprovalHook approvalHook = createApprovalHookIfNeeded(config);
+
+        ReActAgent agent = approvalHook != null
+                ? compositeFactory.createSingleAgentForSession(agentId, session, hook, approvalHook)
+                : compositeFactory.createSingleAgentForSession(agentId, session, hook);
+
+        if (hasStructuredOutput(config)) {
+            return new StructuredOutputAgentRuntime(agent, hook, config.getStructuredOutputClass());
+        }
+        return new AgentRuntime(agent, hook, approvalHook, approvalService, agentId);
+    }
+
+    private AgentRuntime createRoutingRuntimeWithSession(String agentId, Session session) {
+        ObservabilityHook hook = new ObservabilityHook();
+        ReActAgent agent = compositeFactory.createRoutingAgent(
+                configService.getAgentConfig(agentId), session, hook);
+        return new AgentRuntime(agent, hook);
+    }
+
+    private AgentRuntime createHandoffsRuntimeWithSession(String agentId, Session session) {
+        ObservabilityHook hook = new ObservabilityHook();
+        ReActAgent agent = compositeFactory.createHandoffsAgent(
+                configService.getAgentConfig(agentId), session, hook);
+        return new AgentRuntime(agent, hook);
+    }
+
+    private StateGraphRuntime createStateGraphRuntimeWithSession(String agentId, Session session) {
+        ObservabilityHook hook = new ObservabilityHook();
+        OrderFulfillmentGraph graph = compositeFactory.createStateGraphAgent(
+                configService.getAgentConfig(agentId), session);
+        return new StateGraphRuntime(agentId, graph, hook);
+    }
+
+    private StreamingAgentRuntime createHarnessRuntimeWithSession(String agentId, Session session) {
+        log.debug("HARNESS runtime not yet implemented, falling back to SINGLE for agent: {}", agentId);
+        return createSingleRuntimeWithSession(agentId, session);
+    }
+
+    // ---- Shared helpers ----
 
     public CompositeAgentFactory getCompositeFactory() {
         return compositeFactory;

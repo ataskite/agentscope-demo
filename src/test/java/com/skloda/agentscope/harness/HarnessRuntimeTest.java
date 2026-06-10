@@ -30,7 +30,8 @@ class HarnessRuntimeTest {
         Event event = new Event(EventType.REASONING, null, false);
 
         Map<String, Object> result = HarnessRuntime.convertEvent(event);
-        assertEquals("raw_event", result.get("type"));
+        // Events without message return empty
+        assertEquals("empty", result.get("type"));
     }
 
     @Test

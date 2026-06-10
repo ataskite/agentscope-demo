@@ -17,10 +17,18 @@ public class HarnessAgentFactory {
 
     private static final Logger log = LoggerFactory.getLogger(HarnessAgentFactory.class);
 
-    public static HarnessAgent create(AgentConfig config, String apiKey) throws Exception {
+    public static HarnessAgent create(AgentConfig config, String apiKey, String executionModeOverride) throws Exception {
         HarnessConfig harnessConfig = config.getHarnessConfig();
         if (harnessConfig == null) {
             throw new IllegalArgumentException("Agent '" + config.getAgentId() + "' is type HARNESS but has no harnessConfig");
+        }
+
+        // Determine effective execution mode: override > config default
+        boolean isBuilder;
+        if (executionModeOverride != null && !executionModeOverride.isBlank()) {
+            isBuilder = "BUILDER".equalsIgnoreCase(executionModeOverride);
+        } else {
+            isBuilder = harnessConfig.isBuilderMode();
         }
 
         // 1. Resolve workspace path
@@ -51,7 +59,7 @@ public class HarnessAgentFactory {
                 .model(model)
                 .workspace(workspace);
 
-        if (harnessConfig.isBuilderMode()) {
+        if (isBuilder) {
             builder.filesystem(new LocalFilesystemSpec());
             log.info("Agent '{}' using BUILDER mode with LocalFilesystemSpec", config.getAgentId());
         }
@@ -68,8 +76,12 @@ public class HarnessAgentFactory {
 
         HarnessAgent agent = builder.build();
         log.info("HarnessAgent '{}' built with workspace={}, mode={}", config.getAgentId(), workspace,
-                harnessConfig.isBuilderMode() ? "BUILDER" : "CLAW");
+                isBuilder ? "BUILDER" : "CLAW");
         return agent;
+    }
+
+    public static HarnessAgent create(AgentConfig config, String apiKey) throws Exception {
+        return create(config, apiKey, null);
     }
 
     private static Path resolveWorkspace(String configuredPath, String agentId) {

@@ -3,6 +3,7 @@ package com.skloda.agentscope.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.AgentConfigService;
+import com.skloda.agentscope.agent.AgentType;
 import com.skloda.agentscope.agent.SamplePrompt;
 import com.skloda.agentscope.model.*;
 import com.skloda.agentscope.runtime.AgentRuntime;
@@ -138,7 +139,8 @@ public class ChatController {
                         sessionId,
                         request.getImages(),
                         request.getAudio(),
-                        request.getUserId())
+                        request.getUserId(),
+                        request.getExecutionMode())
                 .takeUntil(this::isDoneEvent)
                 .map(this::sseEvent)
                 .onErrorResume(e -> {
@@ -266,13 +268,29 @@ public class ChatController {
 
     /**
      * List all available agent configurations.
+     * Filters out agent types disabled during AgentScope 2.0 migration:
+     * SEQUENTIAL, PARALLEL, DEBATE, LOOP, MSG_HUB, SUBAGENT_SEQ, SUBAGENT_PAR
      */
     @GetMapping("/api/agents")
     @ResponseBody
     public List<AgentConfig> listAgents() {
         return agentConfigService.getAllAgents().stream()
+                .filter(this::isAgentEnabled)
                 .map(this::toAgentConfigPreview)
                 .toList();
+    }
+
+    /**
+     * Check if an agent type is enabled for AgentScope 2.0.
+     * Pipeline-dependent patterns are disabled during 2.0 migration.
+     */
+    private boolean isAgentEnabled(AgentConfig config) {
+        AgentType type = config.getType();
+        if (type == null) return true;
+        return switch (type) {
+            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, MSG_HUB, SUBAGENT_SEQ, SUBAGENT_PAR -> false;
+            default -> true;
+        };
     }
 
     /**

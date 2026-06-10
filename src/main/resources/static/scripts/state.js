@@ -17,7 +17,8 @@ const state = window.__agentScopeState || (window.__agentScopeState = {
     currentAgentMessageWrapper: null,
     thinkingContent: '',
     currentFileInfo: null,
-    builderUserId: 'demo-user'
+    builderUserId: 'demo-user',
+    harnessMode: null
 });
 
 let currentAgent = state.currentAgent;
@@ -140,6 +141,11 @@ defineWindowStateProperty('currentFileInfo', {
 defineWindowStateProperty('builderUserId', {
     get: function() { return state.builderUserId; },
     set: function(val) { state.builderUserId = val; }
+});
+
+defineWindowStateProperty('harnessMode', {
+    get: function() { return state.harnessMode; },
+    set: function(val) { state.harnessMode = val; }
 });
 
 // Export for use in other modules (optional, for transparency)

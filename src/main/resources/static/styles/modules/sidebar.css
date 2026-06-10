@@ -256,6 +256,10 @@
     background: linear-gradient(135deg, rgba(255, 0, 204, 0.08) 0%, rgba(200, 0, 255, 0.04) 100%);
 }
 
+.agent-group-header.color-orange::before {
+    background: linear-gradient(135deg, rgba(255, 165, 0, 0.08) 0%, rgba(255, 120, 0, 0.04) 100%);
+}
+
 .agent-group-header::after {
     content: '';
     position: absolute;
@@ -283,6 +287,11 @@
     box-shadow: 0 0 8px rgba(255, 0, 204, 0.6);
 }
 
+.agent-group-header.color-orange::after {
+    background: #ff9500;
+    box-shadow: 0 0 8px rgba(255, 149, 0, 0.6);
+}
+
 .agent-group-header::before {
     opacity: 1;
 }
@@ -304,6 +313,11 @@
 .agent-group-header.color-magenta:hover {
     border-color: rgba(255, 0, 204, 0.25);
     box-shadow: inset 0 0 20px rgba(255, 0, 204, 0.05);
+}
+
+.agent-group-header.color-orange:hover {
+    border-color: rgba(255, 149, 0, 0.25);
+    box-shadow: inset 0 0 20px rgba(255, 149, 0, 0.05);
 }
 
 .agent-group-header:hover::after {
@@ -352,6 +366,11 @@
     filter: drop-shadow(0 0 4px rgba(255, 0, 204, 0.6));
 }
 
+.agent-group-icon.color-orange {
+    color: #ff9500;
+    filter: drop-shadow(0 0 4px rgba(255, 149, 0, 0.6));
+}
+
 .agent-group-label {
     font-size: 13px;
     font-weight: 600;
@@ -376,6 +395,11 @@
 .agent-group-header.color-magenta .agent-group-label {
     color: rgba(255, 0, 204, 0.85);
     text-shadow: 0 0 8px rgba(255, 0, 204, 0.3);
+}
+
+.agent-group-header.color-orange .agent-group-label {
+    color: rgba(255, 149, 0, 0.85);
+    text-shadow: 0 0 8px rgba(255, 149, 0, 0.3);
 }
 
 .agent-group-count {

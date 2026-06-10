@@ -11,6 +11,7 @@ public class ChatRequest {
     private String fileName;
     private String sessionId;
     private String userId;
+    private String executionMode;
 
     public String getUserId() {
         return userId;
@@ -18,6 +19,14 @@ public class ChatRequest {
 
     public void setUserId(String userId) {
         this.userId = userId;
+    }
+
+    public String getExecutionMode() {
+        return executionMode;
+    }
+
+    public void setExecutionMode(String executionMode) {
+        this.executionMode = executionMode;
     }
 
     // Multi-modal support

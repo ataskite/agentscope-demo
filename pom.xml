@@ -22,7 +22,7 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <agentscope.version>1.1.0-RC1</agentscope.version>
+        <agentscope.version>2.0.0-RC1</agentscope.version>
     </properties>
 
     <dependencies>
@@ -80,13 +80,6 @@
             <version>3.0.7</version>
         </dependency>
 
-        <!-- AgentScope AutoContextMemory -->
-        <dependency>
-            <groupId>io.agentscope</groupId>
-            <artifactId>agentscope-extensions-autocontext-memory</artifactId>
-            <version>${agentscope.version}</version>
-        </dependency>
-
         <!-- AgentScope RAG Simple Knowledge -->
         <dependency>
             <groupId>io.agentscope</groupId>
@@ -128,6 +121,24 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
+                </configuration>
+            </plugin>
+
+            <!-- Maven Compiler Plugin with Lombok annotation processor -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <source>17</source>
+                    <target>17</target>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.46</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
 

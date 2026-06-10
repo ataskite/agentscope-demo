@@ -5,8 +5,6 @@ import com.skloda.agentscope.agent.AgentConfigService;
 import com.skloda.agentscope.agent.AgentFactory;
 import com.skloda.agentscope.agent.AgentType;
 import com.skloda.agentscope.agent.HandoffTrigger;
-import com.skloda.agentscope.agent.LoopConfig;
-import com.skloda.agentscope.agent.MsgHubConfig;
 import com.skloda.agentscope.agent.StateConfig;
 import com.skloda.agentscope.agent.SubAgentConfig;
 import com.skloda.agentscope.agent.TriggerType;
@@ -15,11 +13,11 @@ import io.agentscope.core.agent.AgentBase;
 import io.agentscope.core.agent.StreamOptions;
 import io.agentscope.core.formatter.dashscope.DashScopeChatFormatter;
 import io.agentscope.core.hook.Hook;
-import io.agentscope.core.memory.InMemoryMemory;
-import io.agentscope.core.memory.Memory;
 import io.agentscope.core.model.DashScopeChatModel;
-import io.agentscope.core.pipeline.FanoutPipeline;
-import io.agentscope.core.pipeline.SequentialPipeline;
+import io.agentscope.core.session.Session;
+import io.agentscope.core.session.InMemorySession;
+import io.agentscope.core.state.SessionKey;
+import io.agentscope.core.state.SimpleSessionKey;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.core.tool.subagent.SubAgentProvider;
 import io.agentscope.core.tool.subagent.SubAgentTool;
@@ -34,18 +32,17 @@ import java.util.List;
 import java.util.Map;
 
 import com.skloda.agentscope.composite.graph.OrderFulfillmentGraph;
-import com.skloda.agentscope.composite.pipeline.LoopPipeline;
-import com.skloda.agentscope.composite.pipeline.RoundTablePipeline;
-import com.skloda.agentscope.composite.pipeline.TaskDispatcherPipeline;
-import com.skloda.agentscope.composite.pipeline.TaskOrchestratorPipeline;
 
 /**
  * Factory for creating multi-agent compositions.
- * Dispatches by AgentConfig.type() to the appropriate creation strategy.
- *
- * SINGLE agents delegate to the existing AgentFactory.
- * SEQUENTIAL/PARALLEL agents use AgentScope pipelines.
+ * SINGLE agents delegate to AgentFactory.
  * ROUTING/HANDOFFS agents use SubAgentTool for dynamic dispatch.
+ * STATE_GRAPH agents use custom OrderFulfillmentGraph.
+ *
+ * Pipeline-dependent patterns (SEQUENTIAL, PARALLEL, DEBATE, LOOP, MSG_HUB,
+ * SUBAGENT_SEQ, SUBAGENT_PAR) are disabled during AgentScope 2.0 migration
+ * (io.agentscope.core.pipeline.* removed). They will be reimplemented using
+ * 2.0 subagent/middleware API.
  */
 @Component
 public class CompositeAgentFactory {
@@ -62,32 +59,29 @@ public class CompositeAgentFactory {
         this.configService = configService;
     }
 
-    /**
-     * Create a single (SINGLE-type) agent using the existing AgentFactory.
-     * Delegates to AgentFactory.createAgent(agentId, hooks).
-     */
     public ReActAgent createSingleAgent(String agentId, Hook... hooks) {
         return singleAgentFactory.createAgent(agentId, hooks);
     }
 
     /**
-     * Create a single agent for session use (with externally provided memory).
+     * Create a single agent for session use (with externally provided Session).
      */
-    public ReActAgent createSingleAgentForSession(String agentId, Memory memory, Hook... hooks) {
-        return singleAgentFactory.createAgentForSession(agentId, memory, hooks);
+    public ReActAgent createSingleAgentForSession(String agentId, Session session, Hook... hooks) {
+        return singleAgentFactory.createAgentForSession(agentId, session, hooks);
     }
 
     /**
-     * Create memory for a given agentId.
+     * @deprecated Use {@link #createSingleAgentForSession(String, Session, Hook...)} instead.
      */
-    public Memory createMemory(String agentId) {
-        return singleAgentFactory.createMemory(agentId);
+    @Deprecated
+    public ReActAgent createSingleAgentForSession(String agentId, io.agentscope.core.memory.Memory memory, Hook... hooks) {
+        return singleAgentFactory.createAgent(agentId, hooks);
     }
 
-    /**
-     * Create sub-agents as AgentBase list for pipeline use.
-     * Each sub-agent is created using AgentFactory with a fresh InMemoryMemory.
-     */
+    public Session createSession() {
+        return singleAgentFactory.createSession();
+    }
+
     public List<AgentBase> createSubAgents(AgentConfig config) {
         return config.getSubAgents().stream()
                 .map(sub -> {
@@ -99,125 +93,7 @@ public class CompositeAgentFactory {
                 .toList();
     }
 
-    /**
-     * Create sub-agents with shared memory for pipeline use.
-     */
-    public List<AgentBase> createSubAgentsWithMemory(AgentConfig config, Memory memory) {
-        return config.getSubAgents().stream()
-                .map(sub -> {
-                    log.info("Creating sub-agent: {} for composite: {} (shared memory)", sub.getAgentId(), config.getAgentId());
-                    return singleAgentFactory.createAgentForSession(sub.getAgentId(), memory);
-                })
-                .map(ReActAgent.class::cast)
-                .map(AgentBase.class::cast)
-                .toList();
-    }
-
-    // Stub methods for Tasks 11-13
-    /**
-     * Create a sequential pipeline of sub-agents.
-     * Each sub-agent processes the message in order; the output of one feeds into the next.
-     */
-    public SequentialPipeline createSequentialAgent(AgentConfig config, Memory memory) {
-        if (config.getSubAgents() == null || config.getSubAgents().isEmpty()) {
-            throw new IllegalArgumentException("SEQUENTIAL agent requires at least one sub-agent: " + config.getAgentId());
-        }
-
-        log.info("Creating SEQUENTIAL pipeline for: {} with {} sub-agents", config.getAgentId(), config.getSubAgents().size());
-
-        List<AgentBase> subAgents = (memory != null)
-                ? createSubAgentsWithMemory(config, memory)
-                : createSubAgents(config);
-
-        return SequentialPipeline.builder()
-                .addAgents(subAgents)
-                .build();
-    }
-
-    /**
-     * Create a parallel (fanout) pipeline of sub-agents.
-     * All sub-agents receive the same message and execute concurrently.
-     * Uses config.parallel flag to determine concurrent vs sequential fanout.
-     */
-    public FanoutPipeline createParallelAgent(AgentConfig config, Memory memory) {
-        if (config.getSubAgents() == null || config.getSubAgents().isEmpty()) {
-            throw new IllegalArgumentException("PARALLEL agent requires at least one sub-agent: " + config.getAgentId());
-        }
-
-        boolean concurrent = config.getParallel() != null ? config.getParallel() : true;
-        log.info("Creating PARALLEL pipeline for: {} with {} sub-agents (concurrent={})",
-                config.getAgentId(), config.getSubAgents().size(), concurrent);
-
-        List<AgentBase> subAgents = (memory != null)
-                ? createSubAgentsWithMemory(config, memory)
-                : createSubAgents(config);
-
-        FanoutPipeline.Builder builder = FanoutPipeline.builder()
-                .addAgents(subAgents)
-                .concurrent(concurrent);
-
-        return builder.build();
-    }
-
-    /**
-     * Create a debate pipeline where multiple debaters argue in parallel,
-     * then a judge agent synthesizes their viewpoints into a final decision.
-     *
-     * The last sub-agent in the list is treated as the judge.
-     * All preceding sub-agents are the debaters.
-     */
-    public DebatePipeline createDebateAgent(AgentConfig config, Memory memory) {
-        if (config.getSubAgents() == null || config.getSubAgents().size() < 3) {
-            throw new IllegalArgumentException(
-                    "DEBATE agent requires at least 3 sub-agents (2 debaters + 1 judge): " + config.getAgentId());
-        }
-
-        log.info("Creating DEBATE pipeline for: {} with {} sub-agents",
-                config.getAgentId(), config.getSubAgents().size());
-
-        // Split sub-agents: all except last are debaters, last is judge
-        List<SubAgentConfig> subAgentConfigs = config.getSubAgents();
-        List<SubAgentConfig> debaterConfigs = subAgentConfigs.subList(0, subAgentConfigs.size() - 1);
-        SubAgentConfig judgeConfig = subAgentConfigs.get(subAgentConfigs.size() - 1);
-
-        // Create debater agents
-        List<AgentBase> debaters = debaterConfigs.stream()
-                .map(sub -> {
-                    log.info("  Creating debater sub-agent: {}", sub.getAgentId());
-                    return memory != null
-                            ? singleAgentFactory.createAgentForSession(sub.getAgentId(), memory)
-                            : singleAgentFactory.createAgent(sub.getAgentId());
-                })
-                .map(ReActAgent.class::cast)
-                .map(AgentBase.class::cast)
-                .toList();
-
-        // Create judge agent
-        log.info("  Creating judge sub-agent: {}", judgeConfig.getAgentId());
-        AgentBase judge = memory != null
-                ? singleAgentFactory.createAgentForSession(judgeConfig.getAgentId(), memory)
-                : singleAgentFactory.createAgent(judgeConfig.getAgentId());
-
-        return new DebatePipeline(debaters, judge);
-    }
-
-    public LoopPipeline createLoopAgent(AgentConfig config, Memory memory) {
-        List<SubAgentConfig> subs = config.getSubAgents();
-        if (subs.size() < 2) {
-            throw new IllegalArgumentException("LOOP requires at least 2 sub-agents (writer + critic)");
-        }
-
-        AgentBase writer = findOrCreateAgent(subs.get(0), memory);
-        AgentBase critic = findOrCreateAgent(subs.get(1), memory);
-
-        LoopConfig loopConfig = config.getLoopConfig();
-        int maxIterations = loopConfig != null ? loopConfig.getMaxIterations() : 3;
-        boolean autoExit = loopConfig == null || "AUTO".equalsIgnoreCase(loopConfig.getExitCondition());
-
-        return new LoopPipeline(writer, critic, maxIterations, autoExit);
-    }
-
-    public OrderFulfillmentGraph createStateGraphAgent(AgentConfig config, Memory memory) {
+    public OrderFulfillmentGraph createStateGraphAgent(AgentConfig config, Session session) {
         List<StateConfig> states = config.getStates();
         if (states == null || states.isEmpty()) {
             throw new IllegalArgumentException("STATE_GRAPH requires states configuration");
@@ -226,9 +102,8 @@ public class CompositeAgentFactory {
         Map<String, ReActAgent> stateAgents = new LinkedHashMap<>();
         for (StateConfig state : states) {
             if (state.getAgent() != null) {
-                ReActAgent agent = memory != null
-                        ? singleAgentFactory.createAgentForSession(state.getAgent(), memory)
-                        : singleAgentFactory.createAgent(state.getAgent());
+                Session effectiveSession = session != null ? session : new InMemorySession();
+                ReActAgent agent = singleAgentFactory.createAgentForSession(state.getAgent(), effectiveSession);
                 stateAgents.put(state.getName(), agent);
             }
         }
@@ -236,81 +111,25 @@ public class CompositeAgentFactory {
         return new OrderFulfillmentGraph(states, stateAgents);
     }
 
-    public RoundTablePipeline createMsgHubAgent(AgentConfig config, Memory memory) {
-        List<SubAgentConfig> subs = config.getSubAgents();
-        if (subs.size() < 2) {
-            throw new IllegalArgumentException("MSG_HUB requires at least a moderator + experts");
-        }
-
-        AgentBase moderator = findOrCreateAgent(subs.get(0), memory);
-
-        List<AgentBase> experts = new ArrayList<>();
-        for (int i = 1; i < subs.size(); i++) {
-            experts.add(findOrCreateAgent(subs.get(i), memory));
-        }
-
-        MsgHubConfig msgHubConfig = config.getMsgHubConfig();
-        int rounds = msgHubConfig != null ? msgHubConfig.getRounds() : 3;
-
-        return new RoundTablePipeline(moderator, experts, rounds);
-    }
-
-    public TaskOrchestratorPipeline createSubagentSeqAgent(AgentConfig config, Memory memory) {
-        List<SubAgentConfig> subs = config.getSubAgents();
-        if (subs.isEmpty()) {
-            throw new IllegalArgumentException("SUBAGENT_SEQ requires at least 1 sub-agent");
-        }
-
-        List<AgentBase> agents = new ArrayList<>();
-        List<String> templates = new ArrayList<>();
-        List<String> ids = new ArrayList<>();
-
-        for (SubAgentConfig sub : subs) {
-            agents.add(findOrCreateAgent(sub, memory));
-            templates.add(sub.getTaskTemplate() != null ? sub.getTaskTemplate() : "{input}");
-            ids.add(sub.getAgentId());
-        }
-
-        return new TaskOrchestratorPipeline(agents, templates, ids);
-    }
-
-    public TaskDispatcherPipeline createSubagentParAgent(AgentConfig config, Memory memory) {
-        List<SubAgentConfig> subs = config.getSubAgents();
-        if (subs.isEmpty()) {
-            throw new IllegalArgumentException("SUBAGENT_PAR requires at least 1 sub-agent");
-        }
-
-        List<AgentBase> agents = new ArrayList<>();
-        List<String> templates = new ArrayList<>();
-        List<String> ids = new ArrayList<>();
-
-        for (SubAgentConfig sub : subs) {
-            agents.add(findOrCreateAgent(sub, memory));
-            templates.add(sub.getTaskTemplate() != null ? sub.getTaskTemplate() : "{input}");
-            ids.add(sub.getAgentId());
-        }
-
-        return new TaskDispatcherPipeline(agents, templates, ids);
-    }
-
     /**
-     * Create a routing agent that uses uses LLM to decide which sub-agent to dispatch to.
-     * Each sub-agent is registered as a SubAgentTool, and the router's system prompt
-     * describes each sub-agent's capabilities for intelligent routing.
+     * @deprecated Use {@link #createStateGraphAgent(AgentConfig, Session)} instead.
      */
-    public ReActAgent createRoutingAgent(AgentConfig config, Memory memory, Hook... hooks) {
+    @Deprecated
+    public OrderFulfillmentGraph createStateGraphAgent(AgentConfig config, io.agentscope.core.memory.Memory memory) {
+        return createStateGraphAgent(config, (Session) null);
+    }
+
+    public ReActAgent createRoutingAgent(AgentConfig config, Session session, Hook... hooks) {
         if (config.getSubAgents() == null || config.getSubAgents().isEmpty()) {
             throw new IllegalArgumentException("ROUTING agent requires at least one sub-agent: " + config.getAgentId());
         }
 
         log.info("Creating ROUTING agent for: {} with {} sub-agents", config.getAgentId(), config.getSubAgents().size());
 
-        Memory effectiveMemory = memory != null ? memory : new InMemoryMemory();
+        Session effectiveSession = session != null ? session : new InMemorySession();
 
-        // Build routing system prompt
         String routingPrompt = buildRoutingSystemPrompt(config);
 
-        // Create model for the router
         DashScopeChatModel model = DashScopeChatModel.builder()
                 .apiKey(apiKey)
                 .modelName(config.getModelName())
@@ -319,16 +138,12 @@ public class CompositeAgentFactory {
                 .formatter(new DashScopeChatFormatter())
                 .build();
 
-        // Create toolkit with SubAgentTools
         Toolkit toolkit = new Toolkit();
         List<ReActAgent> subAgents = new ArrayList<>();
 
         for (SubAgentConfig subConfig : config.getSubAgents()) {
-            // For ROUTING agents, create sub-agents without tools to avoid tool call conflicts
             AgentConfig subAgentConfig = configService.getAgentConfig(subConfig.getAgentId());
 
-            // Build a modified system prompt that instructs the sub-agent to respond directly
-            // without calling tools, since it's being invoked as a sub-agent tool
             String originalPrompt = subAgentConfig != null ? subAgentConfig.getSystemPrompt() : "";
             String modifiedPrompt = "你是一个子代理，正在通过工具调用被主代理调用。\n" +
                     "请直接回答用户的问题，不要调用任何工具。\n" +
@@ -343,23 +158,20 @@ public class CompositeAgentFactory {
                     .formatter(new DashScopeChatFormatter())
                     .build();
 
-            // Create sub-agent with modified prompt and no toolkit.
-            // Enable pending tool recovery to handle orphaned tool calls gracefully.
             ReActAgent subAgent = ReActAgent.builder()
                     .name(subConfig.getAgentId())
                     .sysPrompt(modifiedPrompt)
                     .model(subModel)
-                    .memory(effectiveMemory)
-                    .toolkit(new Toolkit()) // Empty toolkit - no tools for sub-agents in ROUTING
+                    .session(new InMemorySession())
+                    .sessionKey(SimpleSessionKey.of(subConfig.getAgentId()))
+                    .toolkit(new Toolkit())
                     .enablePendingToolRecovery(true)
                     .build();
 
             subAgents.add(subAgent);
 
-            // Create SubAgentProvider for this sub-agent
             SubAgentProvider<ReActAgent> provider = () -> subAgent;
 
-            // Build SubAgentConfig for the framework
             io.agentscope.core.tool.subagent.SubAgentConfig frameworkSubConfig =
                     io.agentscope.core.tool.subagent.SubAgentConfig.builder()
                             .toolName(subConfig.getAgentId())
@@ -381,12 +193,12 @@ public class CompositeAgentFactory {
                     subConfig.getAgentId(), config.getAgentId());
         }
 
-        // Build the router agent
         ReActAgent.Builder builder = ReActAgent.builder()
                 .name(config.getName() != null ? config.getName() : config.getAgentId())
                 .sysPrompt(routingPrompt)
                 .model(model)
-                .memory(effectiveMemory)
+                .session(effectiveSession)
+                .sessionKey(SimpleSessionKey.of(config.getAgentId()))
                 .toolkit(toolkit);
 
         if (hooks != null && hooks.length > 0) {
@@ -397,8 +209,13 @@ public class CompositeAgentFactory {
     }
 
     /**
-     * Build a routing system prompt that describes each sub-agent's capabilities.
+     * @deprecated Use {@link #createRoutingAgent(AgentConfig, Session, Hook...)} instead.
      */
+    @Deprecated
+    public ReActAgent createRoutingAgent(AgentConfig config, io.agentscope.core.memory.Memory memory, Hook... hooks) {
+        return createRoutingAgent(config, (Session) null, hooks);
+    }
+
     private String buildRoutingSystemPrompt(AgentConfig config) {
         StringBuilder sb = new StringBuilder();
         sb.append("你是一个智能路由助手，负责将用户请求分配给最合适的子代理处理。\n\n");
@@ -432,12 +249,7 @@ public class CompositeAgentFactory {
         return sb.toString();
     }
 
-    /**
-     * Create a handoffs agent with intent-based triggers.
-     * Built on top of the routing agent pattern, but enhanced with explicit
-     * handoff trigger rules that guide the LLM's routing decisions.
-     */
-    public ReActAgent createHandoffsAgent(AgentConfig config, Memory memory, Hook... hooks) {
+    public ReActAgent createHandoffsAgent(AgentConfig config, Session session, Hook... hooks) {
         if (config.getSubAgents() == null || config.getSubAgents().isEmpty()) {
             throw new IllegalArgumentException("HANDOFFS agent requires at least one sub-agent: " + config.getAgentId());
         }
@@ -446,12 +258,10 @@ public class CompositeAgentFactory {
                 config.getAgentId(), config.getSubAgents().size(),
                 config.getHandoffTriggers() != null ? config.getHandoffTriggers().size() : 0);
 
-        Memory effectiveMemory = memory != null ? memory : new InMemoryMemory();
+        Session effectiveSession = session != null ? session : new InMemorySession();
 
-        // Build handoffs system prompt with trigger rules
         String handoffsPrompt = buildHandoffsSystemPrompt(config);
 
-        // Create model for the handoffs agent
         DashScopeChatModel model = DashScopeChatModel.builder()
                 .apiKey(apiKey)
                 .modelName(config.getModelName())
@@ -460,15 +270,11 @@ public class CompositeAgentFactory {
                 .formatter(new DashScopeChatFormatter())
                 .build();
 
-        // Create toolkit with SubAgentTools
         Toolkit toolkit = new Toolkit();
 
         for (SubAgentConfig subConfig : config.getSubAgents()) {
-            // For HANDOFFS agents, create sub-agents without tools to avoid tool call conflicts
             AgentConfig subAgentConfig = configService.getAgentConfig(subConfig.getAgentId());
 
-            // Build a modified system prompt that instructs the sub-agent to respond directly
-            // without calling tools, since it's being invoked as a sub-agent tool
             String originalPrompt = subAgentConfig != null ? subAgentConfig.getSystemPrompt() : "";
             String modifiedPrompt = "你是一个子代理，正在通过工具调用被主代理调用。\n" +
                     "请直接回答用户的问题，不要调用任何工具。\n" +
@@ -483,14 +289,13 @@ public class CompositeAgentFactory {
                     .formatter(new DashScopeChatFormatter())
                     .build();
 
-            // Create sub-agent with modified prompt and no toolkit.
-            // Enable pending tool recovery to handle orphaned tool calls gracefully.
             ReActAgent subAgent = ReActAgent.builder()
                     .name(subConfig.getAgentId())
                     .sysPrompt(modifiedPrompt)
                     .model(subModel)
-                    .memory(effectiveMemory)
-                    .toolkit(new Toolkit()) // Empty toolkit - no tools for sub-agents in HANDOFFS
+                    .session(new InMemorySession())
+                    .sessionKey(SimpleSessionKey.of(subConfig.getAgentId()))
+                    .toolkit(new Toolkit())
                     .enablePendingToolRecovery(true)
                     .build();
 
@@ -517,12 +322,12 @@ public class CompositeAgentFactory {
                     subConfig.getAgentId(), config.getAgentId());
         }
 
-        // Build the handoffs agent
         ReActAgent.Builder builder = ReActAgent.builder()
                 .name(config.getName() != null ? config.getName() : config.getAgentId())
                 .sysPrompt(handoffsPrompt)
                 .model(model)
-                .memory(effectiveMemory)
+                .session(effectiveSession)
+                .sessionKey(SimpleSessionKey.of(config.getAgentId()))
                 .toolkit(toolkit);
 
         if (hooks != null && hooks.length > 0) {
@@ -533,9 +338,13 @@ public class CompositeAgentFactory {
     }
 
     /**
-     * Build a handoffs system prompt with explicit trigger rules.
-     * Includes both the trigger-based routing rules and sub-agent descriptions.
+     * @deprecated Use {@link #createHandoffsAgent(AgentConfig, Session, Hook...)} instead.
      */
+    @Deprecated
+    public ReActAgent createHandoffsAgent(AgentConfig config, io.agentscope.core.memory.Memory memory, Hook... hooks) {
+        return createHandoffsAgent(config, (Session) null, hooks);
+    }
+
     private String buildHandoffsSystemPrompt(AgentConfig config) {
         StringBuilder sb = new StringBuilder();
         sb.append("你是一个智能代理协调器，负责根据用户意图将请求转交给合适的子代理处理。\n\n");
@@ -547,7 +356,6 @@ public class CompositeAgentFactory {
             sb.append(config.getDescription()).append("\n\n");
         }
 
-        // Handoff trigger rules
         if (config.getHandoffTriggers() != null && !config.getHandoffTriggers().isEmpty()) {
             sb.append("## 转交触发规则\n");
             sb.append("以下规则帮助你决定何时将请求转交给特定的子代理：\n\n");
@@ -563,7 +371,6 @@ public class CompositeAgentFactory {
             }
         }
 
-        // Sub-agent descriptions
         sb.append("## 可用的子代理\n");
         for (SubAgentConfig subConfig : config.getSubAgents()) {
             sb.append("- **").append(subConfig.getAgentId()).append("**");
@@ -581,12 +388,5 @@ public class CompositeAgentFactory {
         }
 
         return sb.toString();
-    }
-
-    private AgentBase findOrCreateAgent(SubAgentConfig subConfig, Memory memory) {
-        String agentId = subConfig.getAgentId();
-        return memory != null
-                ? singleAgentFactory.createAgentForSession(agentId, memory)
-                : singleAgentFactory.createAgent(agentId);
     }
 }

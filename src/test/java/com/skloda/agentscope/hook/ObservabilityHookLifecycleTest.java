@@ -46,8 +46,8 @@ class ObservabilityHookLifecycleTest {
 
     @Test
     void reasoningChunkEmitsThinking() {
-        Msg chunk = Msg.builder().content(ThinkingBlock.builder().thinking("analyzing...").build()).build();
-        Msg accumulated = Msg.builder().content(TextBlock.builder().text("analyzing...").build()).build();
+        Msg chunk = Msg.builder().role(MsgRole.ASSISTANT).content(ThinkingBlock.builder().thinking("analyzing...").build()).build();
+        Msg accumulated = Msg.builder().role(MsgRole.ASSISTANT).content(TextBlock.builder().text("analyzing...").build()).build();
         hook.onEvent(new ReasoningChunkEvent(agent, "qwen-plus", null, chunk, accumulated)).block();
         assertEquals(1, capturedEvents.size());
         assertEquals("thinking", capturedEvents.get(0).get("type"));
@@ -64,8 +64,8 @@ class ObservabilityHookLifecycleTest {
 
     @Test
     void reasoningChunkWithEmptyThinkingSkipsEmit() {
-        Msg chunk = Msg.builder().content(ThinkingBlock.builder().thinking("").build()).build();
-        Msg accumulated = Msg.builder().build();
+        Msg chunk = Msg.builder().role(MsgRole.ASSISTANT).content(ThinkingBlock.builder().thinking("").build()).build();
+        Msg accumulated = Msg.builder().role(MsgRole.ASSISTANT).build();
         hook.onEvent(new ReasoningChunkEvent(agent, "qwen-plus", null, chunk, accumulated)).block();
         assertTrue(capturedEvents.isEmpty());
     }
@@ -83,6 +83,7 @@ class ObservabilityHookLifecycleTest {
     @Test
     void postReasoningExtractsToolCalls() {
         Msg reasoningMsg = Msg.builder()
+                .role(MsgRole.ASSISTANT)
                 .content(TextBlock.builder().text("calling tool").build(),
                         ToolUseBlock.builder().id("t1").name("web_search").input(Map.of("query", "test")).build())
                 .build();

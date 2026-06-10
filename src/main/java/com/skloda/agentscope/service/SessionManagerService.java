@@ -5,9 +5,7 @@ import com.skloda.agentscope.agent.AgentConfigService;
 import com.skloda.agentscope.agent.AgentFactory;
 import com.skloda.agentscope.model.SessionInfo;
 import io.agentscope.core.ReActAgent;
-import io.agentscope.core.memory.InMemoryMemory;
-import io.agentscope.core.memory.Memory;
-import io.agentscope.core.session.SessionManager;
+import io.agentscope.core.session.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,10 +20,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Manages in-process session lifecycle for the demo.
- * Each session holds Memory for the life of the current application process.
- */
 @Service
 public class SessionManagerService {
 
@@ -36,7 +30,6 @@ public class SessionManagerService {
     private final AgentConfigService configService;
     private final Path sessionBasePath;
 
-    /** sessionId → SessionContext */
     private final ConcurrentHashMap<String, SessionContext> activeSessions = new ConcurrentHashMap<>();
 
     public SessionManagerService(AgentFactory agentFactory,
@@ -49,24 +42,20 @@ public class SessionManagerService {
                 sessionBasePath.toAbsolutePath());
     }
 
-    // ---- Inner context class ----
-
     public static class SessionContext {
         private final String sessionId;
         private final String agentId;
         private final ReActAgent agent;
-        private final Memory memory;
-        private final SessionManager sessionManager;
+        private final Session session;
         private final long createdAt;
         private volatile long lastAccessedAt;
 
         SessionContext(String sessionId, String agentId, ReActAgent agent,
-                       Memory memory, SessionManager sessionManager) {
+                       Session session) {
             this.sessionId = sessionId;
             this.agentId = agentId;
             this.agent = agent;
-            this.memory = memory;
-            this.sessionManager = sessionManager;
+            this.session = session;
             this.createdAt = System.currentTimeMillis();
             this.lastAccessedAt = this.createdAt;
         }
@@ -74,18 +63,12 @@ public class SessionManagerService {
         public String getSessionId() { return sessionId; }
         public String getAgentId() { return agentId; }
         public ReActAgent getAgent() { return agent; }
-        public Memory getMemory() { return memory; }
-        public SessionManager getSessionManager() { return sessionManager; }
+        public Session getSession() { return session; }
 
         public long getLastAccessedAt() { return lastAccessedAt; }
         public void touch() { this.lastAccessedAt = System.currentTimeMillis(); }
     }
 
-    // ---- Core operations ----
-
-    /**
-     * Get or create a session. If sessionId is null/blank, creates a new session.
-     */
     public SessionContext getOrCreateSession(String sessionId, String agentId) {
         if (sessionId != null && !sessionId.isBlank()) {
             SessionContext cached = activeSessions.get(sessionId);
@@ -94,13 +77,9 @@ public class SessionManagerService {
                 return cached;
             }
         }
-        // Create new session
         return createNewSession(agentId);
     }
 
-    /**
-     * Get the current in-memory session for an agent, or create one.
-     */
     public SessionContext getOrCreateSessionForAgent(String agentId) {
         return activeSessions.values().stream()
                 .filter(ctx -> Objects.equals(ctx.getAgentId(), agentId))
@@ -112,30 +91,21 @@ public class SessionManagerService {
                 .orElseGet(() -> createNewSession(agentId));
     }
 
-    /**
-     * Create a brand new session with fresh agent and memory.
-     */
     public SessionContext createNewSession(String agentId) {
         String sessionId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         return createSessionContext(sessionId, agentId);
     }
 
     private SessionContext createSessionContext(String sessionId, String agentId) {
-        // Create memory based on config
-        Memory memory = agentFactory.createMemory(agentId);
+        Session session = agentFactory.createSession();
+        ReActAgent agent = agentFactory.createAgentForSession(agentId, session);
 
-        // Create agent with this memory (hooks are per-request, not set here)
-        ReActAgent agent = agentFactory.createAgentForSession(agentId, memory);
-
-        SessionContext ctx = new SessionContext(sessionId, agentId, agent, memory, null);
+        SessionContext ctx = new SessionContext(sessionId, agentId, agent, session);
         activeSessions.put(sessionId, ctx);
         log.info("Created session: {} for agent: {}", sessionId, agentId);
         return ctx;
     }
 
-    /**
-     * Mark session as recently used. In-memory demo sessions are not written to disk.
-     */
     public void saveSession(String sessionId) {
         SessionContext ctx = activeSessions.get(sessionId);
         if (ctx == null) return;
@@ -143,11 +113,7 @@ public class SessionManagerService {
         log.debug("Session {} touched", sessionId);
     }
 
-    /**
-     * List all active in-memory sessions.
-     */
     public List<SessionInfo> listSessions() {
-        // Sort contexts by raw epoch millis (newest first) to avoid string-format granularity loss
         List<Map.Entry<String, SessionContext>> sorted = activeSessions.entrySet().stream()
                 .sorted((a, b) -> Long.compare(b.getValue().getLastAccessedAt(), a.getValue().getLastAccessedAt()))
                 .toList();
@@ -161,33 +127,21 @@ public class SessionManagerService {
             info.setAgentId(ctx.getAgentId());
             AgentConfig cfg = configService.findAgentConfig(ctx.getAgentId()).orElse(null);
             info.setAgentName(cfg != null ? cfg.getName() : ctx.getAgentId());
-            int msgCount = 0;
-            if (ctx.getMemory() instanceof InMemoryMemory imm) {
-                msgCount = imm.getMessages().size();
-            }
-            info.setMessageCount(msgCount);
+            info.setMessageCount(0); // Session-based: message count no longer directly accessible
             info.setLastAccessedAt(formatTime(ctx.getLastAccessedAt()));
             result.add(info);
         }
         return result;
     }
 
-    /**
-     * Delete a session from the active in-memory cache.
-     */
     public void deleteSession(String sessionId) {
         activeSessions.remove(sessionId);
         log.info("Session {} deleted", sessionId);
     }
 
-    /**
-     * Get active session context if available.
-     */
     public SessionContext getSession(String sessionId) {
         return sessionId != null ? activeSessions.get(sessionId) : null;
     }
-
-    // ---- Helpers ----
 
     private String formatTime(long epochMs) {
         return LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMs), ZoneId.systemDefault())

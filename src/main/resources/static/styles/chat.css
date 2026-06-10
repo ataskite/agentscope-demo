@@ -328,28 +328,6 @@
     cursor: pointer;
 }
 
-.builder-user-selector {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 12px;
-    background: rgba(255, 165, 0, 0.08);
-    border: 1px solid rgba(255, 165, 0, 0.2);
-    border-radius: 6px;
-    margin-bottom: 6px;
-}
-.builder-user-selector label {
-    color: var(--text-secondary);
-    font-size: 13px;
-}
-.builder-user-selector select {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    padding: 2px 8px;
-    font-size: 13px;
-}
 .agent-badge.builder {
     display: inline-block;
     font-size: 10px;
@@ -360,4 +338,102 @@
     border: 1px solid rgba(255, 165, 0, 0.3);
     vertical-align: middle;
     margin-left: 4px;
+}
+.agent-badge.claw {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(0, 255, 136, 0.12);
+    color: #00ff88;
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    vertical-align: middle;
+    margin-left: 4px;
+}
+
+/* ===== HARNESS CONTROLS (mode toggle + user selector) ===== */
+.harness-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 0 8px 0;
+    flex-wrap: wrap;
+}
+
+.harness-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.harness-mode-toggle label {
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.mode-switch {
+    display: flex;
+    border: 1px solid var(--border-dim);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.mode-btn {
+    padding: 3px 12px;
+    font-size: 11px;
+    font-family: var(--font-body);
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mode-btn:first-child {
+    border-right: 1px solid var(--border-dim);
+}
+
+.mode-btn.active[data-mode="CLAW"] {
+    background: rgba(0, 255, 136, 0.12);
+    color: #00ff88;
+    text-shadow: 0 0 6px rgba(0, 255, 136, 0.3);
+}
+
+.mode-btn.active[data-mode="BUILDER"] {
+    background: rgba(255, 165, 0, 0.12);
+    color: #ff9500;
+    text-shadow: 0 0 6px rgba(255, 149, 0, 0.3);
+}
+
+.mode-btn:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
+}
+
+.builder-user-selector {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.builder-user-selector label {
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.builder-user-selector select {
+    background: var(--bg-input);
+    border: 1px solid var(--border-dim);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-family: var(--font-body);
+    padding: 3px 8px;
+    outline: none;
+}
+
+.builder-user-selector select:focus {
+    border-color: var(--border-accent);
 }

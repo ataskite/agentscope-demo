@@ -34,9 +34,10 @@ public class HarnessAgentService {
     public Flux<Map<String, Object>> createStreamFlux(String agentId, String message,
                                                        String filePath, String fileName,
                                                        String sessionId,
-                                                       String userId) {
+                                                       String userId,
+                                                       String executionMode) {
         try {
-            HarnessAgent agent = getOrCreateAgent(agentId);
+            HarnessAgent agent = getOrCreateAgent(agentId, executionMode);
 
             String actualMessage = prependFileInfo(filePath, fileName, message);
             Msg userMsg = Msg.builder()
@@ -58,14 +59,15 @@ public class HarnessAgentService {
         }
     }
 
-    private HarnessAgent getOrCreateAgent(String agentId) throws Exception {
-        return agentCache.computeIfAbsent(agentId, id -> {
+    private HarnessAgent getOrCreateAgent(String agentId, String executionMode) throws Exception {
+        String cacheKey = agentId + ":" + (executionMode != null ? executionMode.toUpperCase() : "CLAW");
+        return agentCache.computeIfAbsent(cacheKey, key -> {
             try {
-                AgentConfig config = configService.getAgentConfig(id);
+                AgentConfig config = configService.getAgentConfig(agentId);
                 String effectiveKey = resolveApiKey();
-                return HarnessAgentFactory.create(config, effectiveKey);
+                return HarnessAgentFactory.create(config, effectiveKey, executionMode);
             } catch (Exception e) {
-                throw new RuntimeException("Failed to create HarnessAgent: " + id, e);
+                throw new RuntimeException("Failed to create HarnessAgent: " + key, e);
             }
         });
     }
