@@ -868,36 +868,6 @@ agents:
       - prompt: "请对以下三个专家的观点做出最终裁决"
         expectedBehavior: "综合所有观点，给出结构化的裁决报告"
 
-# === Multi-Agent: Sequential Pipeline ===
-
-  - agentId: doc-analysis-pipeline
-    category: collaboration
-    type: SEQUENTIAL
-    name: 文档分析流水线
-    description: 串行执行文档解析、信息提取、报告生成
-    modelName: qwen-plus
-    streaming: true
-    enableThinking: true
-    systemPrompt: |
-      你是一个文档研究流水线。你会按顺序执行两个步骤：
-      1. 文档专家先解析文档内容，提取关键信息
-      2. 搜索专家根据提取的信息，搜索补充资料
-
-      最终输出应整合文档内容和搜索结果，给出全面的分析报告。
-    subAgents:
-      - agentId: doc-expert
-        description: 解析文档内容
-      - agentId: search-expert
-        description: 搜索补充信息
-    parallel: false
-    samplePrompts:
-      - prompt: "请分析这个文档，并搜索相关的最新信息"
-        expectedBehavior: "文档专家先解析文档，然后搜索专家补充实时信息"
-      - prompt: "帮我总结这份报告的主要内容，并查找相关行业动态"
-        expectedBehavior: "先提取文档摘要，再搜索行业最新动态"
-      - prompt: "分析这个合同，并查找相关法律法规"
-        expectedBehavior: "解析合同内容，然后搜索相关法律条文"
-
 # === Multi-Agent: Routing ===
 
   - agentId: smart-router
@@ -1034,60 +1004,9 @@ agents:
       - prompt: "帮我调研一下 AI Agent 市场的主要玩家，并给出销售建议"
         expectedBehavior: "调用搜索专家获取市场信息，调用销售专家给出建议"
 
-# === Multi-Agent: Debate ===
-
-  - agentId: debate-review
-    category: collaboration
-    type: DEBATE
-    name: 专家辩论评审
-    description: 多专家并行辩论，Judge 综合裁决
-    modelName: qwen-plus
-    streaming: true
-    enableThinking: true
-    subAgents:
-      - agentId: debate-optimist
-        description: 从积极角度分析提案
-      - agentId: debate-critic
-        description: 从风险角度审视提案
-      - agentId: debate-analyst
-        description: 从数据角度客观分析
-      - agentId: debate-judge
-        description: 综合所有观点做出裁决
-    samplePrompts:
-      - prompt: "评估方案：公司全面采用远程办公模式"
-        expectedBehavior: "三位专家并行分析，裁判综合裁决"
-      - prompt: "分析提案：投入 200 万开发内部 AI 助手，预期 6 个月回本"
-        expectedBehavior: "乐观/批评/数据三角度分析，裁判给出 ROI 判断"
-      - prompt: "评估策略：放弃现有客户管理系统，迁移到新平台"
-        expectedBehavior: "多角度风险收益分析，裁判给出迁移建议"
-
 # ============================================================
 # P6: Advanced Multi-Agent Patterns
 # ============================================================
-
-# === P6: Loop Pipeline ===
-
-  - agentId: copywriter-refiner
-    category: collaboration
-    type: LOOP
-    name: 文案打磨
-    description: 写手撰写→评审把关→反复修改，直到文案满意
-    modelName: qwen-plus
-    streaming: true
-    enableThinking: true
-    loopConfig:
-      maxIterations: 3
-      exitCondition: AUTO
-    subAgents:
-      - agentId: writer
-        role: WRITER
-      - agentId: critic
-        role: CRITIC
-    samplePrompts:
-      - prompt: 写一篇关于AI助手的产品介绍
-        expectedBehavior: 撰写→评审→修改，最多3轮
-      - prompt: 帮我润色这段话，让它更专业
-        expectedBehavior: "writer撰写，critic评审，迭代改进直到满意"
 
 # === P6: StateGraph ===
 
@@ -1152,86 +1071,6 @@ agents:
         expectedBehavior: 启动订单履约流程
       - prompt: 我要买一个商品，金额10000元
         expectedBehavior: "进入订单流程，等待审核"
-
-# === P6: MsgHub Roundtable ===
-
-  - agentId: expert-roundtable
-    category: collaboration
-    type: MSG_HUB
-    name: 专家圆桌评审
-    description: 多位专家对技术方案进行多轮讨论评审
-    modelName: qwen-plus
-    streaming: true
-    enableThinking: true
-    msgHubConfig:
-      rounds: 2
-      summaryRole: MODERATOR
-    subAgents:
-      - agentId: moderator
-        role: MODERATOR
-      - agentId: architect
-        role: EXPERT
-      - agentId: dba-expert
-        role: EXPERT
-      - agentId: security-expert
-        role: EXPERT
-    samplePrompts:
-      - prompt: 评审方案：使用微服务架构重构现有单体应用，采用Spring Cloud + Kubernetes
-        expectedBehavior: 架构师、DBA、安全专家分别讨论，主持人总结
-      - prompt: 我们的技术方案是：前后端分离 + 微服务 + MySQL + Redis
-        expectedBehavior: "多专家多轮讨论，主持人给出综合评审报告"
-
-# === P6: Subagents Sequential ===
-
-  - agentId: report-generator
-    category: collaboration
-    type: SUBAGENT_SEQ
-    name: 报告生成流水线
-    description: 调研→分析→撰写，自动生成结构化报告
-    modelName: qwen-plus
-    streaming: true
-    enableThinking: true
-    subAgents:
-      - agentId: researcher
-        role: RESEARCHER
-        taskTemplate: "请调研以下主题的背景信息和最新进展：{input}"
-      - agentId: analyst
-        role: ANALYST
-        taskTemplate: "基于以下调研结果进行深度分析：{prevOutput}"
-      - agentId: report-writer
-        role: WRITER
-        taskTemplate: "根据以下分析结果撰写结构化报告：{prevOutput}"
-    samplePrompts:
-      - prompt: 生成一份关于大语言模型在企业级应用中的现状与发展趋势的报告
-        expectedBehavior: 调研→分析→撰写三步生成报告
-      - prompt: 帮我研究并生成一份关于AI Agent技术的报告
-        expectedBehavior: "串行执行：调研员调研→分析师分析→报告撰写员撰写"
-
-# === P6: Subagents Parallel ===
-
-  - agentId: project-manager
-    category: collaboration
-    type: SUBAGENT_PAR
-    name: 项目经理委派
-    description: 将项目需求同时委派给调研、设计、评估三个专家
-    modelName: qwen-plus
-    streaming: true
-    enableThinking: true
-    subAgents:
-      - agentId: pm-researcher
-        role: RESEARCHER
-        taskTemplate: "调研项目的技术可行性和市场情况：{input}"
-      - agentId: pm-designer
-        role: DESIGNER
-        taskTemplate: "设计项目的技术方案和架构：{input}"
-      - agentId: pm-evaluator
-        role: EVALUATOR
-        taskTemplate: "评估项目的风险和资源需求：{input}"
-    samplePrompts:
-      - prompt: 开发一个基于AI的智能客服系统
-        expectedBehavior: 调研、设计、评估三路并行
-      - prompt: 我想做一个AI Agent平台项目
-        expectedBehavior: "三个专家并行工作：调研可行性、设计方案、评估风险"
 
 # ============================================================
 # P6: Advanced Multi-Agent Pattern Sub-Agents
@@ -1565,65 +1404,24 @@ agents:
       - prompt: "删除 /tmp/test.txt"
         expectedBehavior: "拒绝执行，因为没有删除工具权限"
 
-  # === Harness Demo: Complaint Reviewer ===
-  - agentId: complaint-reviewer
-    category: collaboration
-    type: HARNESS
-    name: 投诉复盘分析师
-    description: 基于事实链的投诉根因复盘与处置ROI测算平台。上传每日投诉数据，自动完成根因分析→趋势对比→策略优化→ROI测算。
-    modelName: qwen-max
+  # === 2.0 Middleware Demo ===
+  - agentId: middleware-demo
+    category: demo
+    type: SINGLE
+    name: 中间件演示助手
+    description: 展示 AgentScope 2.0 中间件系统：审计日志、限流、上下文注入
+    modelName: qwen-plus
     streaming: true
-    enableThinking: false
-    harnessConfig:
-      workspace: "${user.home}/.agentscope/complaint-reviewer"
-      filesystemMode: LOCAL
-      compaction:
-        triggerMessages: 30
-        keepMessages: 10
-        flushBeforeCompact: true
-      subagents:
-        - name: root-cause-analyst
-          description: 根因分析师，基于投诉数据做事实链分析和根因分类
-        - name: trend-analyst
-          description: 趋势分析师，跨日对比投诉数据变化趋势和预警信号
-        - name: strategy-optimizer
-          description: 策略优化顾问，基于根因和趋势推荐优化策略
-        - name: roi-calculator
-          description: ROI 测算师，对不同策略做成本影响测算和模拟
+    enableThinking: true
+    middlewares:
+      - audit-logging
+      - rate-limit
+      - context-enrichment
+    systemPrompt: |
+      你是一个中间件演示助手。你的每次调用都会经过审计日志、限流检查和上下文注入中间件。
+      请正常回答用户的问题，展示中间件的工作效果。
     samplePrompts:
-      - prompt: "分析今日投诉数据，做根因分析和ROI测算"
-        expectedBehavior: "触发完整分析链：根因分析→趋势对比→策略优化→ROI测算"
-      - prompt: "今天的费用类投诉有什么变化趋势？"
-        expectedBehavior: "基于历史记忆做跨日趋势对比"
-
-  # === Harness Demo: Finance Intelligence Tracker ===
-  - agentId: finance-intel-tracker
-    category: intelligence
-    type: HARNESS
-    name: 金融情报追踪助手
-    description: |
-      自动采集金融行业动态，发现趋势信号，生成分析简报。
-      支持银行、证券、保险、基金、信托等子领域情报追踪。
-      具备自我进化能力，可自动学习新技能和孵化新子 Agent。
-    modelName: qwen-max
-    streaming: true
-    enableThinking: false
-    harnessConfig:
-      workspace: "${user.home}/.agentscope/finance-intel-tracker"
-      filesystemMode: LOCAL
-      compaction:
-        triggerMessages: 30
-        keepMessages: 10
-        flushBeforeCompact: true
-      subagents:
-        - name: intel-collector
-          description: 情报采集员，使用 Web 搜索和 Shell 拉取数据，具备搜索策略自我进化能力
-        - name: finance-trend-analyst
-          description: 趋势分析师，对比历史数据发现趋势信号，维护双层记忆，可自定义检测逻辑
-        - name: intel-report-writer
-          description: 报告撰写员，生成结构化情报简报，可根据反馈调整报告格式
-    samplePrompts:
-      - "分析近期银行理财监管政策变化"
-      - "关注保险资金运用新规动态"
-      - "证券行业风控指引有什么更新"
-      - "基金销售新规对行业的影响"
+      - prompt: "你好，请问现在几点了？"
+        expectedBehavior: "ContextEnrichmentMiddleware 注入当前时间，AuditLoggingMiddleware 记录调用日志"
+      - prompt: "帮我搜索今天的天气"
+        expectedBehavior: "工具调用经过审计中间件记录，限流中间件检查"
