@@ -52,6 +52,24 @@ public class AgentRuntimeFactory {
         };
     }
 
+    public StreamingAgentRuntime createRuntime(String agentId, String permissionMode) {
+        log.debug("Creating AgentRuntime for agent: {} [permissionMode={}]", agentId, permissionMode);
+
+        AgentConfig config = configService.getAgentConfig(agentId);
+        AgentType type = config.getType() != null ? config.getType() : AgentType.SINGLE;
+
+        return switch (type) {
+            case SINGLE -> createSingleRuntimeWithPermission(agentId, permissionMode);
+            case ROUTING -> createRoutingRuntime(agentId);
+            case HANDOFFS -> createHandoffsRuntime(agentId);
+            case STATE_GRAPH -> createStateGraphRuntime(agentId);
+            case HARNESS -> createHarnessRuntime(agentId);
+            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, MSG_HUB, SUBAGENT_SEQ, SUBAGENT_PAR ->
+                throw new UnsupportedOperationException(
+                    "Pattern " + type + " is disabled during AgentScope 2.0 migration");
+        };
+    }
+
     /**
      * @deprecated Use {@link #createRuntimeWithSession(String, Session)} instead.
      *             Memory-based creation will be removed once 2.0 migration is complete.
@@ -94,6 +112,24 @@ public class AgentRuntimeFactory {
                 throw new UnsupportedOperationException(
                     "Pattern " + type + " is disabled during AgentScope 2.0 migration (pipeline package removed). " +
                     "Will be reimplemented using 2.0 subagent/middleware API.");
+        };
+    }
+
+    public StreamingAgentRuntime createRuntimeWithSession(String agentId, Session session, String permissionMode) {
+        log.debug("Creating AgentRuntime with session for agent: {} [permissionMode={}]", agentId, permissionMode);
+
+        AgentConfig config = configService.getAgentConfig(agentId);
+        AgentType type = config.getType() != null ? config.getType() : AgentType.SINGLE;
+
+        return switch (type) {
+            case SINGLE -> createSingleRuntimeWithSessionAndPermission(agentId, session, permissionMode);
+            case ROUTING -> createRoutingRuntimeWithSession(agentId, session);
+            case HANDOFFS -> createHandoffsRuntimeWithSession(agentId, session);
+            case STATE_GRAPH -> createStateGraphRuntimeWithSession(agentId, session);
+            case HARNESS -> createHarnessRuntimeWithSession(agentId, session);
+            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, MSG_HUB, SUBAGENT_SEQ, SUBAGENT_PAR ->
+                throw new UnsupportedOperationException(
+                    "Pattern " + type + " is disabled during AgentScope 2.0 migration");
         };
     }
 
@@ -190,6 +226,38 @@ public class AgentRuntimeFactory {
     private StreamingAgentRuntime createHarnessRuntimeWithSession(String agentId, Session session) {
         log.debug("HARNESS runtime not yet implemented, falling back to SINGLE for agent: {}", agentId);
         return createSingleRuntimeWithSession(agentId, session);
+    }
+
+    // ---- Permission-aware runtime helpers ----
+
+    private StreamingAgentRuntime createSingleRuntimeWithPermission(String agentId, String permissionMode) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        ApprovalHook approvalHook = createApprovalHookIfNeeded(config);
+
+        ReActAgent agent = approvalHook != null
+                ? compositeFactory.createSingleAgent(agentId, permissionMode, hook, approvalHook)
+                : compositeFactory.createSingleAgent(agentId, permissionMode, hook);
+
+        if (hasStructuredOutput(config)) {
+            return new StructuredOutputAgentRuntime(agent, hook, config.getStructuredOutputClass());
+        }
+        return new AgentRuntime(agent, hook, approvalHook, approvalService, agentId);
+    }
+
+    private StreamingAgentRuntime createSingleRuntimeWithSessionAndPermission(String agentId, Session session, String permissionMode) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        ApprovalHook approvalHook = createApprovalHookIfNeeded(config);
+
+        ReActAgent agent = approvalHook != null
+                ? compositeFactory.createSingleAgentForSession(agentId, session, permissionMode, hook, approvalHook)
+                : compositeFactory.createSingleAgentForSession(agentId, session, permissionMode, hook);
+
+        if (hasStructuredOutput(config)) {
+            return new StructuredOutputAgentRuntime(agent, hook, config.getStructuredOutputClass());
+        }
+        return new AgentRuntime(agent, hook, approvalHook, approvalService, agentId);
     }
 
     // ---- Shared helpers ----

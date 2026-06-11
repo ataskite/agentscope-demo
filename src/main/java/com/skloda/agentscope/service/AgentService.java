@@ -103,6 +103,17 @@ public class AgentService {
                                                        ChatRequest.AudioFile audio,
                                                        String userId,
                                                        String executionMode) {
+        return createStreamFlux(agentId, message, filePath, fileName, sessionId, images, audio, userId, executionMode, null);
+    }
+
+    public Flux<Map<String, Object>> createStreamFlux(String agentId, String message,
+                                                       String filePath, String fileName,
+                                                       String sessionId,
+                                                       List<ChatRequest.ImageFile> images,
+                                                       ChatRequest.AudioFile audio,
+                                                       String userId,
+                                                       String executionMode,
+                                                       String permissionMode) {
         Msg userMsg = buildUserMessage(message, filePath, fileName, images, audio);
 
         // Route HARNESS type to HarnessAgentService
@@ -116,13 +127,13 @@ public class AgentService {
         String runId = workflowRunService.startRun(agentId, sessionId,
                 buildInputPreview(message, filePath, fileName, images, audio));
 
-        // Session mode: reuse cached agent
         Flux<Map<String, Object>> stream;
         if (sessionId != null && !sessionId.isBlank()) {
-            stream = createSessionStreamFlux(sessionId, agentId, userMsg);
+            stream = createSessionStreamFlux(sessionId, agentId, userMsg, permissionMode);
         } else {
-            // Stateless mode: fresh agent per request
-            StreamingAgentRuntime runtime = runtimeFactory.createRuntime(agentId);
+            StreamingAgentRuntime runtime = (permissionMode != null && !permissionMode.isBlank())
+                    ? runtimeFactory.createRuntime(agentId, permissionMode)
+                    : runtimeFactory.createRuntime(agentId);
             stream = runtime.stream(userMsg);
         }
 
@@ -131,14 +142,15 @@ public class AgentService {
     }
 
     private Flux<Map<String, Object>> createSessionStreamFlux(String sessionId, String agentId,
-                                                                Msg userMsg) {
+                                                                Msg userMsg, String permissionMode) {
         SessionManagerService.SessionContext ctx =
                 sessionManagerService.getOrCreateSession(sessionId, agentId);
 
         String effectiveSessionId = ctx.getSessionId();
 
-        // Create runtime with shared session — new agent per request, session persists
-        StreamingAgentRuntime runtime = runtimeFactory.createRuntimeWithSession(agentId, ctx.getSession());
+        StreamingAgentRuntime runtime = (permissionMode != null && !permissionMode.isBlank())
+                ? runtimeFactory.createRuntimeWithSession(agentId, ctx.getSession(), permissionMode)
+                : runtimeFactory.createRuntimeWithSession(agentId, ctx.getSession());
 
         return runtime.stream(userMsg)
                 .doFinally(signal -> {

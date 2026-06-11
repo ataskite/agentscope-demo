@@ -63,11 +63,19 @@ public class CompositeAgentFactory {
         return singleAgentFactory.createAgent(agentId, hooks);
     }
 
+    public ReActAgent createSingleAgent(String agentId, String permissionMode, Hook... hooks) {
+        return singleAgentFactory.createAgent(agentId, permissionMode, hooks);
+    }
+
     /**
      * Create a single agent for session use (with externally provided Session).
      */
     public ReActAgent createSingleAgentForSession(String agentId, Session session, Hook... hooks) {
         return singleAgentFactory.createAgentForSession(agentId, session, hooks);
+    }
+
+    public ReActAgent createSingleAgentForSession(String agentId, Session session, String permissionMode, Hook... hooks) {
+        return singleAgentFactory.createAgentForSession(agentId, session, permissionMode, hooks);
     }
 
     /**

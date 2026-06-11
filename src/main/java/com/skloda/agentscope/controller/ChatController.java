@@ -140,7 +140,8 @@ public class ChatController {
                         request.getImages(),
                         request.getAudio(),
                         request.getUserId(),
-                        request.getExecutionMode())
+                        request.getExecutionMode(),
+                        request.getPermissionMode())
                 .takeUntil(this::isDoneEvent)
                 .map(this::sseEvent)
                 .onErrorResume(e -> {
