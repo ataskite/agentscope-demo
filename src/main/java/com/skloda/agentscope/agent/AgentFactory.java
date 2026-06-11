@@ -21,6 +21,7 @@ import io.agentscope.core.model.StructuredOutputReminder;
 import io.agentscope.core.rag.RAGMode;
 import io.agentscope.core.rag.model.RetrieveConfig;
 import io.agentscope.core.session.InMemorySession;
+import io.agentscope.core.session.JsonSession;
 import io.agentscope.core.session.Session;
 import io.agentscope.core.skill.SkillBox;
 import io.agentscope.core.skill.repository.ClasspathSkillRepository;
@@ -67,6 +68,16 @@ public class AgentFactory {
      * Create a session for a persistent session (2.0 replaces Memory with Session).
      */
     public Session createSession() {
+        return new InMemorySession();
+    }
+
+    public Session createSession(String type, String storagePath) {
+        if ("json".equalsIgnoreCase(type)) {
+            java.nio.file.Path dir = (storagePath != null && !storagePath.isBlank())
+                    ? java.nio.file.Path.of(storagePath)
+                    : java.nio.file.Path.of(System.getProperty("user.home"), ".agentscope", "demo-sessions");
+            return new JsonSession(dir);
+        }
         return new InMemorySession();
     }
 

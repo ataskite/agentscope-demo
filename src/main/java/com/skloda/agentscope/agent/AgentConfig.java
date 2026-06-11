@@ -82,12 +82,22 @@ public class AgentConfig {
     // === Permission fields ===
     private PermissionConfig permissionConfig;
 
+    // === Session fields ===
+    private SessionConfig sessionConfig;
+
     @Setter
     @Getter
     public static class PermissionConfig {
         private String defaultMode = "bypass";
         private List<String> denyTools = new ArrayList<>();
         private List<String> askTools = new ArrayList<>();
+    }
+
+    @Setter
+    @Getter
+    public static class SessionConfig {
+        private String defaultType = "memory";
+        private String storagePath;
     }
 
     @Setter

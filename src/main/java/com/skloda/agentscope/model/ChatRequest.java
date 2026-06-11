@@ -13,6 +13,7 @@ public class ChatRequest {
     private String userId;
     private String executionMode;
     private String permissionMode;
+    private String sessionType;
 
     public String getUserId() {
         return userId;
@@ -36,6 +37,14 @@ public class ChatRequest {
 
     public void setPermissionMode(String permissionMode) {
         this.permissionMode = permissionMode;
+    }
+
+    public String getSessionType() {
+        return sessionType;
+    }
+
+    public void setSessionType(String sessionType) {
+        this.sessionType = sessionType;
     }
 
     // Multi-modal support
