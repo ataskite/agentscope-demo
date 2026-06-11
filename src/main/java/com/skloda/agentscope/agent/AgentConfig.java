@@ -79,6 +79,17 @@ public class AgentConfig {
     // === Middleware fields ===
     private List<String> middlewares = new ArrayList<>();
 
+    // === Permission fields ===
+    private PermissionConfig permissionConfig;
+
+    @Setter
+    @Getter
+    public static class PermissionConfig {
+        private String defaultMode = "bypass";
+        private List<String> denyTools = new ArrayList<>();
+        private List<String> askTools = new ArrayList<>();
+    }
+
     @Setter
     @Getter
     public static class LongTermMemoryConfig {

@@ -357,6 +357,7 @@ public class ChatController {
         target.setStructuredOutputReminder(source.getStructuredOutputReminder());
         target.setType(source.getType());
         target.setHarnessConfig(source.getHarnessConfig());
+        target.setPermissionConfig(source.getPermissionConfig());
         target.setSubAgents(new ArrayList<>(source.getSubAgents()));
         target.setParallel(source.getParallel());
         target.setHandoffTriggers(new ArrayList<>(source.getHandoffTriggers()));
