@@ -8,6 +8,7 @@ const CATEGORIES = [
     { key: 'single',        label: 'Single Agent',       icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>', color: 'cyan'    },
     { key: 'expert',        label: 'Expert Agent',       icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg>', color: 'green'   },
     { key: 'collaboration', label: 'Multi-Agent',        icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="12" y1="8" x2="5" y2="16"/><line x1="12" y1="8" x2="19" y2="16"/><line x1="5" y1="19" x2="19" y2="19"/></svg>', color: 'magenta' },
+    { key: 'demo',          label: '2.0 Feature Demo',   icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>', color: 'yellow'  },
     { key: 'harness',       label: 'Harness Agent',      icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 12h10"/><path d="M12 7v10"/><circle cx="12" cy="12" r="3"/></svg>', color: 'orange'  },
 ];
 
@@ -178,6 +179,9 @@ export async function selectAgent(agentId) {
 
     // Show sample prompts if available
     showSamplePrompts(agentId);
+
+    // Show/hide permission mode selector
+    renderPermissionSelector(agents[agentId].config);
 
     // Clear messages and restore empty state
     var chatEmpty = document.getElementById('chatEmpty');
@@ -599,4 +603,41 @@ window.setHarnessMode = function(mode) {
     if (builderSelector) {
         builderSelector.style.display = mode === 'BUILDER' ? 'flex' : 'none';
     }
+};
+
+window.renderPermissionSelector = function(agentConfig) {
+    var container = document.getElementById('permissionModeContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!agentConfig || !agentConfig.permissionConfig) {
+        container.style.display = 'none';
+        window.permissionMode = null;
+        return;
+    }
+
+    container.style.display = 'flex';
+    var modes = [
+        { value: 'explore', label: 'EXPLORE (只读)', desc: '只允许读取操作' },
+        { value: 'accept_edits', label: 'ACCEPT_EDITS (编辑)', desc: '允许读写，危险操作需审批' },
+        { value: 'bypass', label: 'BYPASS (无限制)', desc: '所有工具均可使用' }
+    ];
+
+    var defaultMode = agentConfig.permissionConfig.defaultMode || 'explore';
+
+    modes.forEach(function(m) {
+        var btn = document.createElement('button');
+        btn.className = 'perm-mode-btn' + (m.value === defaultMode ? ' active' : '');
+        btn.dataset.mode = m.value;
+        btn.title = m.desc;
+        btn.textContent = m.label;
+        btn.onclick = function() {
+            container.querySelectorAll('.perm-mode-btn').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            window.permissionMode = m.value;
+        };
+        container.appendChild(btn);
+    });
+
+    window.permissionMode = defaultMode;
 };

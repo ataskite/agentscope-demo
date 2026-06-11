@@ -84,7 +84,8 @@ async function sendMessage() {
             fileName: fileInfo ? fileInfo.fileName : null,
             sessionId: currentSessionId || null,
             userId: window.builderUserId || null,
-            executionMode: window.harnessMode || null
+            executionMode: window.harnessMode || null,
+            permissionMode: window.permissionMode || null
         };
 
         // Add images if any
