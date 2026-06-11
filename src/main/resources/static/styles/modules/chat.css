@@ -838,3 +838,31 @@
     border-color: var(--accent, #6c5ce7);
     color: var(--text, #ccc);
 }
+
+/* ===== SESSION TYPE SELECTOR ===== */
+.session-type-container {
+    display: flex;
+    gap: 6px;
+    padding: 8px 16px;
+    background: var(--bg-secondary, #1e1e2e);
+    border-top: 1px solid var(--border, #333);
+}
+.session-type-btn {
+    padding: 4px 12px;
+    border: 1px solid var(--border, #444);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-muted, #888);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.session-type-btn.active {
+    background: var(--accent-green, #00b894);
+    color: #fff;
+    border-color: var(--accent-green, #00b894);
+}
+.session-type-btn:hover:not(.active) {
+    border-color: var(--accent-green, #00b894);
+    color: var(--text, #ccc);
+}

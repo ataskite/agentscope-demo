@@ -85,7 +85,8 @@ async function sendMessage() {
             sessionId: currentSessionId || null,
             userId: window.builderUserId || null,
             executionMode: window.harnessMode || null,
-            permissionMode: window.permissionMode || null
+            permissionMode: window.permissionMode || null,
+            sessionType: window.sessionType || null
         };
 
         // Add images if any

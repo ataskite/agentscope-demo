@@ -19,7 +19,8 @@ const state = window.__agentScopeState || (window.__agentScopeState = {
     currentFileInfo: null,
     builderUserId: 'demo-user',
     harnessMode: null,
-    permissionMode: null
+    permissionMode: null,
+    sessionType: null
 });
 
 let currentAgent = state.currentAgent;
@@ -152,6 +153,11 @@ defineWindowStateProperty('harnessMode', {
 defineWindowStateProperty('permissionMode', {
     get: function() { return state.permissionMode; },
     set: function(val) { state.permissionMode = val; }
+});
+
+defineWindowStateProperty('sessionType', {
+    get: function() { return state.sessionType; },
+    set: function(val) { state.sessionType = val; }
 });
 
 // Export for use in other modules (optional, for transparency)

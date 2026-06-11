@@ -183,6 +183,9 @@ export async function selectAgent(agentId) {
     // Show/hide permission mode selector
     renderPermissionSelector(agents[agentId].config);
 
+    // Show/hide session type selector
+    window.renderSessionTypeSelector(agents[agentId].config);
+
     // Clear messages and restore empty state
     var chatEmpty = document.getElementById('chatEmpty');
     document.getElementById('chatMessages').innerHTML = '';
@@ -640,4 +643,40 @@ window.renderPermissionSelector = function(agentConfig) {
     });
 
     window.permissionMode = defaultMode;
+};
+
+window.renderSessionTypeSelector = function(agentConfig) {
+    var container = document.getElementById('sessionTypeContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!agentConfig || !agentConfig.sessionConfig) {
+        container.style.display = 'none';
+        window.sessionType = null;
+        return;
+    }
+
+    container.style.display = 'flex';
+    var types = [
+        { value: 'memory', label: 'InMemory (内存)', desc: '内存会话，重启丢失' },
+        { value: 'json', label: 'JsonSession (持久)', desc: '文件持久化，重启恢复' }
+    ];
+
+    var defaultType = agentConfig.sessionConfig.defaultType || 'memory';
+
+    types.forEach(function(t) {
+        var btn = document.createElement('button');
+        btn.className = 'session-type-btn' + (t.value === defaultType ? ' active' : '');
+        btn.dataset.type = t.value;
+        btn.title = t.desc;
+        btn.textContent = t.label;
+        btn.onclick = function() {
+            container.querySelectorAll('.session-type-btn').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            window.sessionType = t.value;
+        };
+        container.appendChild(btn);
+    });
+
+    window.sessionType = defaultType;
 };
