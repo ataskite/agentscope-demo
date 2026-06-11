@@ -1409,22 +1409,25 @@ agents:
     category: demo
     type: SINGLE
     name: 中间件演示助手
-    description: 展示 AgentScope 2.0 中间件系统：审计日志、限流、上下文注入
+    description: 展示 AgentScope 2.0 中间件系统：详细审计、指标收集、限流、上下文注入
     modelName: qwen-plus
     streaming: true
     enableThinking: true
     middlewares:
-      - audit-logging
+      - detailed-audit
+      - metrics-collector
       - rate-limit
       - context-enrichment
     systemPrompt: |
-      你是一个中间件演示助手。你的每次调用都会经过审计日志、限流检查和上下文注入中间件。
+      你是一个中间件演示助手。你的每次调用都会经过详细审计、指标收集、限流检查和上下文注入中间件。
       请正常回答用户的问题，展示中间件的工作效果。
     samplePrompts:
       - prompt: "你好，请问现在几点了？"
-        expectedBehavior: "ContextEnrichmentMiddleware 注入当前时间，AuditLoggingMiddleware 记录调用日志"
+        expectedBehavior: "ContextEnrichmentMiddleware 注入当前时间，DetailedAuditMiddleware 输出完整执行链路，MetricsCollectorMiddleware 收集性能指标"
       - prompt: "帮我搜索今天的天气"
-        expectedBehavior: "工具调用经过审计中间件记录，限流中间件检查"
+        expectedBehavior: "工具调用经过详细审计（参数、结果、耗时），限流中间件检查，指标统计更新"
+      - prompt: "计算 123 * 456"
+        expectedBehavior: "计算工具调用被完整审计，工具参数和结果都会被记录"
 
   # === 2.0 Permission Demo ===
   - agentId: permission-demo

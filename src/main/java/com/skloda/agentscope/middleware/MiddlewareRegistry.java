@@ -19,6 +19,23 @@ public class MiddlewareRegistry {
         log.debug("Registered middleware: {}", name);
     }
 
+    /**
+     * Auto-register all built-in middlewares
+     */
+    @javax.annotation.PostConstruct
+    public void registerBuiltInMiddlewares() {
+        // Basic middlewares
+        register("audit-logging", AuditLoggingMiddleware::new);
+        register("rate-limit", RateLimitMiddleware::new);
+        register("context-enrichment", ContextEnrichmentMiddleware::new);
+
+        // Enhanced middlewares
+        register("detailed-audit", DetailedAuditMiddleware::new);
+        register("metrics-collector", MetricsCollectorMiddleware::new);
+
+        log.info("Registered {} built-in middlewares: {}", registry.size(), getRegisteredNames());
+    }
+
     public MiddlewareBase create(String name) {
         Supplier<MiddlewareBase> factory = registry.get(name);
         if (factory == null) {
