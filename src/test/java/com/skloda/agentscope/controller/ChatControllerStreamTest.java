@@ -53,7 +53,9 @@ class ChatControllerStreamTest {
                                                           java.util.List<ChatRequest.ImageFile> images,
                                                           ChatRequest.AudioFile audio,
                                                           String userId,
-                                                          String executionMode) {
+                                                          String executionMode,
+                                                          String permissionMode,
+                                                          String sessionType) {
             return stream;
         }
     }
