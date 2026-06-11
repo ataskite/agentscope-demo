@@ -192,7 +192,7 @@ public class MetricsCollectorMiddleware implements MiddlewareBase {
         double cost = estimateCost(tokens);
         metricsLog.info("  Estimated Cost: ¥{}", String.format("%.4f", cost));
 
-        metricsLog.info("\nTool Statistics:");
+        metricsLog.info("Tool Statistics:");
         TOOL_METRICS.forEach((tool, metrics) -> {
             double avgDuration = metrics.callCount.get() > 0
                 ? (double) metrics.totalDuration.get() / metrics.callCount.get()
@@ -201,26 +201,26 @@ public class MetricsCollectorMiddleware implements MiddlewareBase {
                 ? (double) metrics.errorCount.get() / metrics.callCount.get() * 100
                 : 0;
 
-            metricsLog.info("  {} - Calls: {}, Avg: {:.1f}ms, Min: {}ms, Max: {}ms, Errors: {} ({:.1f}%)",
+            metricsLog.info("  {} - Calls: {}, Avg: {}ms, Min: {}ms, Max: {}ms, Errors: {} ({}%)",
                     tool,
                     metrics.callCount.get(),
-                    avgDuration,
+                    String.format("%.1f", avgDuration),
                     metrics.minDuration.get(),
                     metrics.maxDuration.get(),
                     metrics.errorCount.get(),
-                    errorRate);
+                    String.format("%.1f", errorRate));
         });
 
-        metricsLog.info("\nAgent Statistics:");
+        metricsLog.info("Agent Statistics:");
         AGENT_METRICS.forEach((agent, metrics) -> {
             double avgDuration = metrics.callCount.get() > 0
                 ? (double) metrics.totalDuration.get() / metrics.callCount.get()
                 : 0;
 
-            metricsLog.info("  {} - Calls: {}, Avg: {:.1f}ms, Min: {}ms, Max: {}ms",
+            metricsLog.info("  {} - Calls: {}, Avg: {}ms, Min: {}ms, Max: {}ms",
                     agent,
                     metrics.callCount.get(),
-                    avgDuration,
+                    String.format("%.1f", avgDuration),
                     metrics.minDuration.get(),
                     metrics.maxDuration.get());
         });

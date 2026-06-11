@@ -8,6 +8,7 @@ import com.skloda.agentscope.agent.HandoffTrigger;
 import com.skloda.agentscope.agent.StateConfig;
 import com.skloda.agentscope.agent.SubAgentConfig;
 import com.skloda.agentscope.agent.TriggerType;
+import com.skloda.agentscope.hook.ApprovalHook;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.AgentBase;
 import io.agentscope.core.agent.StreamOptions;
@@ -63,8 +64,16 @@ public class CompositeAgentFactory {
         return singleAgentFactory.createAgent(agentId, hooks);
     }
 
+    public ReActAgent createSingleAgent(String agentId, Hook hook, ApprovalHook approvalHook) {
+        return singleAgentFactory.createAgent(agentId, mergeHooks(hook, approvalHook));
+    }
+
     public ReActAgent createSingleAgent(String agentId, String permissionMode, Hook... hooks) {
         return singleAgentFactory.createAgent(agentId, permissionMode, hooks);
+    }
+
+    public ReActAgent createSingleAgent(String agentId, String permissionMode, Hook hook, ApprovalHook approvalHook) {
+        return singleAgentFactory.createAgent(agentId, permissionMode, mergeHooks(hook, approvalHook));
     }
 
     /**
@@ -74,8 +83,26 @@ public class CompositeAgentFactory {
         return singleAgentFactory.createAgentForSession(agentId, session, hooks);
     }
 
+    public ReActAgent createSingleAgentForSession(String agentId, Session session, Hook hook, ApprovalHook approvalHook) {
+        return singleAgentFactory.createAgentForSession(agentId, session, mergeHooks(hook, approvalHook));
+    }
+
     public ReActAgent createSingleAgentForSession(String agentId, Session session, String permissionMode, Hook... hooks) {
         return singleAgentFactory.createAgentForSession(agentId, session, permissionMode, hooks);
+    }
+
+    public ReActAgent createSingleAgentForSession(String agentId, Session session, String permissionMode, Hook hook, ApprovalHook approvalHook) {
+        return singleAgentFactory.createAgentForSession(agentId, session, permissionMode, mergeHooks(hook, approvalHook));
+    }
+
+    /**
+     * Merge hooks into a single array for vararg methods.
+     */
+    private Hook[] mergeHooks(Hook hook, ApprovalHook approvalHook) {
+        if (approvalHook == null) {
+            return new Hook[] { hook };
+        }
+        return new Hook[] { hook, approvalHook };
     }
 
     /**
@@ -84,6 +111,14 @@ public class CompositeAgentFactory {
     @Deprecated
     public ReActAgent createSingleAgentForSession(String agentId, io.agentscope.core.memory.Memory memory, Hook... hooks) {
         return singleAgentFactory.createAgent(agentId, hooks);
+    }
+
+    /**
+     * @deprecated Use {@link #createSingleAgentForSession(String, Session, Hook...)} instead.
+     */
+    @Deprecated
+    public ReActAgent createSingleAgentForSession(String agentId, io.agentscope.core.memory.Memory memory, Hook hook, ApprovalHook approvalHook) {
+        return singleAgentFactory.createAgent(agentId, mergeHooks(hook, approvalHook));
     }
 
     public Session createSession() {
