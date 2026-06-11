@@ -73,5 +73,6 @@ logging:
     root: INFO
     io.agentscope: INFO
     com.msxf.agentscope: INFO
+    METRICS: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

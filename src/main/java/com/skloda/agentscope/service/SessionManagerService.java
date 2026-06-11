@@ -49,21 +49,24 @@ public class SessionManagerService {
         private final Session session;
         private final long createdAt;
         private volatile long lastAccessedAt;
+        private final String sessionType;
 
         SessionContext(String sessionId, String agentId, ReActAgent agent,
-                       Session session) {
+                       Session session, String sessionType) {
             this.sessionId = sessionId;
             this.agentId = agentId;
             this.agent = agent;
             this.session = session;
             this.createdAt = System.currentTimeMillis();
             this.lastAccessedAt = this.createdAt;
+            this.sessionType = sessionType;
         }
 
         public String getSessionId() { return sessionId; }
         public String getAgentId() { return agentId; }
         public ReActAgent getAgent() { return agent; }
         public Session getSession() { return session; }
+        public String getSessionType() { return sessionType; }
 
         public long getLastAccessedAt() { return lastAccessedAt; }
         public void touch() { this.lastAccessedAt = System.currentTimeMillis(); }
@@ -73,11 +76,49 @@ public class SessionManagerService {
         if (sessionId != null && !sessionId.isBlank()) {
             SessionContext cached = activeSessions.get(sessionId);
             if (cached != null) {
+                // Check if session type has changed
+                AgentConfig config = configService.getAgentConfig(agentId);
+                String effectiveType = resolveSessionType(config, sessionType);
+                String cachedType = cached.getSessionType();
+                if (effectiveType != null && !effectiveType.equalsIgnoreCase(cachedType)) {
+                    log.info("Session type changed for sessionId {}: {} -> {}, migrating session",
+                            sessionId, cachedType, effectiveType);
+                    return migrateSession(sessionId, agentId, cached, sessionType, effectiveType);
+                }
                 cached.touch();
                 return cached;
             }
         }
         return createNewSession(agentId, sessionType);
+    }
+
+    private SessionContext migrateSession(String sessionId, String agentId, SessionContext oldContext,
+                                         String requestType, String newType) {
+        Session oldSession = oldContext.getSession();
+        String storagePath = configService.getAgentConfig(agentId).getSessionConfig() != null
+                ? configService.getAgentConfig(agentId).getSessionConfig().getStoragePath() : null;
+
+        // Create new session with requested type
+        Session newSession = agentFactory.createSession(newType, storagePath);
+        ReActAgent newAgent = agentFactory.createAgentForSession(agentId, newSession);
+
+        // Try to load persisted messages if switching to JsonSession
+        if ("json".equalsIgnoreCase(newType)) {
+            try {
+                // JsonSession has a load() method to load persisted messages
+                var loadMethod = newSession.getClass().getMethod("load");
+                loadMethod.invoke(newSession);
+                log.info("Loaded persisted messages into JsonSession {}", sessionId);
+            } catch (Exception e) {
+                log.debug("JsonSession load failed (might not have persisted data yet): {}", e.getMessage());
+            }
+        }
+
+        // Create new context
+        SessionContext newContext = new SessionContext(sessionId, agentId, newAgent, newSession, newType);
+        activeSessions.put(sessionId, newContext);
+        log.info("Migrated session {} from {} to {}", sessionId, oldContext.getSessionType(), newType);
+        return newContext;
     }
 
     public SessionContext getOrCreateSession(String sessionId, String agentId) {
@@ -110,7 +151,7 @@ public class SessionManagerService {
         String storagePath = config.getSessionConfig() != null ? config.getSessionConfig().getStoragePath() : null;
         Session session = agentFactory.createSession(effectiveType, storagePath);
         ReActAgent agent = agentFactory.createAgentForSession(agentId, session);
-        SessionContext ctx = new SessionContext(sessionId, agentId, agent, session);
+        SessionContext ctx = new SessionContext(sessionId, agentId, agent, session, effectiveType);
         activeSessions.put(sessionId, ctx);
         log.info("Created session: {} for agent: {} [type={}]", sessionId, agentId, effectiveType);
         return ctx;

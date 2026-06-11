@@ -673,30 +673,8 @@ window.renderSessionTypeSelector = function(agentConfig) {
         btn.onclick = function() {
             container.querySelectorAll('.session-type-btn').forEach(function(b) { b.classList.remove('active'); });
             btn.classList.add('active');
-            var oldType = window.sessionType;
             window.sessionType = t.value;
-            // Reset session ID and clear chat when switching session type to create new session with new type
-            if (oldType && oldType !== t.value) {
-                window.currentSessionId = null;
-                // Clear chat messages
-                var chatEmpty = document.getElementById('chatEmpty');
-                var chatMessages = document.getElementById('chatMessages');
-                if (chatMessages && chatEmpty) {
-                    chatMessages.innerHTML = '';
-                    chatMessages.appendChild(chatEmpty);
-                    chatEmpty.style.display = 'flex';
-                }
-                window.messageCount = 0;
-                // Clear debug panel
-                var debugRounds = document.getElementById('debugRounds');
-                if (debugRounds) {
-                    debugRounds.innerHTML = '';
-                }
-                window.rounds = [];
-                window.currentRound = null;
-                window.roundNumber = 0;
-                console.log('[Session Type] Switched from', oldType, 'to', t.value, '- session and chat cleared');
-            }
+            console.log('[Session Type] Changed to:', t.value);
         };
         container.appendChild(btn);
     });
