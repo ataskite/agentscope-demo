@@ -1458,3 +1458,29 @@ agents:
         expectedBehavior: "EXPLORE 模式下 write_text_file 被拒绝，提示切换模式"
       - prompt: "执行 ls -la /tmp 命令"
         expectedBehavior: "ACCEPT_EDITS 模式下 execute_shell_command 需要审批"
+
+  # === 2.0 Distributed Session Demo ===
+  - agentId: session-demo
+    category: demo
+    type: SINGLE
+    name: 会话持久化助手
+    description: 展示 AgentScope 2.0 会话持久化 — 内存/文件两种模式实时切换，重启后历史恢复
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    systemPrompt: |
+      你是一个会话持久化演示助手。用户可以切换 InMemory 和 JsonSession 模式来体验不同的会话持久化行为。
+      在 JsonSession 模式下，对话历史会被持久化到文件，应用重启后可以恢复。
+    userTools:
+      - get_current_time
+      - calculate_sum
+      - web_search
+    sessionConfig:
+      defaultType: json
+    samplePrompts:
+      - prompt: "记住我的名字是小明"
+        expectedBehavior: "JsonSession 模式下保存到文件，重启后可恢复"
+      - prompt: "我叫什么名字？"
+        expectedBehavior: "重启后 JsonSession 恢复历史，能记住用户名字"
+      - prompt: "帮我搜索今天的天气"
+        expectedBehavior: "正常工具调用，Session 类型不影响功能"
