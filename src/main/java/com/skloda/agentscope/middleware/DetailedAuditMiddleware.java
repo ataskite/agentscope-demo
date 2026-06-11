@@ -52,11 +52,11 @@ public class DetailedAuditMiddleware implements MiddlewareBase {
         TraceContext context = new TraceContext(traceId, agentName);
         TRACE_CONTEXT.set(context);
 
-        log.info("[audit] ===== Agent Execution Start =====");
-        log.info("[audit] Trace ID: {}", traceId);
-        log.info("[audit] Agent: {}", agentName);
-        log.info("[audit] Input: {} message(s)", msgCount);
-        log.info("[audit] Time: {}", java.time.LocalDateTime.now());
+        System.out.println("[DETAILED-AUDIT] ===== Agent Execution Start =====");
+        System.out.println("[DETAILED-AUDIT] Trace ID: " + traceId);
+        System.out.println("[DETAILED-AUDIT] Agent: " + agentName);
+        System.out.println("[DETAILED-AUDIT] Input: " + msgCount + " message(s)");
+        System.out.println("[DETAILED-AUDIT] Time: " + java.time.LocalDateTime.now());
 
         // Log input messages preview
         if (input.msgs() != null && !input.msgs().isEmpty()) {

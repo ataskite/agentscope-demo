@@ -53,6 +53,8 @@ public class MetricsCollectorMiddleware implements MiddlewareBase {
         MetricsContext context = new MetricsContext(agentName);
         METRICS_CONTEXT.set(context);
 
+        System.out.println("[METRICS-COLLECTOR] Agent start: " + agentName);
+
         long startNanos = System.nanoTime();
 
         return next.apply(input)
@@ -66,15 +68,14 @@ public class MetricsCollectorMiddleware implements MiddlewareBase {
                     updateMin(agentMetrics.minDuration, durationMs);
                     updateMax(agentMetrics.maxDuration, durationMs);
 
-                    // Log metrics summary
+                    // Log metrics summary to console
                     long tokens = context.tokens.get();
                     double cost = estimateCost(tokens);
-                    metricsLog.info("[metrics] Agent: {} | Duration: {}ms | Tools: {} | Tokens: {} | Cost: ¥{}",
-                            agentName,
-                            durationMs,
-                            context.toolCalls.get(),
-                            tokens,
-                            String.format("%.4f", cost));
+                    System.out.println("[METRICS-COLLECTOR] Agent: " + agentName +
+                        " | Duration: " + durationMs + "ms" +
+                        " | Tools: " + context.toolCalls.get() +
+                        " | Tokens: " + tokens +
+                        " | Cost: ¥" + String.format("%.4f", cost));
 
                     // Update global metrics
                     GLOBAL_CALLS.incrementAndGet();
@@ -83,7 +84,7 @@ public class MetricsCollectorMiddleware implements MiddlewareBase {
                 })
                 .doOnError(e -> {
                     GLOBAL_ERRORS.incrementAndGet();
-                    metricsLog.error("[metrics] Agent: {} | ERROR: {}", agentName, e.getMessage());
+                    System.err.println("[METRICS-COLLECTOR] Agent: " + agentName + " | ERROR: " + e.getMessage());
                     METRICS_CONTEXT.remove();
                 });
     }
