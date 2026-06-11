@@ -141,7 +141,8 @@ public class ChatController {
                         request.getAudio(),
                         request.getUserId(),
                         request.getExecutionMode(),
-                        request.getPermissionMode())
+                        request.getPermissionMode(),
+                        request.getSessionType())
                 .takeUntil(this::isDoneEvent)
                 .map(this::sseEvent)
                 .onErrorResume(e -> {
@@ -359,6 +360,7 @@ public class ChatController {
         target.setType(source.getType());
         target.setHarnessConfig(source.getHarnessConfig());
         target.setPermissionConfig(source.getPermissionConfig());
+        target.setSessionConfig(source.getSessionConfig());
         target.setSubAgents(new ArrayList<>(source.getSubAgents()));
         target.setParallel(source.getParallel());
         target.setHandoffTriggers(new ArrayList<>(source.getHandoffTriggers()));

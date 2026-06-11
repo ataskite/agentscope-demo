@@ -114,6 +114,18 @@ public class AgentService {
                                                        String userId,
                                                        String executionMode,
                                                        String permissionMode) {
+        return createStreamFlux(agentId, message, filePath, fileName, sessionId, images, audio, userId, executionMode, permissionMode, null);
+    }
+
+    public Flux<Map<String, Object>> createStreamFlux(String agentId, String message,
+                                                       String filePath, String fileName,
+                                                       String sessionId,
+                                                       List<ChatRequest.ImageFile> images,
+                                                       ChatRequest.AudioFile audio,
+                                                       String userId,
+                                                       String executionMode,
+                                                       String permissionMode,
+                                                       String sessionType) {
         Msg userMsg = buildUserMessage(message, filePath, fileName, images, audio);
 
         // Route HARNESS type to HarnessAgentService
@@ -129,7 +141,7 @@ public class AgentService {
 
         Flux<Map<String, Object>> stream;
         if (sessionId != null && !sessionId.isBlank()) {
-            stream = createSessionStreamFlux(sessionId, agentId, userMsg, permissionMode);
+            stream = createSessionStreamFlux(sessionId, agentId, userMsg, permissionMode, sessionType);
         } else {
             StreamingAgentRuntime runtime = (permissionMode != null && !permissionMode.isBlank())
                     ? runtimeFactory.createRuntime(agentId, permissionMode)
@@ -142,9 +154,10 @@ public class AgentService {
     }
 
     private Flux<Map<String, Object>> createSessionStreamFlux(String sessionId, String agentId,
-                                                                Msg userMsg, String permissionMode) {
+                                                                Msg userMsg, String permissionMode,
+                                                                String sessionType) {
         SessionManagerService.SessionContext ctx =
-                sessionManagerService.getOrCreateSession(sessionId, agentId);
+                sessionManagerService.getOrCreateSession(sessionId, agentId, sessionType);
 
         String effectiveSessionId = ctx.getSessionId();
 

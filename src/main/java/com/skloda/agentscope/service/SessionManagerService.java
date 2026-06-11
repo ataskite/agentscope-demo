@@ -69,7 +69,7 @@ public class SessionManagerService {
         public void touch() { this.lastAccessedAt = System.currentTimeMillis(); }
     }
 
-    public SessionContext getOrCreateSession(String sessionId, String agentId) {
+    public SessionContext getOrCreateSession(String sessionId, String agentId, String sessionType) {
         if (sessionId != null && !sessionId.isBlank()) {
             SessionContext cached = activeSessions.get(sessionId);
             if (cached != null) {
@@ -77,7 +77,11 @@ public class SessionManagerService {
                 return cached;
             }
         }
-        return createNewSession(agentId);
+        return createNewSession(agentId, sessionType);
+    }
+
+    public SessionContext getOrCreateSession(String sessionId, String agentId) {
+        return getOrCreateSession(sessionId, agentId, null);
     }
 
     public SessionContext getOrCreateSessionForAgent(String agentId) {
@@ -91,19 +95,35 @@ public class SessionManagerService {
                 .orElseGet(() -> createNewSession(agentId));
     }
 
-    public SessionContext createNewSession(String agentId) {
+    public SessionContext createNewSession(String agentId, String sessionType) {
         String sessionId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-        return createSessionContext(sessionId, agentId);
+        return createSessionContext(sessionId, agentId, sessionType);
+    }
+
+    public SessionContext createNewSession(String agentId) {
+        return createNewSession(agentId, null);
+    }
+
+    private SessionContext createSessionContext(String sessionId, String agentId, String sessionType) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        String effectiveType = resolveSessionType(config, sessionType);
+        String storagePath = config.getSessionConfig() != null ? config.getSessionConfig().getStoragePath() : null;
+        Session session = agentFactory.createSession(effectiveType, storagePath);
+        ReActAgent agent = agentFactory.createAgentForSession(agentId, session);
+        SessionContext ctx = new SessionContext(sessionId, agentId, agent, session);
+        activeSessions.put(sessionId, ctx);
+        log.info("Created session: {} for agent: {} [type={}]", sessionId, agentId, effectiveType);
+        return ctx;
     }
 
     private SessionContext createSessionContext(String sessionId, String agentId) {
-        Session session = agentFactory.createSession();
-        ReActAgent agent = agentFactory.createAgentForSession(agentId, session);
+        return createSessionContext(sessionId, agentId, (String) null);
+    }
 
-        SessionContext ctx = new SessionContext(sessionId, agentId, agent, session);
-        activeSessions.put(sessionId, ctx);
-        log.info("Created session: {} for agent: {}", sessionId, agentId);
-        return ctx;
+    private String resolveSessionType(AgentConfig config, String requestType) {
+        if (requestType != null && !requestType.isBlank()) return requestType;
+        if (config.getSessionConfig() != null) return config.getSessionConfig().getDefaultType();
+        return "memory";
     }
 
     public void saveSession(String sessionId) {
