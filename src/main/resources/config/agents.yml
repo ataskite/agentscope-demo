@@ -1425,3 +1425,36 @@ agents:
         expectedBehavior: "ContextEnrichmentMiddleware 注入当前时间，AuditLoggingMiddleware 记录调用日志"
       - prompt: "帮我搜索今天的天气"
         expectedBehavior: "工具调用经过审计中间件记录，限流中间件检查"
+
+  # === 2.0 Permission Demo ===
+  - agentId: permission-demo
+    category: demo
+    type: SINGLE
+    name: 权限沙箱助手
+    description: 展示 AgentScope 2.0 工具权限控制 — 只读/编辑/无限制三种模式实时切换
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    systemPrompt: |
+      你是一个权限沙箱演示助手。你拥有多种工具，但不同权限模式下能使用的工具不同。
+      当工具被拒绝时，请向用户解释当前模式下的限制，并建议切换到更宽松的模式。
+    userTools:
+      - get_current_time
+      - calculate_sum
+      - web_search
+      - parse_docx
+    systemTools:
+      - write_text_file
+      - edit_docx
+      - execute_shell_command
+    permissionConfig:
+      defaultMode: explore
+      askTools:
+        - execute_shell_command
+    samplePrompts:
+      - prompt: "现在几点了？"
+        expectedBehavior: "EXPLORE 模式下允许调用 get_current_time"
+      - prompt: "帮我写一个文件到 /tmp/test.txt，内容是 hello world"
+        expectedBehavior: "EXPLORE 模式下 write_text_file 被拒绝，提示切换模式"
+      - prompt: "执行 ls -la /tmp 命令"
+        expectedBehavior: "ACCEPT_EDITS 模式下 execute_shell_command 需要审批"
