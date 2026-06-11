@@ -24,7 +24,7 @@
 - **上传文档**: 支持 PDF、DOCX、TXT、MD 格式
 - **向量相似度搜索**: 基于 DashScope text-embedding-v3
 - **智能问答**: Generic RAG 模式，高效检索增强
-- **状态追踪**: Agent 配置面板实时显示索引状态
+- **状态追踪**: Agent 配置面板实时显示索引状态[cs-strategy-kb](../cs-strategy-kb)
 
 ### 🗂️ 会话管理
 - 持久化会话历史
