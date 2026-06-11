@@ -2,6 +2,8 @@ package com.skloda.agentscope.agent;
 
 import com.skloda.agentscope.middleware.MiddlewareRegistry;
 import com.skloda.agentscope.mcp.McpClientService;
+import com.skloda.agentscope.permission.PermissionContextFactory;
+import io.agentscope.core.permission.PermissionContextState;
 import com.skloda.agentscope.mcp.McpServerRef;
 import com.skloda.agentscope.mcp.ToolGroupConfig;
 import com.skloda.agentscope.service.KnowledgeService;
@@ -47,15 +49,18 @@ public class AgentFactory {
     private final KnowledgeService knowledgeService;
     private final McpClientService mcpClientService;
     private final MiddlewareRegistry middlewareRegistry;
+    private final PermissionContextFactory permissionContextFactory;
 
     public AgentFactory(AgentConfigService configService, ToolRegistry toolRegistry,
                         KnowledgeService knowledgeService, McpClientService mcpClientService,
-                        MiddlewareRegistry middlewareRegistry) {
+                        MiddlewareRegistry middlewareRegistry,
+                        PermissionContextFactory permissionContextFactory) {
         this.configService = configService;
         this.toolRegistry = toolRegistry;
         this.knowledgeService = knowledgeService;
         this.mcpClientService = mcpClientService;
         this.middlewareRegistry = middlewareRegistry;
+        this.permissionContextFactory = permissionContextFactory;
     }
 
     /**
@@ -77,6 +82,14 @@ public class AgentFactory {
      */
     public ReActAgent createAgent(String agentId, Hook... hooks) {
         return buildAgent(agentId, new InMemorySession(), hooks);
+    }
+
+    public ReActAgent createAgentForSession(String agentId, Session session, String permissionMode, Hook... hooks) {
+        return buildAgentWithPermission(agentId, session, permissionMode, hooks);
+    }
+
+    public ReActAgent createAgent(String agentId, String permissionMode, Hook... hooks) {
+        return buildAgentWithPermission(agentId, new InMemorySession(), permissionMode, hooks);
     }
 
     private ReActAgent buildAgent(String agentId, Session session, Hook... hooks) {
@@ -166,6 +179,100 @@ public class AgentFactory {
         builder.enablePendingToolRecovery(true);
 
         return builder.build();
+    }
+
+    private ReActAgent buildAgentWithPermission(String agentId, Session session, String permissionMode, Hook... hooks) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        log.info("Creating agent: {} ({}) [permissionMode={}]", config.getName(), agentId, permissionMode);
+
+        DashScopeChatModel model = DashScopeChatModel.builder()
+                .apiKey(apiKey)
+                .modelName(config.getModelName())
+                .stream(config.isStreaming())
+                .enableThinking(config.isEnableThinking())
+                .formatter(new DashScopeChatFormatter())
+                .build();
+
+        ReActAgent.Builder builder = ReActAgent.builder()
+                .name(config.getName())
+                .sysPrompt(config.getSystemPrompt())
+                .model(model)
+                .session(session)
+                .sessionKey(SimpleSessionKey.of(agentId));
+
+        if (config.isPlanEnabled()) {
+            builder.enablePlan();
+            log.info("  Enabled PlanNotebook for agent: {}", agentId);
+        }
+
+        Toolkit toolkit = new Toolkit();
+        registerToolsAndSkills(builder, toolkit, config, agentId);
+        registerMcpTools(config, toolkit);
+
+        if (config.getStructuredOutputClass() != null && !config.getStructuredOutputClass().isBlank()) {
+            StructuredOutputReminder reminder = "PROMPT".equalsIgnoreCase(config.getStructuredOutputReminder())
+                    ? StructuredOutputReminder.PROMPT
+                    : StructuredOutputReminder.TOOL_CHOICE;
+            builder.structuredOutputReminder(reminder);
+            log.info("  Configured structured output for agent: {} (class={}, mode={})",
+                    agentId, config.getStructuredOutputClass(), reminder);
+        }
+
+        if (config.isRagEnabled()) {
+            RAGMode ragMode = parseRagMode(config.getRagMode());
+            builder.knowledge(knowledgeService.getKnowledge())
+                    .ragMode(ragMode)
+                    .retrieveConfig(RetrieveConfig.builder()
+                            .limit(config.getRagRetrieveLimit())
+                            .scoreThreshold(config.getRagScoreThreshold())
+                            .build());
+            log.info("  Enabled RAG for agent: {} (mode={}, limit={}, threshold={})",
+                    agentId, ragMode, config.getRagRetrieveLimit(), config.getRagScoreThreshold());
+        }
+
+        if (config.getLongTermMemory() != null && !"none".equals(config.getLongTermMemory().getType())) {
+            LongTermMemory ltm = createLongTermMemory(config.getLongTermMemory());
+            if (ltm != null) {
+                LongTermMemoryMode mode = parseLtmMode(config.getLongTermMemory().getMode());
+                builder.longTermMemory(ltm).longTermMemoryMode(mode);
+                log.info("  Enabled long-term memory for agent: {} (type={}, mode={})",
+                        agentId, config.getLongTermMemory().getType(), mode);
+            }
+        }
+
+        if (hooks != null && hooks.length > 0) {
+            builder.hooks(List.of(hooks));
+            log.info("  Registered {} hooks for agent: {}", hooks.length, agentId);
+        }
+
+        if (config.getMiddlewares() != null && !config.getMiddlewares().isEmpty()) {
+            List<MiddlewareBase> middlewares = config.getMiddlewares().stream()
+                    .map(middlewareRegistry::create)
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
+            if (!middlewares.isEmpty()) {
+                builder.middlewares(middlewares);
+                log.info("  Registered {} middlewares for agent: {}", middlewares.size(), agentId);
+            }
+        }
+
+        // Configure permission context
+        String effectiveMode = resolvePermissionMode(config, permissionMode);
+        if (effectiveMode != null) {
+            PermissionContextState permContext = permissionContextFactory.build(
+                    effectiveMode, config.getPermissionConfig());
+            builder.permissionContext(permContext);
+            log.info("  Configured permission mode: {} for agent: {}", effectiveMode, agentId);
+        }
+
+        builder.enablePendingToolRecovery(true);
+        return builder.build();
+    }
+
+    private String resolvePermissionMode(AgentConfig config, String requestMode) {
+        if (config.getPermissionConfig() == null) return null;
+        if (requestMode != null && !requestMode.isBlank()) return requestMode;
+        return config.getPermissionConfig().getDefaultMode();
     }
 
     private void registerToolsAndSkills(ReActAgent.Builder builder, Toolkit toolkit,
