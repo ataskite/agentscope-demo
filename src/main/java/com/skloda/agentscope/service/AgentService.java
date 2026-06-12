@@ -162,8 +162,8 @@ public class AgentService {
         String effectiveSessionId = ctx.getSessionId();
 
         StreamingAgentRuntime runtime = (permissionMode != null && !permissionMode.isBlank())
-                ? runtimeFactory.createRuntimeWithSession(agentId, ctx.getSession(), permissionMode)
-                : runtimeFactory.createRuntimeWithSession(agentId, ctx.getSession());
+                ? runtimeFactory.createRuntimeWithSession(agentId, ctx.getStateStore(), permissionMode)
+                : runtimeFactory.createRuntimeWithSession(agentId, ctx.getStateStore());
 
         return runtime.stream(userMsg)
                 .doFinally(signal -> {

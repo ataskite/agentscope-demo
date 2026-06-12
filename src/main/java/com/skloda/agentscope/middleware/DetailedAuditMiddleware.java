@@ -1,6 +1,7 @@
 package com.skloda.agentscope.middleware;
 
 import io.agentscope.core.agent.Agent;
+import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.AgentEventType;
 import io.agentscope.core.event.ModelCallEndEvent;
@@ -42,7 +43,7 @@ public class DetailedAuditMiddleware implements MiddlewareBase {
     private static final ThreadLocal<TraceContext> TRACE_CONTEXT = new ThreadLocal<>();
 
     @Override
-    public Flux<AgentEvent> onAgent(Agent agent, AgentInput input,
+    public Flux<AgentEvent> onAgent(Agent agent, RuntimeContext ctx, AgentInput input,
                                      Function<AgentInput, Flux<AgentEvent>> next) {
         String traceId = UUID.randomUUID().toString().substring(0, 8);
         String agentName = agent != null ? agent.getName() : "unknown";
@@ -52,11 +53,11 @@ public class DetailedAuditMiddleware implements MiddlewareBase {
         TraceContext context = new TraceContext(traceId, agentName);
         TRACE_CONTEXT.set(context);
 
-        System.out.println("[DETAILED-AUDIT] ===== Agent Execution Start =====");
-        System.out.println("[DETAILED-AUDIT] Trace ID: " + traceId);
-        System.out.println("[DETAILED-AUDIT] Agent: " + agentName);
-        System.out.println("[DETAILED-AUDIT] Input: " + msgCount + " message(s)");
-        System.out.println("[DETAILED-AUDIT] Time: " + java.time.LocalDateTime.now());
+        log.info("[DETAILED-AUDIT] ===== Agent Execution Start =====");
+        log.info("[DETAILED-AUDIT] Trace ID: {}", traceId);
+        log.info("[DETAILED-AUDIT] Agent: {}", agentName);
+        log.info("[DETAILED-AUDIT] Input: {} message(s)", msgCount);
+        log.info("[DETAILED-AUDIT] Time: {}", java.time.LocalDateTime.now());
 
         // Log input messages preview
         if (input.msgs() != null && !input.msgs().isEmpty()) {
@@ -107,7 +108,7 @@ public class DetailedAuditMiddleware implements MiddlewareBase {
     }
 
     @Override
-    public Flux<AgentEvent> onReasoning(Agent agent, ReasoningInput input,
+    public Flux<AgentEvent> onReasoning(Agent agent, RuntimeContext ctx, ReasoningInput input,
                                          Function<ReasoningInput, Flux<AgentEvent>> next) {
         TraceContext context = TRACE_CONTEXT.get();
         if (context != null) {
@@ -178,7 +179,7 @@ public class DetailedAuditMiddleware implements MiddlewareBase {
     }
 
     @Override
-    public Flux<AgentEvent> onActing(Agent agent, ActingInput input,
+    public Flux<AgentEvent> onActing(Agent agent, RuntimeContext ctx, ActingInput input,
                                       Function<ActingInput, Flux<AgentEvent>> next) {
         TraceContext context = TRACE_CONTEXT.get();
         List<ToolUseBlock> toolCalls = input.toolCalls();
@@ -240,7 +241,7 @@ public class DetailedAuditMiddleware implements MiddlewareBase {
     }
 
     @Override
-    public Flux<AgentEvent> onModelCall(Agent agent, ModelCallInput input,
+    public Flux<AgentEvent> onModelCall(Agent agent, RuntimeContext ctx, ModelCallInput input,
                                         Function<ModelCallInput, Flux<AgentEvent>> next) {
         TraceContext context = TRACE_CONTEXT.get();
 

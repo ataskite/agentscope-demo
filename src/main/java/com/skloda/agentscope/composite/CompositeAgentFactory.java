@@ -15,10 +15,8 @@ import io.agentscope.core.agent.StreamOptions;
 import io.agentscope.core.formatter.dashscope.DashScopeChatFormatter;
 import io.agentscope.core.hook.Hook;
 import io.agentscope.core.model.DashScopeChatModel;
-import io.agentscope.core.session.Session;
-import io.agentscope.core.session.InMemorySession;
-import io.agentscope.core.state.SessionKey;
-import io.agentscope.core.state.SimpleSessionKey;
+import io.agentscope.core.state.AgentStateStore;
+import io.agentscope.core.state.InMemoryAgentStateStore;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.core.tool.subagent.SubAgentProvider;
 import io.agentscope.core.tool.subagent.SubAgentTool;
@@ -77,22 +75,22 @@ public class CompositeAgentFactory {
     }
 
     /**
-     * Create a single agent for session use (with externally provided Session).
+     * Create a single agent for session use (with externally provided AgentStateStore).
      */
-    public ReActAgent createSingleAgentForSession(String agentId, Session session, Hook... hooks) {
-        return singleAgentFactory.createAgentForSession(agentId, session, hooks);
+    public ReActAgent createSingleAgentForSession(String agentId, AgentStateStore stateStore, Hook... hooks) {
+        return singleAgentFactory.createAgentForSession(agentId, stateStore, hooks);
     }
 
-    public ReActAgent createSingleAgentForSession(String agentId, Session session, Hook hook, ApprovalHook approvalHook) {
-        return singleAgentFactory.createAgentForSession(agentId, session, mergeHooks(hook, approvalHook));
+    public ReActAgent createSingleAgentForSession(String agentId, AgentStateStore stateStore, Hook hook, ApprovalHook approvalHook) {
+        return singleAgentFactory.createAgentForSession(agentId, stateStore, mergeHooks(hook, approvalHook));
     }
 
-    public ReActAgent createSingleAgentForSession(String agentId, Session session, String permissionMode, Hook... hooks) {
-        return singleAgentFactory.createAgentForSession(agentId, session, permissionMode, hooks);
+    public ReActAgent createSingleAgentForSession(String agentId, AgentStateStore stateStore, String permissionMode, Hook... hooks) {
+        return singleAgentFactory.createAgentForSession(agentId, stateStore, permissionMode, hooks);
     }
 
-    public ReActAgent createSingleAgentForSession(String agentId, Session session, String permissionMode, Hook hook, ApprovalHook approvalHook) {
-        return singleAgentFactory.createAgentForSession(agentId, session, permissionMode, mergeHooks(hook, approvalHook));
+    public ReActAgent createSingleAgentForSession(String agentId, AgentStateStore stateStore, String permissionMode, Hook hook, ApprovalHook approvalHook) {
+        return singleAgentFactory.createAgentForSession(agentId, stateStore, permissionMode, mergeHooks(hook, approvalHook));
     }
 
     /**
@@ -105,8 +103,8 @@ public class CompositeAgentFactory {
         return new Hook[] { hook, approvalHook };
     }
 
-    public Session createSession() {
-        return singleAgentFactory.createSession();
+    public AgentStateStore createStateStore() {
+        return singleAgentFactory.createStateStore();
     }
 
     public List<AgentBase> createSubAgents(AgentConfig config) {
@@ -120,7 +118,7 @@ public class CompositeAgentFactory {
                 .toList();
     }
 
-    public OrderFulfillmentGraph createStateGraphAgent(AgentConfig config, Session session) {
+    public OrderFulfillmentGraph createStateGraphAgent(AgentConfig config, AgentStateStore stateStore) {
         List<StateConfig> states = config.getStates();
         if (states == null || states.isEmpty()) {
             throw new IllegalArgumentException("STATE_GRAPH requires states configuration");
@@ -129,8 +127,8 @@ public class CompositeAgentFactory {
         Map<String, ReActAgent> stateAgents = new LinkedHashMap<>();
         for (StateConfig state : states) {
             if (state.getAgent() != null) {
-                Session effectiveSession = session != null ? session : new InMemorySession();
-                ReActAgent agent = singleAgentFactory.createAgentForSession(state.getAgent(), effectiveSession);
+                AgentStateStore effectiveStore = stateStore != null ? stateStore : new InMemoryAgentStateStore();
+                ReActAgent agent = singleAgentFactory.createAgentForSession(state.getAgent(), effectiveStore);
                 stateAgents.put(state.getName(), agent);
             }
         }
@@ -138,14 +136,14 @@ public class CompositeAgentFactory {
         return new OrderFulfillmentGraph(states, stateAgents);
     }
 
-    public ReActAgent createRoutingAgent(AgentConfig config, Session session, Hook... hooks) {
+    public ReActAgent createRoutingAgent(AgentConfig config, AgentStateStore stateStore, Hook... hooks) {
         if (config.getSubAgents() == null || config.getSubAgents().isEmpty()) {
             throw new IllegalArgumentException("ROUTING agent requires at least one sub-agent: " + config.getAgentId());
         }
 
         log.info("Creating ROUTING agent for: {} with {} sub-agents", config.getAgentId(), config.getSubAgents().size());
 
-        Session effectiveSession = session != null ? session : new InMemorySession();
+        AgentStateStore effectiveStore = stateStore != null ? stateStore : new InMemoryAgentStateStore();
 
         String routingPrompt = buildRoutingSystemPrompt(config);
 
@@ -181,8 +179,8 @@ public class CompositeAgentFactory {
                     .name(subConfig.getAgentId())
                     .sysPrompt(modifiedPrompt)
                     .model(subModel)
-                    .session(new InMemorySession())
-                    .sessionKey(SimpleSessionKey.of(subConfig.getAgentId()))
+                    .stateStore(new InMemoryAgentStateStore())
+                    .defaultSessionId(subConfig.getAgentId())
                     .toolkit(new Toolkit())
                     .enablePendingToolRecovery(true)
                     .build();
@@ -216,8 +214,8 @@ public class CompositeAgentFactory {
                 .name(config.getName() != null ? config.getName() : config.getAgentId())
                 .sysPrompt(routingPrompt)
                 .model(model)
-                .session(effectiveSession)
-                .sessionKey(SimpleSessionKey.of(config.getAgentId()))
+                .stateStore(effectiveStore)
+                .defaultSessionId(config.getAgentId())
                 .toolkit(toolkit);
 
         if (hooks != null && hooks.length > 0) {
@@ -260,7 +258,7 @@ public class CompositeAgentFactory {
         return sb.toString();
     }
 
-    public ReActAgent createHandoffsAgent(AgentConfig config, Session session, Hook... hooks) {
+    public ReActAgent createHandoffsAgent(AgentConfig config, AgentStateStore stateStore, Hook... hooks) {
         if (config.getSubAgents() == null || config.getSubAgents().isEmpty()) {
             throw new IllegalArgumentException("HANDOFFS agent requires at least one sub-agent: " + config.getAgentId());
         }
@@ -269,7 +267,7 @@ public class CompositeAgentFactory {
                 config.getAgentId(), config.getSubAgents().size(),
                 config.getHandoffTriggers() != null ? config.getHandoffTriggers().size() : 0);
 
-        Session effectiveSession = session != null ? session : new InMemorySession();
+        AgentStateStore effectiveStore = stateStore != null ? stateStore : new InMemoryAgentStateStore();
 
         String handoffsPrompt = buildHandoffsSystemPrompt(config);
 
@@ -304,8 +302,8 @@ public class CompositeAgentFactory {
                     .name(subConfig.getAgentId())
                     .sysPrompt(modifiedPrompt)
                     .model(subModel)
-                    .session(new InMemorySession())
-                    .sessionKey(SimpleSessionKey.of(subConfig.getAgentId()))
+                    .stateStore(new InMemoryAgentStateStore())
+                    .defaultSessionId(subConfig.getAgentId())
                     .toolkit(new Toolkit())
                     .enablePendingToolRecovery(true)
                     .build();
@@ -337,8 +335,8 @@ public class CompositeAgentFactory {
                 .name(config.getName() != null ? config.getName() : config.getAgentId())
                 .sysPrompt(handoffsPrompt)
                 .model(model)
-                .session(effectiveSession)
-                .sessionKey(SimpleSessionKey.of(config.getAgentId()))
+                .stateStore(effectiveStore)
+                .defaultSessionId(config.getAgentId())
                 .toolkit(toolkit);
 
         if (hooks != null && hooks.length > 0) {

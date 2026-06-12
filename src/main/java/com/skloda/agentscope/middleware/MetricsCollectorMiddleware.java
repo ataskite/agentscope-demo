@@ -1,6 +1,7 @@
 package com.skloda.agentscope.middleware;
 
 import io.agentscope.core.agent.Agent;
+import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.AgentEventType;
 import io.agentscope.core.event.ModelCallEndEvent;
@@ -47,7 +48,7 @@ public class MetricsCollectorMiddleware implements MiddlewareBase {
     private static final double OUTPUT_TOKEN_COST_PER_1K = 0.002;  // CNY
 
     @Override
-    public Flux<AgentEvent> onAgent(Agent agent, AgentInput input,
+    public Flux<AgentEvent> onAgent(Agent agent, RuntimeContext ctx, AgentInput input,
                                      Function<AgentInput, Flux<AgentEvent>> next) {
         String agentName = agent != null ? agent.getName() : "unknown";
         MetricsContext context = new MetricsContext(agentName);
@@ -90,7 +91,7 @@ public class MetricsCollectorMiddleware implements MiddlewareBase {
     }
 
     @Override
-    public Flux<AgentEvent> onReasoning(Agent agent, ReasoningInput input,
+    public Flux<AgentEvent> onReasoning(Agent agent, RuntimeContext ctx, ReasoningInput input,
                                          Function<ReasoningInput, Flux<AgentEvent>> next) {
         MetricsContext context = METRICS_CONTEXT.get();
         long startNanos = System.nanoTime();
@@ -105,7 +106,7 @@ public class MetricsCollectorMiddleware implements MiddlewareBase {
     }
 
     @Override
-    public Flux<AgentEvent> onActing(Agent agent, ActingInput input,
+    public Flux<AgentEvent> onActing(Agent agent, RuntimeContext ctx, ActingInput input,
                                       Function<ActingInput, Flux<AgentEvent>> next) {
         MetricsContext context = METRICS_CONTEXT.get();
         List<ToolUseBlock> toolCalls = input.toolCalls();
@@ -141,7 +142,7 @@ public class MetricsCollectorMiddleware implements MiddlewareBase {
     }
 
     @Override
-    public Flux<AgentEvent> onModelCall(Agent agent, ModelCallInput input,
+    public Flux<AgentEvent> onModelCall(Agent agent, RuntimeContext ctx, ModelCallInput input,
                                         Function<ModelCallInput, Flux<AgentEvent>> next) {
         MetricsContext context = METRICS_CONTEXT.get();
 

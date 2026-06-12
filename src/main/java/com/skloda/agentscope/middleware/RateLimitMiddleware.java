@@ -1,6 +1,7 @@
 package com.skloda.agentscope.middleware;
 
 import io.agentscope.core.agent.Agent;
+import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.middleware.MiddlewareBase;
 import io.agentscope.core.middleware.ModelCallInput;
@@ -28,7 +29,7 @@ public class RateLimitMiddleware implements MiddlewareBase {
     }
 
     @Override
-    public Flux<AgentEvent> onModelCall(Agent agent, ModelCallInput input,
+    public Flux<AgentEvent> onModelCall(Agent agent, RuntimeContext ctx, ModelCallInput input,
                                          Function<ModelCallInput, Flux<AgentEvent>> next) {
         long now = System.currentTimeMillis();
         long windowStart = now - 60_000;

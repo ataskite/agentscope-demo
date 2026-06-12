@@ -1,6 +1,7 @@
 package com.skloda.agentscope.middleware;
 
 import io.agentscope.core.agent.Agent;
+import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.middleware.*;
 import io.agentscope.core.message.ToolUseBlock;
@@ -16,10 +17,12 @@ public class AuditLoggingMiddleware implements MiddlewareBase {
     private static final Logger log = LoggerFactory.getLogger(AuditLoggingMiddleware.class);
 
     @Override
-    public Flux<AgentEvent> onAgent(Agent agent, AgentInput input,
+    public Flux<AgentEvent> onAgent(Agent agent, RuntimeContext ctx, AgentInput input,
                                      Function<AgentInput, Flux<AgentEvent>> next) {
         String agentName = agent != null ? agent.getName() : "unknown";
         int msgCount = input.msgs() != null ? input.msgs().size() : 0;
+
+        System.out.println("[AUDIT-LOGGING] Agent '" + agentName + "' starting with " + msgCount + " input messages");
         log.info("[audit] Agent '{}' starting with {} input messages", agentName, msgCount);
         long startNanos = System.nanoTime();
 
@@ -32,7 +35,7 @@ public class AuditLoggingMiddleware implements MiddlewareBase {
     }
 
     @Override
-    public Flux<AgentEvent> onReasoning(Agent agent, ReasoningInput input,
+    public Flux<AgentEvent> onReasoning(Agent agent, RuntimeContext ctx, ReasoningInput input,
                                          Function<ReasoningInput, Flux<AgentEvent>> next) {
         int msgCount = input.messages() != null ? input.messages().size() : 0;
         log.info("[audit] Reasoning phase starting with {} messages", msgCount);
@@ -46,7 +49,7 @@ public class AuditLoggingMiddleware implements MiddlewareBase {
     }
 
     @Override
-    public Flux<AgentEvent> onActing(Agent agent, ActingInput input,
+    public Flux<AgentEvent> onActing(Agent agent, RuntimeContext ctx, ActingInput input,
                                       Function<ActingInput, Flux<AgentEvent>> next) {
         List<ToolUseBlock> toolCalls = input.toolCalls();
         for (ToolUseBlock tool : toolCalls) {
