@@ -363,4 +363,160 @@ public class CompositeAgentFactory {
 
         return sb.toString();
     }
+
+    // ---- Pipeline runtime factory methods (SEQUENTIAL, PARALLEL, DEBATE, LOOP, SUBAGENT_SEQ, SUBAGENT_PAR) ----
+
+    public com.skloda.agentscope.runtime.SequentialRuntime createSequentialRuntime(
+            com.skloda.agentscope.agent.AgentConfig config,
+            com.skloda.agentscope.hook.ObservabilityHook hook,
+            io.agentscope.core.state.AgentStateStore stateStore) {
+
+        io.agentscope.core.state.AgentStateStore effectiveStore = stateStore != null ? stateStore : new io.agentscope.core.state.InMemoryAgentStateStore();
+
+        List<ReActAgent> agents = config.getSubAgents().stream()
+                .map(sub -> singleAgentFactory.createAgentForSession(sub.getAgentId(), effectiveStore, null))
+                .toList();
+
+        return new com.skloda.agentscope.runtime.SequentialRuntime(agents, hook, config.getAgentId());
+    }
+
+    public com.skloda.agentscope.runtime.ParallelRuntime createParallelRuntime(
+            com.skloda.agentscope.agent.AgentConfig config,
+            com.skloda.agentscope.hook.ObservabilityHook hook,
+            io.agentscope.core.state.AgentStateStore stateStore) {
+
+        io.agentscope.core.state.AgentStateStore effectiveStore = stateStore != null ? stateStore : new io.agentscope.core.state.InMemoryAgentStateStore();
+
+        List<ReActAgent> agents = config.getSubAgents().stream()
+                .map(sub -> singleAgentFactory.createAgentForSession(sub.getAgentId(), effectiveStore, null))
+                .toList();
+
+        return new com.skloda.agentscope.runtime.ParallelRuntime(agents, hook, config.getAgentId());
+    }
+
+    public com.skloda.agentscope.runtime.DebateRuntime createDebateRuntime(
+            com.skloda.agentscope.agent.AgentConfig config,
+            com.skloda.agentscope.hook.ObservabilityHook hook,
+            io.agentscope.core.state.AgentStateStore stateStore) {
+
+        io.agentscope.core.state.AgentStateStore effectiveStore = stateStore != null ? stateStore : new io.agentscope.core.state.InMemoryAgentStateStore();
+
+        List<SubAgentConfig> subConfigs = config.getSubAgents();
+        if (subConfigs == null || subConfigs.size() < 2) {
+            throw new IllegalArgumentException("DEBATE agent requires at least 2 sub-agents (experts + judge). Got: " + subConfigs);
+        }
+
+        // All but last are experts, last is judge
+        List<ReActAgent> experts = new ArrayList<>();
+        for (int i = 0; i < subConfigs.size() - 1; i++) {
+            experts.add(singleAgentFactory.createAgentForSession(subConfigs.get(i).getAgentId(), effectiveStore, null));
+        }
+        ReActAgent judge = singleAgentFactory.createAgentForSession(
+                subConfigs.get(subConfigs.size() - 1).getAgentId(), effectiveStore, null);
+
+        // Default to 2 rounds if not specified
+        int rounds = 2;
+
+        return new com.skloda.agentscope.runtime.DebateRuntime(experts, judge, hook, config.getAgentId(), rounds);
+    }
+
+    public com.skloda.agentscope.runtime.LoopRuntime createLoopRuntime(
+            com.skloda.agentscope.agent.AgentConfig config,
+            com.skloda.agentscope.hook.ObservabilityHook hook,
+            io.agentscope.core.state.AgentStateStore stateStore) {
+
+        io.agentscope.core.state.AgentStateStore effectiveStore = stateStore != null ? stateStore : new io.agentscope.core.state.InMemoryAgentStateStore();
+
+        List<SubAgentConfig> subConfigs = config.getSubAgents();
+        if (subConfigs == null || subConfigs.size() < 2) {
+            throw new IllegalArgumentException("LOOP agent requires at least 2 sub-agents (writer + critic). Got: " + subConfigs);
+        }
+
+        // First is writer, second is critic
+        ReActAgent writer = singleAgentFactory.createAgentForSession(subConfigs.get(0).getAgentId(), effectiveStore, null);
+        ReActAgent critic = singleAgentFactory.createAgentForSession(subConfigs.get(1).getAgentId(), effectiveStore, null);
+
+        // Extract maxIterations from loopConfig, default to 3
+        int maxIterations = 3;
+        if (config.getLoopConfig() != null && config.getLoopConfig().getMaxIterations() > 0) {
+            maxIterations = config.getLoopConfig().getMaxIterations();
+        }
+
+        return new com.skloda.agentscope.runtime.LoopRuntime(writer, critic, hook, config.getAgentId(), maxIterations);
+    }
+
+    public com.skloda.agentscope.runtime.MsgHubRuntime createMsgHubRuntime(
+            com.skloda.agentscope.agent.AgentConfig config,
+            com.skloda.agentscope.hook.ObservabilityHook hook,
+            io.agentscope.core.state.AgentStateStore stateStore) {
+
+        io.agentscope.core.state.AgentStateStore effectiveStore = stateStore != null ? stateStore : new io.agentscope.core.state.InMemoryAgentStateStore();
+
+        List<SubAgentConfig> subConfigs = config.getSubAgents();
+        if (subConfigs == null || subConfigs.size() < 2) {
+            throw new IllegalArgumentException("MSG_HUB agent requires at least 2 sub-agents (experts + moderator). Got: " + subConfigs);
+        }
+
+        // All but last are experts, last is moderator
+        List<ReActAgent> experts = new ArrayList<>();
+        for (int i = 0; i < subConfigs.size() - 1; i++) {
+            experts.add(singleAgentFactory.createAgentForSession(subConfigs.get(i).getAgentId(), effectiveStore, null));
+        }
+        ReActAgent moderator = singleAgentFactory.createAgentForSession(
+                subConfigs.get(subConfigs.size() - 1).getAgentId(), effectiveStore, null);
+
+        // Extract rounds from msgHubConfig, default to 3
+        int rounds = 3;
+        if (config.getMsgHubConfig() != null && config.getMsgHubConfig().getRounds() > 0) {
+            rounds = config.getMsgHubConfig().getRounds();
+        }
+
+        return new com.skloda.agentscope.runtime.MsgHubRuntime(experts, moderator, hook, config.getAgentId(), rounds);
+    }
+
+    public com.skloda.agentscope.runtime.SubAgentSeqRuntime createSubAgentSeqRuntime(
+            com.skloda.agentscope.agent.AgentConfig config,
+            com.skloda.agentscope.hook.ObservabilityHook hook,
+            io.agentscope.core.state.AgentStateStore stateStore) {
+
+        io.agentscope.core.state.AgentStateStore effectiveStore = stateStore != null ? stateStore : new io.agentscope.core.state.InMemoryAgentStateStore();
+
+        List<SubAgentConfig> subConfigs = config.getSubAgents();
+        if (subConfigs == null || subConfigs.isEmpty()) {
+            throw new IllegalArgumentException("SUBAGENT_SEQ agent requires at least 1 sub-agent. Got: " + subConfigs);
+        }
+
+        List<com.skloda.agentscope.runtime.SubAgentSeqRuntime.SubAgentStep> steps = new ArrayList<>();
+        for (SubAgentConfig subConfig : subConfigs) {
+            ReActAgent agent = singleAgentFactory.createAgentForSession(subConfig.getAgentId(), effectiveStore, null);
+            // Use taskTemplate from config, default to "{input}"
+            String taskTemplate = subConfig.getTaskTemplate() != null ? subConfig.getTaskTemplate() : "{input}";
+            steps.add(new com.skloda.agentscope.runtime.SubAgentSeqRuntime.SubAgentStep(agent, subConfig.getAgentId(), taskTemplate));
+        }
+
+        return new com.skloda.agentscope.runtime.SubAgentSeqRuntime(steps, hook, config.getAgentId());
+    }
+
+    public com.skloda.agentscope.runtime.SubAgentParRuntime createSubAgentParRuntime(
+            com.skloda.agentscope.agent.AgentConfig config,
+            com.skloda.agentscope.hook.ObservabilityHook hook,
+            io.agentscope.core.state.AgentStateStore stateStore) {
+
+        io.agentscope.core.state.AgentStateStore effectiveStore = stateStore != null ? stateStore : new io.agentscope.core.state.InMemoryAgentStateStore();
+
+        List<SubAgentConfig> subConfigs = config.getSubAgents();
+        if (subConfigs == null || subConfigs.isEmpty()) {
+            throw new IllegalArgumentException("SUBAGENT_PAR agent requires at least 1 sub-agent. Got: " + subConfigs);
+        }
+
+        List<com.skloda.agentscope.runtime.SubAgentParRuntime.SubAgentTask> tasks = new ArrayList<>();
+        for (SubAgentConfig subConfig : subConfigs) {
+            ReActAgent agent = singleAgentFactory.createAgentForSession(subConfig.getAgentId(), effectiveStore, null);
+            // Use taskTemplate from config, default to "{input}"
+            String taskDescription = subConfig.getTaskTemplate() != null ? subConfig.getTaskTemplate() : "{input}";
+            tasks.add(new com.skloda.agentscope.runtime.SubAgentParRuntime.SubAgentTask(agent, subConfig.getAgentId(), taskDescription));
+        }
+
+        return new com.skloda.agentscope.runtime.SubAgentParRuntime(tasks, hook, config.getAgentId());
+    }
 }

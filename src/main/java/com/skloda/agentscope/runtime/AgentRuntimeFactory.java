@@ -3,6 +3,7 @@ package com.skloda.agentscope.runtime;
 import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.AgentConfigService;
 import com.skloda.agentscope.agent.AgentType;
+import com.skloda.agentscope.agent.LoopConfig;
 import com.skloda.agentscope.agent.MsgHubConfig;
 import com.skloda.agentscope.agent.SubAgentConfig;
 import com.skloda.agentscope.composite.CompositeAgentFactory;
@@ -49,11 +50,12 @@ public class AgentRuntimeFactory {
             case STATE_GRAPH -> createStateGraphRuntime(agentId);
             case MSG_HUB -> createMsgHubRuntime(agentId);
             case HARNESS -> createHarnessRuntime(agentId);
-            // Pipeline-dependent patterns disabled for 2.0 migration
-            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, SUBAGENT_SEQ, SUBAGENT_PAR ->
-                throw new UnsupportedOperationException(
-                    "Pattern " + type + " is disabled during AgentScope 2.0 migration (pipeline package removed). " +
-                    "Will be reimplemented using 2.0 subagent/middleware API.");
+            case SEQUENTIAL -> createSequentialRuntime(agentId);
+            case PARALLEL -> createParallelRuntime(agentId);
+            case DEBATE -> createDebateRuntime(agentId);
+            case LOOP -> createLoopRuntime(agentId);
+            case SUBAGENT_SEQ -> createSubAgentSeqRuntime(agentId);
+            case SUBAGENT_PAR -> createSubAgentParRuntime(agentId);
         };
     }
 
@@ -70,9 +72,12 @@ public class AgentRuntimeFactory {
             case STATE_GRAPH -> createStateGraphRuntime(agentId);
             case MSG_HUB -> createMsgHubRuntime(agentId);
             case HARNESS -> createHarnessRuntime(agentId);
-            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, SUBAGENT_SEQ, SUBAGENT_PAR ->
-                throw new UnsupportedOperationException(
-                    "Pattern " + type + " is disabled during AgentScope 2.0 migration");
+            case SEQUENTIAL -> createSequentialRuntime(agentId);
+            case PARALLEL -> createParallelRuntime(agentId);
+            case DEBATE -> createDebateRuntime(agentId);
+            case LOOP -> createLoopRuntime(agentId);
+            case SUBAGENT_SEQ -> createSubAgentSeqRuntime(agentId);
+            case SUBAGENT_PAR -> createSubAgentParRuntime(agentId);
         };
     }
 
@@ -89,11 +94,12 @@ public class AgentRuntimeFactory {
             case STATE_GRAPH -> createStateGraphRuntimeWithSession(agentId, stateStore);
             case MSG_HUB -> createMsgHubRuntimeWithSession(agentId, stateStore);
             case HARNESS -> createHarnessRuntimeWithSession(agentId, stateStore);
-            // Pipeline-dependent patterns disabled for 2.0 migration
-            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, SUBAGENT_SEQ, SUBAGENT_PAR ->
-                throw new UnsupportedOperationException(
-                    "Pattern " + type + " is disabled during AgentScope 2.0 migration (pipeline package removed). " +
-                    "Will be reimplemented using 2.0 subagent/middleware API.");
+            case SEQUENTIAL -> createSequentialRuntimeWithSession(agentId, stateStore);
+            case PARALLEL -> createParallelRuntimeWithSession(agentId, stateStore);
+            case DEBATE -> createDebateRuntimeWithSession(agentId, stateStore);
+            case LOOP -> createLoopRuntimeWithSession(agentId, stateStore);
+            case SUBAGENT_SEQ -> createSubAgentSeqRuntimeWithSession(agentId, stateStore);
+            case SUBAGENT_PAR -> createSubAgentParRuntimeWithSession(agentId, stateStore);
         };
     }
 
@@ -110,9 +116,12 @@ public class AgentRuntimeFactory {
             case STATE_GRAPH -> createStateGraphRuntimeWithSession(agentId, stateStore);
             case MSG_HUB -> createMsgHubRuntimeWithSession(agentId, stateStore);
             case HARNESS -> createHarnessRuntimeWithSession(agentId, stateStore);
-            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, SUBAGENT_SEQ, SUBAGENT_PAR ->
-                throw new UnsupportedOperationException(
-                    "Pattern " + type + " is disabled during AgentScope 2.0 migration");
+            case SEQUENTIAL -> createSequentialRuntimeWithSession(agentId, stateStore);
+            case PARALLEL -> createParallelRuntimeWithSession(agentId, stateStore);
+            case DEBATE -> createDebateRuntimeWithSession(agentId, stateStore);
+            case LOOP -> createLoopRuntimeWithSession(agentId, stateStore);
+            case SUBAGENT_SEQ -> createSubAgentSeqRuntimeWithSession(agentId, stateStore);
+            case SUBAGENT_PAR -> createSubAgentParRuntimeWithSession(agentId, stateStore);
         };
     }
 
@@ -294,5 +303,81 @@ public class AgentRuntimeFactory {
         log.info("  ApprovalHook enabled for agent: {} (required={}, tools={})",
                 config.getAgentId(), config.isApprovalRequired(), config.getApprovalTools());
         return new ApprovalHook(config.isApprovalRequired(), config.getApprovalTools());
+    }
+
+    // ---- Pipeline runtime helpers (SEQUENTIAL, PARALLEL, DEBATE, LOOP, SUBAGENT_SEQ, SUBAGENT_PAR) ----
+
+    private SequentialRuntime createSequentialRuntime(String agentId) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        return compositeFactory.createSequentialRuntime(config, hook, null);
+    }
+
+    private ParallelRuntime createParallelRuntime(String agentId) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        return compositeFactory.createParallelRuntime(config, hook, null);
+    }
+
+    private DebateRuntime createDebateRuntime(String agentId) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        return compositeFactory.createDebateRuntime(config, hook, null);
+    }
+
+    private LoopRuntime createLoopRuntime(String agentId) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        return compositeFactory.createLoopRuntime(config, hook, null);
+    }
+
+    private SubAgentSeqRuntime createSubAgentSeqRuntime(String agentId) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        return compositeFactory.createSubAgentSeqRuntime(config, hook, null);
+    }
+
+    private SubAgentParRuntime createSubAgentParRuntime(String agentId) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        return compositeFactory.createSubAgentParRuntime(config, hook, null);
+    }
+
+    // Session-based pipeline runtimes
+
+    private SequentialRuntime createSequentialRuntimeWithSession(String agentId, AgentStateStore stateStore) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        return compositeFactory.createSequentialRuntime(config, hook, stateStore);
+    }
+
+    private ParallelRuntime createParallelRuntimeWithSession(String agentId, AgentStateStore stateStore) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        return compositeFactory.createParallelRuntime(config, hook, stateStore);
+    }
+
+    private DebateRuntime createDebateRuntimeWithSession(String agentId, AgentStateStore stateStore) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        return compositeFactory.createDebateRuntime(config, hook, stateStore);
+    }
+
+    private LoopRuntime createLoopRuntimeWithSession(String agentId, AgentStateStore stateStore) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        return compositeFactory.createLoopRuntime(config, hook, stateStore);
+    }
+
+    private SubAgentSeqRuntime createSubAgentSeqRuntimeWithSession(String agentId, AgentStateStore stateStore) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        return compositeFactory.createSubAgentSeqRuntime(config, hook, stateStore);
+    }
+
+    private SubAgentParRuntime createSubAgentParRuntimeWithSession(String agentId, AgentStateStore stateStore) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+        return compositeFactory.createSubAgentParRuntime(config, hook, stateStore);
     }
 }
