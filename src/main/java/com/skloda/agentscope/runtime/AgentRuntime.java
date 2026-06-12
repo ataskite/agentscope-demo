@@ -7,28 +7,22 @@ import com.skloda.agentscope.hook.ApprovalHook;
 import com.skloda.agentscope.hook.ObservabilityHook;
 import com.skloda.agentscope.service.ApprovalService;
 import io.agentscope.core.ReActAgent;
-import io.agentscope.core.agent.EventType;
-import io.agentscope.core.agent.Event;
-import io.agentscope.core.agent.StreamOptions;
-import io.agentscope.core.hook.Hook;
-import io.agentscope.core.hook.HookEvent;
-import io.agentscope.core.hook.PostActingEvent;
+import io.agentscope.core.event.*;
 import io.agentscope.core.message.*;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
 
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.function.BiConsumer;
 
 /**
  * Runtime container for a single Agent interaction session.
- * Encapsulates Agent + Hook + Sink, providing a clean Flux interface.
+ * Uses agent.streamEvents() for automatic lifecycle events (AgentScope 2.0)
+ * and EventSink for manual multi-agent events.
  */
 public class AgentRuntime implements StreamingAgentRuntime {
 
@@ -43,8 +37,6 @@ public class AgentRuntime implements StreamingAgentRuntime {
     private final ApprovalService approvalService;
     private final String agentId;
     private final String sessionId;
-    private final Sinks.Many<Map<String, Object>> sink;
-    private final BiConsumer<String, Map<String, Object>> hookBridge;
     private final Runnable onClose;
 
     public AgentRuntime(ReActAgent agent, ObservabilityHook hook) {
@@ -66,14 +58,6 @@ public class AgentRuntime implements StreamingAgentRuntime {
         this.agentId = agentId;
         this.sessionId = sessionId;
         this.onClose = onClose;
-        this.sink = Sinks.many().multicast().onBackpressureBuffer();
-
-        this.hookBridge = (type, data) -> {
-            Map<String, Object> payload = new LinkedHashMap<>(data);
-            payload.put("type", type);
-            emit(payload);
-        };
-        hook.addConsumer(hookBridge);
     }
 
     @Override
@@ -83,90 +67,284 @@ public class AgentRuntime implements StreamingAgentRuntime {
 
     /**
      * Stream agent response as Flux.
-     * Merges hook events (timeline/metrics) with agent text stream.
+     * Merges manual multi-agent events (from EventSink) with automatic agent lifecycle events.
      *
-     * @param userMsg      the user message
+     * @param userMsg          the user message
      * @param isApprovalResume true if this is a resume after HITL approval
      */
     public Flux<Map<String, Object>> stream(Msg userMsg, boolean isApprovalResume) {
         log.debug("Starting stream for agent: {} (resume={})", agent.getName(), isApprovalResume);
 
-        StreamOptions streamOptions = StreamOptions.builder()
-                .eventTypes(EventType.REASONING, EventType.TOOL_RESULT)
-                .incremental(true)
-                .includeReasoningResult(false)
-                .build();
+        // Manual multi-agent events from EventSink (pipeline, routing, handoff, etc.)
+        Flux<Map<String, Object>> sinkEvents = hook.getEventSink().asFlux();
 
-        Flux<Map<String, Object>> hookEvents = this.sink.asFlux()
-                .doOnNext(payload -> log.debug("[hook -> stream] {}", payload));
+        Flux<Map<String, Object>> agentEvents;
+        if (isApprovalResume) {
+            agentEvents = createApprovalResumeStream(userMsg);
+        } else {
+            agentEvents = agent.streamEvents(userMsg)
+                    .map(this::mapAgentEvent)
+                    .filter(map -> map != null && !map.isEmpty());
+        }
 
-        Flux<Map<String, Object>> textStream = Flux.create(fluxSink -> {
-            if (isApprovalResume) {
-                Hook stopAfterApprovedToolHook = new StopAfterApprovedToolHook();
-                Runnable removeStopHook = addTemporaryHook(stopAfterApprovedToolHook);
-                // Resume: call agent with null message to continue executing pending tools
-                reactor.core.publisher.Mono<Msg> resumeCall = userMsg != null
-                        ? agent.call(userMsg)
-                        : agent.call();
-                resumeCall
-                        .doFinally(signalType -> removeStopHook.run())
-                        .subscribe(
-                                msg -> {
-                                    if (msg != null && msg.getContent() != null) {
-                                        for (ContentBlock block : msg.getContent()) {
-                                            if (block instanceof TextBlock tb) {
-                                                String text = tb.getText();
-                                                if (text != null && !text.isEmpty()) {
-                                                    fluxSink.next(Map.of("type", "text", "content", text));
-                                                }
-                                            } else if (block instanceof ToolResultBlock trb) {
-                                                String text = formatToolResultBlock(trb);
-                                                if (text != null && !text.isBlank()) {
-                                                    fluxSink.next(Map.of("type", "text", "content", text));
-                                                }
-                                            }
-                                        }
-                                    }
-                                },
-                                error -> {
-                                    log.error("Resume stream error", error);
-                                    fluxSink.error(error);
-                                },
-                                () -> completeStream(fluxSink, false)
-                        );
-            } else {
-                agent.stream(userMsg, streamOptions)
-                        .subscribe(
-                                event -> handleStreamEvent(event, fluxSink),
-                                error -> {
-                                    log.error("Stream error", error);
-                                    fluxSink.error(error);
-                                },
-                                () -> completeStream(fluxSink, false)
-                        );
-            }
-        });
-
-        return Flux.merge(hookEvents, textStream)
+        return Flux.merge(sinkEvents, agentEvents)
+                .concatWith(Mono.fromCallable(() -> {
+                    // On completion, check if approval was triggered
+                    if (approvalHook != null && approvalHook.isApprovalTriggered()) {
+                        return handleApprovalCompletion();
+                    }
+                    return Map.of("type", "done");
+                }))
                 .doOnCancel(this::close)
                 .doOnComplete(() -> {
-                    this.sink.tryEmitComplete();
+                    hook.getEventSink().complete();
                     this.close();
                 })
                 .doOnError(e -> {
                     log.error("Stream error for agent: {}", agent.getName(), e);
-                    this.sink.tryEmitComplete();
+                    hook.getEventSink().complete();
                     this.close();
                 });
     }
 
-    private Runnable addTemporaryHook(Hook hook) {
-        List<Hook> hooks = agent.getHooks();
-        if (hooks == null) {
-            return () -> { };
+    /**
+     * Approval resume path: uses agent.call() to continue executing pending tools.
+     * Emits text events from the call result.
+     */
+    private Flux<Map<String, Object>> createApprovalResumeStream(Msg userMsg) {
+        return Flux.create(fluxSink -> {
+            Mono<Msg> resumeCall = userMsg != null
+                    ? agent.call(userMsg)
+                    : agent.call();
+            resumeCall
+                    .subscribe(
+                            msg -> {
+                                if (msg != null && msg.getContent() != null) {
+                                    for (ContentBlock block : msg.getContent()) {
+                                        if (block instanceof TextBlock tb) {
+                                            String text = tb.getText();
+                                            if (text != null && !text.isEmpty()) {
+                                                fluxSink.next(Map.of("type", "text", "content", text));
+                                            }
+                                        } else if (block instanceof ToolResultBlock trb) {
+                                            String text = formatToolResultBlock(trb);
+                                            if (text != null && !text.isBlank()) {
+                                                fluxSink.next(Map.of("type", "text", "content", text));
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            error -> {
+                                log.error("Resume stream error", error);
+                                fluxSink.error(error);
+                            },
+                            fluxSink::complete
+                    );
+        });
+    }
+
+    /**
+     * Build the approval completion event and register the pending approval.
+     */
+    private Map<String, Object> handleApprovalCompletion() {
+        String approvalId = approvalService.registerPendingApproval(
+                agent, hook, approvalHook.getPendingToolUseBlocks(), agentId, sessionId);
+        return Map.of(
+                "type", "pending_approval",
+                "approvalId", approvalId,
+                "agentId", agentId != null ? agentId : "",
+                "toolCalls", approvalHook.getPendingToolCallsForSse(),
+                "timestamp", System.currentTimeMillis()
+        );
+    }
+
+    /**
+     * Convert an AgentEvent from streamEvents() into an SSE-compatible Map.
+     * Returns null for events that should be silently consumed.
+     */
+    private Map<String, Object> mapAgentEvent(AgentEvent event) {
+        try {
+            AgentEventType type = event.getType();
+            return switch (type) {
+                case TEXT_BLOCK_DELTA -> {
+                    if (event instanceof TextBlockDeltaEvent tde) {
+                        String delta = tde.getDelta();
+                        if (delta != null && !delta.isEmpty()) {
+                            yield Map.of("type", "text", "content", delta);
+                        }
+                    }
+                    yield null;
+                }
+                case THINKING_BLOCK_DELTA -> {
+                    if (event instanceof ThinkingBlockDeltaEvent tde) {
+                        String delta = tde.getDelta();
+                        if (delta != null && !delta.isEmpty()) {
+                            yield Map.of("type", "thinking", "content", delta);
+                        }
+                    }
+                    yield null;
+                }
+                case AGENT_START -> {
+                    if (event instanceof AgentStartEvent ase) {
+                        yield Map.<String, Object>of(
+                                "type", "agent_start",
+                                "name", ase.getName() != null ? ase.getName() : "",
+                                "role", ase.getRole() != null ? ase.getRole() : "",
+                                "timestamp", System.currentTimeMillis()
+                        );
+                    }
+                    yield Map.of("type", "agent_start", "timestamp", System.currentTimeMillis());
+                }
+                case AGENT_END -> Map.of("type", "agent_end", "timestamp", System.currentTimeMillis());
+                case AGENT_RESULT -> {
+                    if (event instanceof AgentResultEvent are) {
+                        Msg result = are.getResult();
+                        if (result != null && result.getContent() != null) {
+                            StringBuilder sb = new StringBuilder();
+                            for (ContentBlock block : result.getContent()) {
+                                if (block instanceof TextBlock tb && tb.getText() != null) {
+                                    sb.append(tb.getText());
+                                }
+                            }
+                            if (!sb.isEmpty()) {
+                                yield Map.of("type", "agent_result_text", "content", sb.toString(),
+                                        "timestamp", System.currentTimeMillis());
+                            }
+                        }
+                    }
+                    yield null;
+                }
+                case MODEL_CALL_START -> Map.of("type", "llm_start", "timestamp", System.currentTimeMillis());
+                case MODEL_CALL_END -> {
+                    Map<String, Object> data = new LinkedHashMap<>();
+                    data.put("type", "llm_end");
+                    if (event instanceof ModelCallEndEvent mcee && mcee.getUsage() != null) {
+                        data.put("inputTokens", mcee.getUsage().getInputTokens());
+                        data.put("outputTokens", mcee.getUsage().getOutputTokens());
+                        data.put("totalTokens", mcee.getUsage().getTotalTokens());
+                    }
+                    data.put("timestamp", System.currentTimeMillis());
+                    yield data;
+                }
+                case TOOL_CALL_START -> {
+                    if (event instanceof ToolCallStartEvent tcse) {
+                        yield Map.<String, Object>of(
+                                "type", "tool_start",
+                                "toolName", tcse.getToolCallName() != null ? tcse.getToolCallName() : "",
+                                "toolCallId", tcse.getToolCallId() != null ? tcse.getToolCallId() : "",
+                                "timestamp", System.currentTimeMillis()
+                        );
+                    }
+                    yield Map.of("type", "tool_start", "timestamp", System.currentTimeMillis());
+                }
+                case TOOL_CALL_END -> {
+                    if (event instanceof ToolCallEndEvent tcee) {
+                        yield Map.<String, Object>of(
+                                "type", "tool_end",
+                                "toolName", tcee.getToolCallName() != null ? tcee.getToolCallName() : "",
+                                "toolCallId", tcee.getToolCallId() != null ? tcee.getToolCallId() : "",
+                                "timestamp", System.currentTimeMillis()
+                        );
+                    }
+                    yield Map.of("type", "tool_end", "timestamp", System.currentTimeMillis());
+                }
+                case TOOL_RESULT_START -> {
+                    if (event instanceof ToolResultStartEvent trse) {
+                        yield Map.<String, Object>of(
+                                "type", "tool_result_start",
+                                "toolName", trse.getToolCallName() != null ? trse.getToolCallName() : "",
+                                "toolCallId", trse.getToolCallId() != null ? trse.getToolCallId() : "",
+                                "timestamp", System.currentTimeMillis()
+                        );
+                    }
+                    yield null;
+                }
+                case TOOL_RESULT_END -> {
+                    Map<String, Object> data = new LinkedHashMap<>();
+                    data.put("type", "tool_result_end");
+                    if (event instanceof ToolResultEndEvent tree) {
+                        if (tree.getToolCallName() != null) {
+                            data.put("toolName", tree.getToolCallName());
+                        }
+                        if (tree.getState() != null) {
+                            data.put("state", tree.getState().name());
+                        }
+                    }
+                    data.put("timestamp", System.currentTimeMillis());
+                    yield data;
+                }
+                case TOOL_RESULT_TEXT_DELTA -> {
+                    if (event instanceof ToolResultTextDeltaEvent trtde) {
+                        String delta = trtde.getDelta();
+                        if (delta != null && !delta.isEmpty()) {
+                            yield Map.of("type", "tool_result_delta", "content", delta,
+                                    "toolName", trtde.getToolCallName() != null ? trtde.getToolCallName() : "",
+                                    "timestamp", System.currentTimeMillis());
+                        }
+                    }
+                    yield null;
+                }
+                case EXCEED_MAX_ITERS -> {
+                    if (event instanceof ExceedMaxItersEvent emie) {
+                        yield Map.<String, Object>of(
+                                "type", "exceed_max_iters",
+                                "maxIters", emie.getMaxIters(),
+                                "currentIter", emie.getCurrentIter(),
+                                "timestamp", System.currentTimeMillis()
+                        );
+                    }
+                    yield Map.of("type", "exceed_max_iters", "timestamp", System.currentTimeMillis());
+                }
+                case REQUIRE_USER_CONFIRM -> {
+                    if (event instanceof RequireUserConfirmEvent ruce) {
+                        yield Map.<String, Object>of(
+                                "type", "require_user_confirm",
+                                "toolCalls", ruce.getToolCalls(),
+                                "timestamp", System.currentTimeMillis()
+                        );
+                    }
+                    yield Map.of("type", "require_user_confirm", "timestamp", System.currentTimeMillis());
+                }
+                case REQUEST_STOP -> Map.of("type", "request_stop", "timestamp", System.currentTimeMillis());
+                case HINT_BLOCK -> {
+                    if (event instanceof HintBlockEvent hbe) {
+                        yield Map.<String, Object>of(
+                                "type", "hint",
+                                "hint", hbe.getHint() != null ? hbe.getHint() : "",
+                                "source", hbe.getHintSource() != null ? hbe.getHintSource() : "",
+                                "timestamp", System.currentTimeMillis()
+                        );
+                    }
+                    yield null;
+                }
+                case CUSTOM -> {
+                    if (event instanceof CustomEvent ce) {
+                        Map<String, Object> data = new LinkedHashMap<>();
+                        data.put("type", ce.getName() != null ? ce.getName() : "custom");
+                        if (ce.getValue() != null) {
+                            data.putAll(ce.getValue());
+                        }
+                        data.put("timestamp", System.currentTimeMillis());
+                        yield data;
+                    }
+                    yield null;
+                }
+                // Block boundary events: useful for streaming coordination but no SSE content
+                case TEXT_BLOCK_START, TEXT_BLOCK_END,
+                     THINKING_BLOCK_START, THINKING_BLOCK_END,
+                     DATA_BLOCK_START, DATA_BLOCK_DELTA, DATA_BLOCK_END,
+                     TOOL_CALL_DELTA,
+                     TOOL_RESULT_DATA_DELTA,
+                     SUBAGENT_EXPOSED,
+                     USER_CONFIRM_RESULT,
+                     EXTERNAL_EXECUTION_RESULT,
+                     REQUIRE_EXTERNAL_EXECUTION -> null;
+            };
+        } catch (Exception e) {
+            log.error("Error mapping agent event: {}", event, e);
+            return Map.of("type", "error", "message", "Event mapping error: " + e.getMessage());
         }
-        hooks.add(hook);
-        return () -> hooks.remove(hook);
     }
 
     private String formatToolResultBlock(ToolResultBlock resultBlock) {
@@ -236,76 +414,12 @@ public class AgentRuntime implements StreamingAgentRuntime {
         return value != null ? value.toString() : "";
     }
 
-    private void completeStream(reactor.core.publisher.FluxSink<Map<String, Object>> fluxSink,
-                                boolean skipClose) {
-        log.debug("Stream completing for agent: {}", agent.getName());
-
-        // Check if approval was triggered during this stream
-        if (!skipClose && approvalHook != null && approvalHook.isApprovalTriggered()) {
-            // Register the paused agent for later resume
-            String approvalId = approvalService.registerPendingApproval(
-                    agent, hook, approvalHook.getPendingToolUseBlocks(), agentId, sessionId);
-
-            fluxSink.next(Map.of(
-                    "type", "pending_approval",
-                    "approvalId", approvalId,
-                    "agentId", agentId != null ? agentId : "",
-                    "toolCalls", approvalHook.getPendingToolCallsForSse(),
-                    "timestamp", System.currentTimeMillis()
-            ));
-            fluxSink.next(Map.of("type", "done"));
-            fluxSink.complete();
-            return;
-        }
-
-        // Normal completion
-        fluxSink.next(Map.of("type", "done"));
-        fluxSink.complete();
-    }
-
-    private void handleStreamEvent(Event event, reactor.core.publisher.FluxSink<Map<String, Object>> sink) {
-        try {
-            Msg msg = event.getMessage();
-            if (msg != null && msg.getContent() != null) {
-                for (ContentBlock block : msg.getContent()) {
-                    if (block instanceof TextBlock tb) {
-                        String text = tb.getText();
-                        if (text != null && !text.isEmpty()) {
-                            sink.next(Map.of("type", "text", "content", text));
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.error("Error handling stream event", e);
-        }
-    }
-
-    private void emit(Map<String, Object> payload) {
-        Sinks.EmitResult result = sink.tryEmitNext(payload);
-        if (result.isFailure()) {
-            log.warn("Failed to emit event: {}", result);
-        }
-    }
-
     @Override
     public void close() {
-        hook.removeConsumer(hookBridge);
         hook.reset();
-        sink.tryEmitComplete();
         if (onClose != null) {
             onClose.run();
         }
         log.debug("AgentRuntime closed for agent: {}", agent.getName());
-    }
-
-    private static class StopAfterApprovedToolHook implements Hook {
-        @Override
-        public <T extends HookEvent> Mono<T> onEvent(T event) {
-            if (event instanceof PostActingEvent postActingEvent) {
-                postActingEvent.stopAgent();
-            }
-            return Mono.just(event);
-        }
     }
 }
