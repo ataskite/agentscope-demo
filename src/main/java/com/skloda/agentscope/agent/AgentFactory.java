@@ -20,13 +20,10 @@ import io.agentscope.core.model.DashScopeChatModel;
 
 import io.agentscope.core.rag.RAGMode;
 import io.agentscope.core.rag.model.RetrieveConfig;
-import io.agentscope.core.session.InMemorySession;
-import io.agentscope.core.session.JsonSession;
-import io.agentscope.core.session.Session;
-import io.agentscope.core.skill.SkillBox;
+import io.agentscope.core.state.AgentStateStore;
+import io.agentscope.core.state.InMemoryAgentStateStore;
+import io.agentscope.core.state.JsonFileAgentStateStore;
 import io.agentscope.core.skill.repository.ClasspathSkillRepository;
-import io.agentscope.core.state.SessionKey;
-import io.agentscope.core.state.SimpleSessionKey;
 import io.agentscope.core.tool.Toolkit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,45 +62,45 @@ public class AgentFactory {
     }
 
     /**
-     * Create a session for a persistent session (2.0 replaces Memory with Session).
+     * Create an in-memory AgentStateStore (replaces InMemorySession in 2.0.0-RC3).
      */
-    public Session createSession() {
-        return new InMemorySession();
+    public AgentStateStore createStateStore() {
+        return new InMemoryAgentStateStore();
     }
 
-    public Session createSession(String type, String storagePath) {
+    public AgentStateStore createStateStore(String type, String storagePath) {
         if ("json".equalsIgnoreCase(type)) {
             java.nio.file.Path dir = (storagePath != null && !storagePath.isBlank())
                     ? java.nio.file.Path.of(storagePath)
                     : java.nio.file.Path.of(System.getProperty("user.home"), ".agentscope", "demo-sessions");
-            return new JsonSession(dir);
+            return new JsonFileAgentStateStore(dir);
         }
-        return new InMemorySession();
+        return new InMemoryAgentStateStore();
     }
 
     /**
-     * Create agent for a persistent session (with shared session + hooks).
+     * Create agent for a persistent session (with shared stateStore + hooks).
      */
-    public ReActAgent createAgentForSession(String agentId, Session session, Hook... hooks) {
-        return buildAgent(agentId, session, hooks);
+    public ReActAgent createAgentForSession(String agentId, AgentStateStore stateStore, Hook... hooks) {
+        return buildAgent(agentId, stateStore, hooks);
     }
 
     /**
-     * Create agent with optional hooks (stateless, creates fresh Session each time).
+     * Create agent with optional hooks (stateless, creates fresh AgentStateStore each time).
      */
     public ReActAgent createAgent(String agentId, Hook... hooks) {
-        return buildAgent(agentId, new InMemorySession(), hooks);
+        return buildAgent(agentId, new InMemoryAgentStateStore(), hooks);
     }
 
-    public ReActAgent createAgentForSession(String agentId, Session session, String permissionMode, Hook... hooks) {
-        return buildAgentWithPermission(agentId, session, permissionMode, hooks);
+    public ReActAgent createAgentForSession(String agentId, AgentStateStore stateStore, String permissionMode, Hook... hooks) {
+        return buildAgentWithPermission(agentId, stateStore, permissionMode, hooks);
     }
 
     public ReActAgent createAgent(String agentId, String permissionMode, Hook... hooks) {
-        return buildAgentWithPermission(agentId, new InMemorySession(), permissionMode, hooks);
+        return buildAgentWithPermission(agentId, new InMemoryAgentStateStore(), permissionMode, hooks);
     }
 
-    private ReActAgent buildAgent(String agentId, Session session, Hook... hooks) {
+    private ReActAgent buildAgent(String agentId, AgentStateStore stateStore, Hook... hooks) {
         AgentConfig config = configService.getAgentConfig(agentId);
         log.info("Creating agent: {} ({})", config.getName(), agentId);
 
@@ -119,12 +116,12 @@ public class AgentFactory {
                 .name(config.getName())
                 .sysPrompt(config.getSystemPrompt())
                 .model(model)
-                .session(session)
-                .sessionKey(SimpleSessionKey.of(agentId));
+                .stateStore(stateStore)
+                .defaultSessionId(agentId);
 
         // Enable PlanNotebook if configured
         if (config.isPlanEnabled()) {
-            builder.enablePlan();
+            builder.enableTaskList();
             log.info("  Enabled PlanNotebook for agent: {}", agentId);
         }
 
@@ -182,7 +179,7 @@ public class AgentFactory {
         return builder.build();
     }
 
-    private ReActAgent buildAgentWithPermission(String agentId, Session session, String permissionMode, Hook... hooks) {
+    private ReActAgent buildAgentWithPermission(String agentId, AgentStateStore stateStore, String permissionMode, Hook... hooks) {
         AgentConfig config = configService.getAgentConfig(agentId);
         log.info("Creating agent: {} ({}) [permissionMode={}]", config.getName(), agentId, permissionMode);
 
@@ -198,11 +195,11 @@ public class AgentFactory {
                 .name(config.getName())
                 .sysPrompt(config.getSystemPrompt())
                 .model(model)
-                .session(session)
-                .sessionKey(SimpleSessionKey.of(agentId));
+                .stateStore(stateStore)
+                .defaultSessionId(agentId);
 
         if (config.isPlanEnabled()) {
-            builder.enablePlan();
+            builder.enableTaskList();
             log.info("  Enabled PlanNotebook for agent: {}", agentId);
         }
 
@@ -271,22 +268,29 @@ public class AgentFactory {
                                          AgentConfig config, String agentId) {
         Set<String> skillToolNames = new HashSet<>();
 
-        SkillBox skillBox = null;
-        if (!config.getSkills().isEmpty()) {
-            skillBox = new SkillBox(toolkit);
-            try (ClasspathSkillRepository repo = new ClasspathSkillRepository("skills")) {
+        boolean hasSkills = !config.getSkills().isEmpty();
+        if (hasSkills) {
+            try {
+                // Create ClasspathSkillRepository (not closed here -- its lifecycle is managed
+                // by the DynamicSkillMiddleware inside the agent)
+                ClasspathSkillRepository repo = new ClasspathSkillRepository("skills");
+
+                // Register tool instances directly on toolkit for each configured skill
                 for (String skillName : config.getSkills()) {
                     if (toolRegistry.hasTool(skillName)) {
-                        skillBox.registration()
-                                .skill(repo.getSkill(skillName))
-                                .tool(toolRegistry.getTool(skillName))
-                                .apply();
+                        toolkit.registerTool(toolRegistry.getTool(skillName));
                         skillToolNames.addAll(toolRegistry.getToolNamesForClass(skillName));
-                        log.info("  Registered skill: {} for agent: {}", skillName, agentId);
+                        log.info("  Registered skill tool: {} for agent: {}", skillName, agentId);
                     } else {
                         log.error("  Tool for skill not found in registry: {} (agent: {})", skillName, agentId);
                     }
                 }
+
+                // Use the new SkillRepository API instead of deprecated SkillBox
+                builder.skillRepository(repo);
+                builder.dynamicSkillsEnabled(true);
+                log.info("  Configured SkillRepository with dynamic loading for {} skills (agent: {})",
+                        config.getSkills().size(), agentId);
             } catch (Exception e) {
                 log.error("  Failed to load skills for agent: {}", agentId, e);
             }
@@ -308,11 +312,7 @@ public class AgentFactory {
             log.info("  Registered system tool class: {} for agent: {}", toolInstance.getClass().getSimpleName(), agentId);
         }
 
-        if (skillBox != null) {
-            builder.toolkit(toolkit).skillBox(skillBox);
-        } else {
-            builder.toolkit(toolkit);
-        }
+        builder.toolkit(toolkit);
     }
 
     private void registerMcpTools(AgentConfig config, Toolkit toolkit) {
