@@ -17,7 +17,7 @@ import io.agentscope.core.memory.LongTermMemoryMode;
 import io.agentscope.core.memory.LongTermMemoryMode;
 import io.agentscope.core.memory.bailian.BailianLongTermMemory;
 import io.agentscope.core.model.DashScopeChatModel;
-import io.agentscope.core.model.StructuredOutputReminder;
+
 import io.agentscope.core.rag.RAGMode;
 import io.agentscope.core.rag.model.RetrieveConfig;
 import io.agentscope.core.session.InMemorySession;
@@ -135,16 +135,6 @@ public class AgentFactory {
         // Register MCP tools after local tools/skills are set up
         registerMcpTools(config, toolkit);
 
-        // Configure structured output if specified
-        if (config.getStructuredOutputClass() != null && !config.getStructuredOutputClass().isBlank()) {
-            StructuredOutputReminder reminder = "PROMPT".equalsIgnoreCase(config.getStructuredOutputReminder())
-                    ? StructuredOutputReminder.PROMPT
-                    : StructuredOutputReminder.TOOL_CHOICE;
-            builder.structuredOutputReminder(reminder);
-            log.info("  Configured structured output for agent: {} (class={}, mode={})",
-                    agentId, config.getStructuredOutputClass(), reminder);
-        }
-
         // Register RAG knowledge if enabled
         if (config.isRagEnabled()) {
             RAGMode ragMode = parseRagMode(config.getRagMode());
@@ -219,15 +209,6 @@ public class AgentFactory {
         Toolkit toolkit = new Toolkit();
         registerToolsAndSkills(builder, toolkit, config, agentId);
         registerMcpTools(config, toolkit);
-
-        if (config.getStructuredOutputClass() != null && !config.getStructuredOutputClass().isBlank()) {
-            StructuredOutputReminder reminder = "PROMPT".equalsIgnoreCase(config.getStructuredOutputReminder())
-                    ? StructuredOutputReminder.PROMPT
-                    : StructuredOutputReminder.TOOL_CHOICE;
-            builder.structuredOutputReminder(reminder);
-            log.info("  Configured structured output for agent: {} (class={}, mode={})",
-                    agentId, config.getStructuredOutputClass(), reminder);
-        }
 
         if (config.isRagEnabled()) {
             RAGMode ragMode = parseRagMode(config.getRagMode());
