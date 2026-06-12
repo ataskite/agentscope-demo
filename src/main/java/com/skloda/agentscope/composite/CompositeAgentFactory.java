@@ -519,4 +519,18 @@ public class CompositeAgentFactory {
 
         return new com.skloda.agentscope.runtime.SubAgentParRuntime(tasks, hook, config.getAgentId());
     }
+
+    // ---- Helper methods for AgentRuntimeFactory ----
+
+    public AgentFactory getSingleAgentFactory() {
+        return singleAgentFactory;
+    }
+
+    public AgentConfigService getConfigService() {
+        return configService;
+    }
+
+    public String getApiKey() {
+        return apiKey;
+    }
 }

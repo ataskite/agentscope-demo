@@ -170,8 +170,22 @@ public class AgentRuntimeFactory {
     }
 
     public StreamingAgentRuntime createHarnessRuntime(String agentId) {
-        log.debug("HARNESS runtime not yet implemented, falling back to SINGLE for agent: {}", agentId);
-        return createSingleRuntime(agentId);
+        try {
+            log.debug("Creating HarnessRuntime for agent: {}", agentId);
+            io.agentscope.harness.agent.HarnessAgent harnessAgent =
+                    com.skloda.agentscope.harness.HarnessAgentFactory.create(
+                            configService.getAgentConfig(agentId),
+                            compositeFactory.getApiKey()
+                    );
+            io.agentscope.core.agent.RuntimeContext ctx = io.agentscope.core.agent.RuntimeContext.builder()
+                    .sessionId("default")
+                    .userId("demo-user")
+                    .build();
+            return new com.skloda.agentscope.harness.HarnessRuntime(harnessAgent, ctx);
+        } catch (Exception e) {
+            log.error("Failed to create HarnessRuntime for agent: {}", agentId, e);
+            throw new RuntimeException("Failed to create HarnessRuntime", e);
+        }
     }
 
     // ---- Session-based runtime helpers (AgentScope 2.0) ----
@@ -235,8 +249,22 @@ public class AgentRuntimeFactory {
     }
 
     private StreamingAgentRuntime createHarnessRuntimeWithSession(String agentId, AgentStateStore stateStore) {
-        log.debug("HARNESS runtime not yet implemented, falling back to SINGLE for agent: {}", agentId);
-        return createSingleRuntimeWithSession(agentId, stateStore);
+        try {
+            log.debug("Creating HarnessRuntime with session for agent: {}", agentId);
+            io.agentscope.harness.agent.HarnessAgent harnessAgent =
+                    com.skloda.agentscope.harness.HarnessAgentFactory.create(
+                            configService.getAgentConfig(agentId),
+                            compositeFactory.getApiKey()
+                    );
+            io.agentscope.core.agent.RuntimeContext ctx = io.agentscope.core.agent.RuntimeContext.builder()
+                    .sessionId("default")
+                    .userId("demo-user")
+                    .build();
+            return new com.skloda.agentscope.harness.HarnessRuntime(harnessAgent, ctx);
+        } catch (Exception e) {
+            log.error("Failed to create HarnessRuntime with session for agent: {}", agentId, e);
+            throw new RuntimeException("Failed to create HarnessRuntime", e);
+        }
     }
 
     // ---- Permission-aware runtime helpers ----

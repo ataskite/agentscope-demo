@@ -51,8 +51,8 @@ public class HarnessAgentService {
                     .userId(effectiveUserId)
                     .build();
 
-            HarnessRuntime runtime = new HarnessRuntime(agent);
-            return runtime.stream(userMsg, ctx);
+            HarnessRuntime runtime = new HarnessRuntime(agent, ctx);
+            return runtime.stream(userMsg);
         } catch (Exception e) {
             log.error("Failed to create harness stream for agent: {}", agentId, e);
             return Flux.just(Map.of("type", "error", "message", e.getMessage()));

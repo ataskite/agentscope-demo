@@ -1,5 +1,6 @@
 package com.skloda.agentscope.harness;
 
+import com.skloda.agentscope.hook.ObservabilityHook;
 import io.agentscope.core.agent.Event;
 import io.agentscope.core.agent.EventType;
 import io.agentscope.core.agent.RuntimeContext;
@@ -14,21 +15,39 @@ import reactor.core.publisher.Flux;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-public class HarnessRuntime {
+public class HarnessRuntime implements com.skloda.agentscope.runtime.StreamingAgentRuntime {
 
     private static final Logger log = LoggerFactory.getLogger(HarnessRuntime.class);
 
     private final HarnessAgent agent;
+    private final RuntimeContext runtimeContext;
+    private final ObservabilityHook hook = new ObservabilityHook();
 
-    public HarnessRuntime(HarnessAgent agent) {
+    public HarnessRuntime(HarnessAgent agent, RuntimeContext runtimeContext) {
         this.agent = agent;
+        this.runtimeContext = runtimeContext;
     }
 
-    public Flux<Map<String, Object>> stream(Msg userMsg, RuntimeContext ctx) {
-        return agent.stream(userMsg, ctx)
+    public HarnessRuntime(HarnessAgent agent) {
+        this(agent, RuntimeContext.builder().build());
+    }
+
+    @Override
+    public Flux<Map<String, Object>> stream(Msg userMsg) {
+        return agent.stream(userMsg, runtimeContext)
                 .map(HarnessRuntime::convertEvent)
                 .doOnNext(event -> log.debug("[harness] event: {}", event.get("type")))
                 .concatWith(Flux.just(Map.of("type", "done")));
+    }
+
+    @Override
+    public ObservabilityHook getHook() {
+        return hook;
+    }
+
+    @Override
+    public void close() {
+        // No resources to clean up
     }
 
     static Map<String, Object> convertEvent(Event event) {

@@ -1655,3 +1655,66 @@ agents:
         expectedBehavior: "重启后 JsonSession 恢复历史，能记住用户名字"
       - prompt: "帮我搜索今天的天气"
         expectedBehavior: "正常工具调用，Session 类型不影响功能"
+
+# ============================================================
+# Phase 3: HARNESS Feature Demos
+# ============================================================
+
+# === HARNESS: Context Compaction Demo ===
+
+  - agentId: compaction-demo
+    category: demo
+    type: HARNESS
+    name: 上下文压缩演示
+    description: 长对话场景，自动触发上下文压缩，保留关键信息
+    systemPrompt: |
+      你是一个对话助手。在多轮对话中，你会处理大量信息。
+      当对话历史过长时，系统会自动压缩上下文，保留关键信息。
+    modelName: qwen-max
+    streaming: true
+    enableThinking: true
+    harnessConfig:
+      executionMode: CLAW
+      isolationScope: USER
+      filesystemMode: LOCAL
+      compaction:
+        triggerMessages: 10
+        keepMessages: 5
+        flushBeforeCompact: true
+    samplePrompts:
+      - prompt: "我们来聊聊天，我想了解你的技术能力"
+        expectedBehavior: "开始多轮对话，持续对话超过 10 轮后会触发自动压缩"
+      - prompt: "这是我们第 15 轮对话了，你还记得我最开始问的问题吗？"
+        expectedBehavior: "上下文已压缩，只保留最近 5 轮关键对话"
+      - prompt: "继续深入讨论技术细节"
+        expectedBehavior: "压缩后继续流畅对话，不会因上下文过长而卡顿"
+
+# === HARNESS: Sandbox Execution Demo ===
+
+  - agentId: sandbox-demo
+    category: demo
+    type: HARNESS
+    name: 沙箱执行演示
+    description: 安全代码执行演示，使用 Local 沙箱后端
+    systemPrompt: |
+      你是一个代码执行助手。你可以在安全的沙箱环境中执行 Python 代码。
+      用户可以要求你执行计算、数据分析、文件操作等任务。
+    modelName: qwen-max
+    streaming: true
+    enableThinking: true
+    harnessConfig:
+      executionMode: BUILDER
+      isolationScope: USER
+      filesystemMode: LOCAL
+      workspace: /tmp/agentscope-sandbox
+      compaction:
+        triggerMessages: 30
+        keepMessages: 10
+        flushBeforeCompact: true
+    samplePrompts:
+      - prompt: "用 Python 计算 1 到 100 的和"
+        expectedBehavior: "在沙箱中执行 Python 代码，返回计算结果"
+      - prompt: "创建一个简单的数据分析和可视化"
+        expectedBehavior: "执行多行 Python 代码进行数据分析"
+      - prompt: "读取 /tmp/agentscope-sandbox/test.txt 文件"
+        expectedBehavior: "在安全沙箱中执行文件读取操作"
