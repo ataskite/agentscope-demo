@@ -105,22 +105,6 @@ public class CompositeAgentFactory {
         return new Hook[] { hook, approvalHook };
     }
 
-    /**
-     * @deprecated Use {@link #createSingleAgentForSession(String, Session, Hook...)} instead.
-     */
-    @Deprecated
-    public ReActAgent createSingleAgentForSession(String agentId, io.agentscope.core.memory.Memory memory, Hook... hooks) {
-        return singleAgentFactory.createAgent(agentId, hooks);
-    }
-
-    /**
-     * @deprecated Use {@link #createSingleAgentForSession(String, Session, Hook...)} instead.
-     */
-    @Deprecated
-    public ReActAgent createSingleAgentForSession(String agentId, io.agentscope.core.memory.Memory memory, Hook hook, ApprovalHook approvalHook) {
-        return singleAgentFactory.createAgent(agentId, mergeHooks(hook, approvalHook));
-    }
-
     public Session createSession() {
         return singleAgentFactory.createSession();
     }
@@ -152,14 +136,6 @@ public class CompositeAgentFactory {
         }
 
         return new OrderFulfillmentGraph(states, stateAgents);
-    }
-
-    /**
-     * @deprecated Use {@link #createStateGraphAgent(AgentConfig, Session)} instead.
-     */
-    @Deprecated
-    public OrderFulfillmentGraph createStateGraphAgent(AgentConfig config, io.agentscope.core.memory.Memory memory) {
-        return createStateGraphAgent(config, (Session) null);
     }
 
     public ReActAgent createRoutingAgent(AgentConfig config, Session session, Hook... hooks) {
@@ -249,14 +225,6 @@ public class CompositeAgentFactory {
         }
 
         return builder.build();
-    }
-
-    /**
-     * @deprecated Use {@link #createRoutingAgent(AgentConfig, Session, Hook...)} instead.
-     */
-    @Deprecated
-    public ReActAgent createRoutingAgent(AgentConfig config, io.agentscope.core.memory.Memory memory, Hook... hooks) {
-        return createRoutingAgent(config, (Session) null, hooks);
     }
 
     private String buildRoutingSystemPrompt(AgentConfig config) {
@@ -378,14 +346,6 @@ public class CompositeAgentFactory {
         }
 
         return builder.build();
-    }
-
-    /**
-     * @deprecated Use {@link #createHandoffsAgent(AgentConfig, Session, Hook...)} instead.
-     */
-    @Deprecated
-    public ReActAgent createHandoffsAgent(AgentConfig config, io.agentscope.core.memory.Memory memory, Hook... hooks) {
-        return createHandoffsAgent(config, (Session) null, hooks);
     }
 
     private String buildHandoffsSystemPrompt(AgentConfig config) {

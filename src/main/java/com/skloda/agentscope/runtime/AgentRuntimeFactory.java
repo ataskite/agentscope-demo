@@ -9,7 +9,6 @@ import com.skloda.agentscope.hook.ApprovalHook;
 import com.skloda.agentscope.hook.ObservabilityHook;
 import com.skloda.agentscope.service.ApprovalService;
 import io.agentscope.core.ReActAgent;
-import io.agentscope.core.memory.Memory;
 import io.agentscope.core.session.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,31 +69,6 @@ public class AgentRuntimeFactory {
         };
     }
 
-    /**
-     * @deprecated Use {@link #createRuntimeWithSession(String, Session)} instead.
-     *             Memory-based creation will be removed once 2.0 migration is complete.
-     */
-    @Deprecated
-    public StreamingAgentRuntime createRuntimeWithMemory(String agentId, Memory memory) {
-        log.debug("Creating AgentRuntime with shared memory for agent: {}", agentId);
-
-        AgentConfig config = configService.getAgentConfig(agentId);
-        AgentType type = config.getType() != null ? config.getType() : AgentType.SINGLE;
-
-        return switch (type) {
-            case SINGLE -> createSingleRuntimeWithMemory(agentId, memory);
-            case ROUTING -> createRoutingRuntimeWithMemory(agentId, memory);
-            case HANDOFFS -> createHandoffsRuntimeWithMemory(agentId, memory);
-            case STATE_GRAPH -> createStateGraphRuntimeWithMemory(agentId, memory);
-            case HARNESS -> createHarnessRuntimeWithMemory(agentId, memory);
-            // Pipeline-dependent patterns disabled for 2.0 migration
-            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, MSG_HUB, SUBAGENT_SEQ, SUBAGENT_PAR ->
-                throw new UnsupportedOperationException(
-                    "Pattern " + type + " is disabled during AgentScope 2.0 migration (pipeline package removed). " +
-                    "Will be reimplemented using 2.0 subagent/middleware API.");
-        };
-    }
-
     public StreamingAgentRuntime createRuntimeWithSession(String agentId, Session session) {
         log.debug("Creating AgentRuntime with shared session for agent: {}", agentId);
 
@@ -140,21 +114,7 @@ public class AgentRuntimeFactory {
         return new AgentRuntime(agent, hook);
     }
 
-    public AgentRuntime createRoutingRuntimeWithMemory(String agentId, Memory memory) {
-        ObservabilityHook hook = new ObservabilityHook();
-        ReActAgent agent = compositeFactory.createRoutingAgent(
-                configService.getAgentConfig(agentId), (Session) null, hook);
-        return new AgentRuntime(agent, hook);
-    }
-
     public AgentRuntime createHandoffsRuntime(String agentId) {
-        ObservabilityHook hook = new ObservabilityHook();
-        ReActAgent agent = compositeFactory.createHandoffsAgent(
-                configService.getAgentConfig(agentId), (Session) null, hook);
-        return new AgentRuntime(agent, hook);
-    }
-
-    public AgentRuntime createHandoffsRuntimeWithMemory(String agentId, Memory memory) {
         ObservabilityHook hook = new ObservabilityHook();
         ReActAgent agent = compositeFactory.createHandoffsAgent(
                 configService.getAgentConfig(agentId), (Session) null, hook);
@@ -168,21 +128,9 @@ public class AgentRuntimeFactory {
         return new StateGraphRuntime(agentId, graph, hook);
     }
 
-    public StateGraphRuntime createStateGraphRuntimeWithMemory(String agentId, Memory memory) {
-        ObservabilityHook hook = new ObservabilityHook();
-        OrderFulfillmentGraph graph = compositeFactory.createStateGraphAgent(
-                configService.getAgentConfig(agentId), (Session) null);
-        return new StateGraphRuntime(agentId, graph, hook);
-    }
-
     public StreamingAgentRuntime createHarnessRuntime(String agentId) {
         log.debug("HARNESS runtime not yet implemented, falling back to SINGLE for agent: {}", agentId);
         return createSingleRuntime(agentId);
-    }
-
-    public StreamingAgentRuntime createHarnessRuntimeWithMemory(String agentId, Memory memory) {
-        log.debug("HARNESS runtime not yet implemented, falling back to SINGLE for agent: {}", agentId);
-        return createSingleRuntimeWithMemory(agentId, memory);
     }
 
     // ---- Session-based runtime helpers (AgentScope 2.0) ----
@@ -278,21 +226,6 @@ public class AgentRuntimeFactory {
         ReActAgent agent = approvalHook != null
                 ? compositeFactory.createSingleAgent(agentId, hook, approvalHook)
                 : compositeFactory.createSingleAgent(agentId, hook);
-
-        if (hasStructuredOutput(config)) {
-            return new StructuredOutputAgentRuntime(agent, hook, config.getStructuredOutputClass());
-        }
-        return new AgentRuntime(agent, hook, approvalHook, approvalService, agentId);
-    }
-
-    private StreamingAgentRuntime createSingleRuntimeWithMemory(String agentId, Memory memory) {
-        AgentConfig config = configService.getAgentConfig(agentId);
-        ObservabilityHook hook = new ObservabilityHook();
-        ApprovalHook approvalHook = createApprovalHookIfNeeded(config);
-
-        ReActAgent agent = approvalHook != null
-                ? compositeFactory.createSingleAgentForSession(agentId, memory, hook, approvalHook)
-                : compositeFactory.createSingleAgentForSession(agentId, memory, hook);
 
         if (hasStructuredOutput(config)) {
             return new StructuredOutputAgentRuntime(agent, hook, config.getStructuredOutputClass());
