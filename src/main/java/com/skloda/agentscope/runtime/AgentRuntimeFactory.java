@@ -3,6 +3,8 @@ package com.skloda.agentscope.runtime;
 import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.AgentConfigService;
 import com.skloda.agentscope.agent.AgentType;
+import com.skloda.agentscope.agent.MsgHubConfig;
+import com.skloda.agentscope.agent.SubAgentConfig;
 import com.skloda.agentscope.composite.CompositeAgentFactory;
 import com.skloda.agentscope.composite.graph.OrderFulfillmentGraph;
 import com.skloda.agentscope.hook.ApprovalHook;
@@ -13,6 +15,9 @@ import io.agentscope.core.state.AgentStateStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Component
 public class AgentRuntimeFactory {
@@ -42,9 +47,10 @@ public class AgentRuntimeFactory {
             case ROUTING -> createRoutingRuntime(agentId);
             case HANDOFFS -> createHandoffsRuntime(agentId);
             case STATE_GRAPH -> createStateGraphRuntime(agentId);
+            case MSG_HUB -> createMsgHubRuntime(agentId);
             case HARNESS -> createHarnessRuntime(agentId);
             // Pipeline-dependent patterns disabled for 2.0 migration
-            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, MSG_HUB, SUBAGENT_SEQ, SUBAGENT_PAR ->
+            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, SUBAGENT_SEQ, SUBAGENT_PAR ->
                 throw new UnsupportedOperationException(
                     "Pattern " + type + " is disabled during AgentScope 2.0 migration (pipeline package removed). " +
                     "Will be reimplemented using 2.0 subagent/middleware API.");
@@ -62,8 +68,9 @@ public class AgentRuntimeFactory {
             case ROUTING -> createRoutingRuntime(agentId);
             case HANDOFFS -> createHandoffsRuntime(agentId);
             case STATE_GRAPH -> createStateGraphRuntime(agentId);
+            case MSG_HUB -> createMsgHubRuntime(agentId);
             case HARNESS -> createHarnessRuntime(agentId);
-            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, MSG_HUB, SUBAGENT_SEQ, SUBAGENT_PAR ->
+            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, SUBAGENT_SEQ, SUBAGENT_PAR ->
                 throw new UnsupportedOperationException(
                     "Pattern " + type + " is disabled during AgentScope 2.0 migration");
         };
@@ -80,9 +87,10 @@ public class AgentRuntimeFactory {
             case ROUTING -> createRoutingRuntimeWithSession(agentId, stateStore);
             case HANDOFFS -> createHandoffsRuntimeWithSession(agentId, stateStore);
             case STATE_GRAPH -> createStateGraphRuntimeWithSession(agentId, stateStore);
+            case MSG_HUB -> createMsgHubRuntimeWithSession(agentId, stateStore);
             case HARNESS -> createHarnessRuntimeWithSession(agentId, stateStore);
             // Pipeline-dependent patterns disabled for 2.0 migration
-            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, MSG_HUB, SUBAGENT_SEQ, SUBAGENT_PAR ->
+            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, SUBAGENT_SEQ, SUBAGENT_PAR ->
                 throw new UnsupportedOperationException(
                     "Pattern " + type + " is disabled during AgentScope 2.0 migration (pipeline package removed). " +
                     "Will be reimplemented using 2.0 subagent/middleware API.");
@@ -100,8 +108,9 @@ public class AgentRuntimeFactory {
             case ROUTING -> createRoutingRuntimeWithSession(agentId, stateStore);
             case HANDOFFS -> createHandoffsRuntimeWithSession(agentId, stateStore);
             case STATE_GRAPH -> createStateGraphRuntimeWithSession(agentId, stateStore);
+            case MSG_HUB -> createMsgHubRuntimeWithSession(agentId, stateStore);
             case HARNESS -> createHarnessRuntimeWithSession(agentId, stateStore);
-            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, MSG_HUB, SUBAGENT_SEQ, SUBAGENT_PAR ->
+            case SEQUENTIAL, PARALLEL, DEBATE, LOOP, SUBAGENT_SEQ, SUBAGENT_PAR ->
                 throw new UnsupportedOperationException(
                     "Pattern " + type + " is disabled during AgentScope 2.0 migration");
         };
@@ -126,6 +135,29 @@ public class AgentRuntimeFactory {
         OrderFulfillmentGraph graph = compositeFactory.createStateGraphAgent(
                 configService.getAgentConfig(agentId), (AgentStateStore) null);
         return new StateGraphRuntime(agentId, graph, hook);
+    }
+
+    public MsgHubRuntime createMsgHubRuntime(String agentId) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+
+        List<SubAgentConfig> subAgentConfigs = config.getSubAgents();
+        if (subAgentConfigs == null || subAgentConfigs.size() < 2) {
+            throw new IllegalArgumentException("MSG_HUB agent requires at least 2 sub-agents (experts + moderator). Got: " + subAgentConfigs);
+        }
+
+        // Last sub-agent is the moderator, all others are experts
+        List<ReActAgent> experts = new ArrayList<>();
+        for (int i = 0; i < subAgentConfigs.size() - 1; i++) {
+            experts.add(compositeFactory.createSingleAgent(subAgentConfigs.get(i).getAgentId()));
+        }
+        ReActAgent moderator = compositeFactory.createSingleAgent(
+                subAgentConfigs.get(subAgentConfigs.size() - 1).getAgentId());
+
+        MsgHubConfig msgHubConfig = config.getMsgHubConfig();
+        int rounds = msgHubConfig != null ? msgHubConfig.getRounds() : 3;
+
+        return new MsgHubRuntime(experts, moderator, hook, agentId, rounds);
     }
 
     public StreamingAgentRuntime createHarnessRuntime(String agentId) {
@@ -167,6 +199,30 @@ public class AgentRuntimeFactory {
         OrderFulfillmentGraph graph = compositeFactory.createStateGraphAgent(
                 configService.getAgentConfig(agentId), stateStore);
         return new StateGraphRuntime(agentId, graph, hook);
+    }
+
+    private MsgHubRuntime createMsgHubRuntimeWithSession(String agentId, AgentStateStore stateStore) {
+        AgentConfig config = configService.getAgentConfig(agentId);
+        ObservabilityHook hook = new ObservabilityHook();
+
+        List<SubAgentConfig> subAgentConfigs = config.getSubAgents();
+        if (subAgentConfigs == null || subAgentConfigs.size() < 2) {
+            throw new IllegalArgumentException("MSG_HUB agent requires at least 2 sub-agents (experts + moderator). Got: " + subAgentConfigs);
+        }
+
+        // Last sub-agent is the moderator, all others are experts
+        List<ReActAgent> experts = new ArrayList<>();
+        for (int i = 0; i < subAgentConfigs.size() - 1; i++) {
+            experts.add(compositeFactory.createSingleAgentForSession(
+                    subAgentConfigs.get(i).getAgentId(), stateStore, null));
+        }
+        ReActAgent moderator = compositeFactory.createSingleAgentForSession(
+                subAgentConfigs.get(subAgentConfigs.size() - 1).getAgentId(), stateStore, null);
+
+        MsgHubConfig msgHubConfig = config.getMsgHubConfig();
+        int rounds = msgHubConfig != null ? msgHubConfig.getRounds() : 3;
+
+        return new MsgHubRuntime(experts, moderator, hook, agentId, rounds);
     }
 
     private StreamingAgentRuntime createHarnessRuntimeWithSession(String agentId, AgentStateStore stateStore) {
