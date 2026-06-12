@@ -11,11 +11,8 @@ import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Sinks;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.function.BiConsumer;
 
 /**
  * Runtime for agents configured with structured output.
@@ -35,8 +32,6 @@ public class StructuredOutputAgentRuntime implements StreamingAgentRuntime {
     private final String structuredOutputClassName;
     private final StructuredOutputValidator validator;
     private final int maxRepairAttempts;
-    private final Sinks.Many<Map<String, Object>> sink;
-    private final BiConsumer<String, Map<String, Object>> hookBridge;
 
     public StructuredOutputAgentRuntime(ReActAgent agent, ObservabilityHook hook,
                                          String structuredOutputClassName) {
@@ -52,14 +47,6 @@ public class StructuredOutputAgentRuntime implements StreamingAgentRuntime {
         this.structuredOutputClassName = structuredOutputClassName;
         this.validator = validator;
         this.maxRepairAttempts = maxRepairAttempts;
-        this.sink = Sinks.many().multicast().onBackpressureBuffer();
-
-        this.hookBridge = (type, data) -> {
-            Map<String, Object> payload = new LinkedHashMap<>(data);
-            payload.put("type", type);
-            emit(payload);
-        };
-        hook.addConsumer(hookBridge);
     }
 
     @Override
@@ -67,7 +54,7 @@ public class StructuredOutputAgentRuntime implements StreamingAgentRuntime {
         log.debug("Starting structured output stream for agent: {} (schema={})",
                 agent.getName(), structuredOutputClassName);
 
-        Flux<Map<String, Object>> hookEvents = this.sink.asFlux();
+        Flux<Map<String, Object>> sinkEvents = hook.getEventSink().asFlux();
 
         Flux<Map<String, Object>> resultStream = Flux.create(fluxSink -> {
             try {
@@ -144,7 +131,7 @@ public class StructuredOutputAgentRuntime implements StreamingAgentRuntime {
             }
         });
 
-        return Flux.merge(hookEvents, resultStream)
+        return Flux.merge(sinkEvents, resultStream)
                 .doOnCancel(this::close);
     }
 
@@ -187,18 +174,9 @@ public class StructuredOutputAgentRuntime implements StreamingAgentRuntime {
                 .build();
     }
 
-    private void emit(Map<String, Object> payload) {
-        Sinks.EmitResult result = sink.tryEmitNext(payload);
-        if (result.isFailure()) {
-            log.warn("Failed to emit event: {}", result);
-        }
-    }
-
     @Override
     public void close() {
-        hook.removeConsumer(hookBridge);
-        hook.reset();
-        sink.tryEmitComplete();
+        hook.getEventSink().complete();
         log.debug("StructuredOutputAgentRuntime closed for agent: {}", agent.getName());
     }
 }
