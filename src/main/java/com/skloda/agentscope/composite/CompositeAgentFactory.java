@@ -13,7 +13,6 @@ import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.AgentBase;
 import io.agentscope.core.agent.StreamOptions;
 import io.agentscope.core.formatter.dashscope.DashScopeChatFormatter;
-import io.agentscope.core.hook.Hook;
 import io.agentscope.core.model.DashScopeChatModel;
 import io.agentscope.core.state.AgentStateStore;
 import io.agentscope.core.state.InMemoryAgentStateStore;
@@ -58,49 +57,27 @@ public class CompositeAgentFactory {
         this.configService = configService;
     }
 
-    public ReActAgent createSingleAgent(String agentId, Hook... hooks) {
-        return singleAgentFactory.createAgent(agentId, hooks);
+    public ReActAgent createSingleAgent(String agentId) {
+        return singleAgentFactory.createAgent(agentId, null);
     }
 
-    public ReActAgent createSingleAgent(String agentId, Hook hook, ApprovalHook approvalHook) {
-        return singleAgentFactory.createAgent(agentId, mergeHooks(hook, approvalHook));
+    public ReActAgent createSingleAgent(String agentId, ApprovalHook approvalHook) {
+        return singleAgentFactory.createAgent(agentId, approvalHook);
     }
 
-    public ReActAgent createSingleAgent(String agentId, String permissionMode, Hook... hooks) {
-        return singleAgentFactory.createAgent(agentId, permissionMode, hooks);
-    }
-
-    public ReActAgent createSingleAgent(String agentId, String permissionMode, Hook hook, ApprovalHook approvalHook) {
-        return singleAgentFactory.createAgent(agentId, permissionMode, mergeHooks(hook, approvalHook));
+    public ReActAgent createSingleAgent(String agentId, String permissionMode, ApprovalHook approvalHook) {
+        return singleAgentFactory.createAgent(agentId, permissionMode, approvalHook);
     }
 
     /**
      * Create a single agent for session use (with externally provided AgentStateStore).
      */
-    public ReActAgent createSingleAgentForSession(String agentId, AgentStateStore stateStore, Hook... hooks) {
-        return singleAgentFactory.createAgentForSession(agentId, stateStore, hooks);
+    public ReActAgent createSingleAgentForSession(String agentId, AgentStateStore stateStore, ApprovalHook approvalHook) {
+        return singleAgentFactory.createAgentForSession(agentId, stateStore, approvalHook);
     }
 
-    public ReActAgent createSingleAgentForSession(String agentId, AgentStateStore stateStore, Hook hook, ApprovalHook approvalHook) {
-        return singleAgentFactory.createAgentForSession(agentId, stateStore, mergeHooks(hook, approvalHook));
-    }
-
-    public ReActAgent createSingleAgentForSession(String agentId, AgentStateStore stateStore, String permissionMode, Hook... hooks) {
-        return singleAgentFactory.createAgentForSession(agentId, stateStore, permissionMode, hooks);
-    }
-
-    public ReActAgent createSingleAgentForSession(String agentId, AgentStateStore stateStore, String permissionMode, Hook hook, ApprovalHook approvalHook) {
-        return singleAgentFactory.createAgentForSession(agentId, stateStore, permissionMode, mergeHooks(hook, approvalHook));
-    }
-
-    /**
-     * Merge hooks into a single array for vararg methods.
-     */
-    private Hook[] mergeHooks(Hook hook, ApprovalHook approvalHook) {
-        if (approvalHook == null) {
-            return new Hook[] { hook };
-        }
-        return new Hook[] { hook, approvalHook };
+    public ReActAgent createSingleAgentForSession(String agentId, AgentStateStore stateStore, String permissionMode, ApprovalHook approvalHook) {
+        return singleAgentFactory.createAgentForSession(agentId, stateStore, permissionMode, approvalHook);
     }
 
     public AgentStateStore createStateStore() {
@@ -111,7 +88,7 @@ public class CompositeAgentFactory {
         return config.getSubAgents().stream()
                 .map(sub -> {
                     log.info("Creating sub-agent: {} for composite: {}", sub.getAgentId(), config.getAgentId());
-                    return singleAgentFactory.createAgent(sub.getAgentId());
+                    return singleAgentFactory.createAgent(sub.getAgentId(), (ApprovalHook) null);
                 })
                 .map(ReActAgent.class::cast)
                 .map(AgentBase.class::cast)
@@ -128,7 +105,7 @@ public class CompositeAgentFactory {
         for (StateConfig state : states) {
             if (state.getAgent() != null) {
                 AgentStateStore effectiveStore = stateStore != null ? stateStore : new InMemoryAgentStateStore();
-                ReActAgent agent = singleAgentFactory.createAgentForSession(state.getAgent(), effectiveStore);
+                ReActAgent agent = singleAgentFactory.createAgentForSession(state.getAgent(), effectiveStore, null);
                 stateAgents.put(state.getName(), agent);
             }
         }
@@ -136,7 +113,7 @@ public class CompositeAgentFactory {
         return new OrderFulfillmentGraph(states, stateAgents);
     }
 
-    public ReActAgent createRoutingAgent(AgentConfig config, AgentStateStore stateStore, Hook... hooks) {
+    public ReActAgent createRoutingAgent(AgentConfig config, AgentStateStore stateStore) {
         if (config.getSubAgents() == null || config.getSubAgents().isEmpty()) {
             throw new IllegalArgumentException("ROUTING agent requires at least one sub-agent: " + config.getAgentId());
         }
@@ -218,9 +195,7 @@ public class CompositeAgentFactory {
                 .defaultSessionId(config.getAgentId())
                 .toolkit(toolkit);
 
-        if (hooks != null && hooks.length > 0) {
-            builder.hooks(List.of(hooks));
-        }
+        // No hooks registration -- ObservabilityHook is no longer a Hook interface impl
 
         return builder.build();
     }
@@ -258,7 +233,7 @@ public class CompositeAgentFactory {
         return sb.toString();
     }
 
-    public ReActAgent createHandoffsAgent(AgentConfig config, AgentStateStore stateStore, Hook... hooks) {
+    public ReActAgent createHandoffsAgent(AgentConfig config, AgentStateStore stateStore) {
         if (config.getSubAgents() == null || config.getSubAgents().isEmpty()) {
             throw new IllegalArgumentException("HANDOFFS agent requires at least one sub-agent: " + config.getAgentId());
         }
@@ -339,9 +314,7 @@ public class CompositeAgentFactory {
                 .defaultSessionId(config.getAgentId())
                 .toolkit(toolkit);
 
-        if (hooks != null && hooks.length > 0) {
-            builder.hooks(List.of(hooks));
-        }
+        // No hooks registration -- ObservabilityHook is no longer a Hook interface impl
 
         return builder.build();
     }

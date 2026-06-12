@@ -110,14 +110,14 @@ public class AgentRuntimeFactory {
     public AgentRuntime createRoutingRuntime(String agentId) {
         ObservabilityHook hook = new ObservabilityHook();
         ReActAgent agent = compositeFactory.createRoutingAgent(
-                configService.getAgentConfig(agentId), (AgentStateStore) null, hook);
+                configService.getAgentConfig(agentId), (AgentStateStore) null);
         return new AgentRuntime(agent, hook);
     }
 
     public AgentRuntime createHandoffsRuntime(String agentId) {
         ObservabilityHook hook = new ObservabilityHook();
         ReActAgent agent = compositeFactory.createHandoffsAgent(
-                configService.getAgentConfig(agentId), (AgentStateStore) null, hook);
+                configService.getAgentConfig(agentId), (AgentStateStore) null);
         return new AgentRuntime(agent, hook);
     }
 
@@ -140,9 +140,7 @@ public class AgentRuntimeFactory {
         ObservabilityHook hook = new ObservabilityHook();
         ApprovalHook approvalHook = createApprovalHookIfNeeded(config);
 
-        ReActAgent agent = approvalHook != null
-                ? compositeFactory.createSingleAgentForSession(agentId, stateStore, hook, approvalHook)
-                : compositeFactory.createSingleAgentForSession(agentId, stateStore, hook);
+        ReActAgent agent = compositeFactory.createSingleAgentForSession(agentId, stateStore, approvalHook);
 
         if (hasStructuredOutput(config)) {
             return new StructuredOutputAgentRuntime(agent, hook, config.getStructuredOutputClass());
@@ -153,14 +151,14 @@ public class AgentRuntimeFactory {
     private AgentRuntime createRoutingRuntimeWithSession(String agentId, AgentStateStore stateStore) {
         ObservabilityHook hook = new ObservabilityHook();
         ReActAgent agent = compositeFactory.createRoutingAgent(
-                configService.getAgentConfig(agentId), stateStore, hook);
+                configService.getAgentConfig(agentId), stateStore);
         return new AgentRuntime(agent, hook);
     }
 
     private AgentRuntime createHandoffsRuntimeWithSession(String agentId, AgentStateStore stateStore) {
         ObservabilityHook hook = new ObservabilityHook();
         ReActAgent agent = compositeFactory.createHandoffsAgent(
-                configService.getAgentConfig(agentId), stateStore, hook);
+                configService.getAgentConfig(agentId), stateStore);
         return new AgentRuntime(agent, hook);
     }
 
@@ -183,9 +181,7 @@ public class AgentRuntimeFactory {
         ObservabilityHook hook = new ObservabilityHook();
         ApprovalHook approvalHook = createApprovalHookIfNeeded(config);
 
-        ReActAgent agent = approvalHook != null
-                ? compositeFactory.createSingleAgent(agentId, permissionMode, hook, approvalHook)
-                : compositeFactory.createSingleAgent(agentId, permissionMode, hook);
+        ReActAgent agent = compositeFactory.createSingleAgent(agentId, permissionMode, approvalHook);
 
         if (hasStructuredOutput(config)) {
             return new StructuredOutputAgentRuntime(agent, hook, config.getStructuredOutputClass());
@@ -198,9 +194,7 @@ public class AgentRuntimeFactory {
         ObservabilityHook hook = new ObservabilityHook();
         ApprovalHook approvalHook = createApprovalHookIfNeeded(config);
 
-        ReActAgent agent = approvalHook != null
-                ? compositeFactory.createSingleAgentForSession(agentId, stateStore, permissionMode, hook, approvalHook)
-                : compositeFactory.createSingleAgentForSession(agentId, stateStore, permissionMode, hook);
+        ReActAgent agent = compositeFactory.createSingleAgentForSession(agentId, stateStore, permissionMode, approvalHook);
 
         if (hasStructuredOutput(config)) {
             return new StructuredOutputAgentRuntime(agent, hook, config.getStructuredOutputClass());
@@ -223,9 +217,7 @@ public class AgentRuntimeFactory {
         ObservabilityHook hook = new ObservabilityHook();
         ApprovalHook approvalHook = createApprovalHookIfNeeded(config);
 
-        ReActAgent agent = approvalHook != null
-                ? compositeFactory.createSingleAgent(agentId, hook, approvalHook)
-                : compositeFactory.createSingleAgent(agentId, hook);
+        ReActAgent agent = compositeFactory.createSingleAgent(agentId, approvalHook);
 
         if (hasStructuredOutput(config)) {
             return new StructuredOutputAgentRuntime(agent, hook, config.getStructuredOutputClass());
