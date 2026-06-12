@@ -6,38 +6,23 @@ import io.agentscope.core.message.ContentBlock;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.TextBlock;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Sinks;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiConsumer;
 
 public class StateGraphRuntime implements StreamingAgentRuntime {
 
     private final String graphName;
     private final OrderFulfillmentGraph graph;
     private final ObservabilityHook hook;
-    private final Sinks.Many<Map<String, Object>> sink;
-    private final BiConsumer<String, Map<String, Object>> hookBridge;
 
     public StateGraphRuntime(String graphName, OrderFulfillmentGraph graph, ObservabilityHook hook) {
         this.graphName = graphName;
         this.graph = graph;
         this.hook = hook;
-        this.sink = Sinks.many().multicast().onBackpressureBuffer();
-
-        this.hookBridge = (type, data) -> {
-            Map<String, Object> payload = new LinkedHashMap<>(data);
-            payload.put("type", type);
-            emit(payload);
-        };
-        hook.addConsumer(hookBridge);
 
         graph.addEventConsumer((type, data) -> {
-            Map<String, Object> payload = new LinkedHashMap<>(data);
-            payload.put("type", type);
-            emit(payload);
+            hook.getEventSink().emit(type, data);
         });
     }
 
@@ -73,7 +58,7 @@ public class StateGraphRuntime implements StreamingAgentRuntime {
             }
         });
 
-        return Flux.merge(this.sink.asFlux(), graphStream)
+        return Flux.merge(hook.getEventSink().asFlux(), graphStream)
                 .doOnCancel(this::close);
     }
 
@@ -82,14 +67,8 @@ public class StateGraphRuntime implements StreamingAgentRuntime {
         return hook;
     }
 
-    private void emit(Map<String, Object> payload) {
-        sink.tryEmitNext(payload);
-    }
-
     @Override
     public void close() {
-        hook.removeConsumer(hookBridge);
-        hook.reset();
-        sink.tryEmitComplete();
+        hook.getEventSink().complete();
     }
 }
