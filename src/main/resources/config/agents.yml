@@ -1005,6 +1005,174 @@ agents:
         expectedBehavior: "调用搜索专家获取市场信息，调用销售专家给出建议"
 
 # ============================================================
+# Phase 2: Pipeline Pattern Agents (Task 8)
+# ============================================================
+
+  - agentId: doc-analysis-pipeline-v2
+    category: collaboration
+    type: SEQUENTIAL
+    name: 文档分析流水线 v2
+    description: 文档解析 → 信息搜索的顺序处理流水线
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    subAgents:
+      - agentId: doc-expert
+        description: 文档专家，负责解析和分析文档内容
+      - agentId: search-expert
+        description: 搜索专家，基于文档内容搜索补充信息
+    parallel: false
+    samplePrompts:
+      - prompt: "请分析我上传的合同，并搜索相关法律法规作为参考"
+        expectedBehavior: "先由文档专家解析合同，再由搜索专家查找法规，最后综合给出分析结果"
+      - prompt: "分析这份产品文档，并搜索竞品对比信息"
+        expectedBehavior: "文档专家提取产品信息，搜索专家查找竞品资料"
+
+  - agentId: parallel-analysis-v2
+    category: collaboration
+    type: PARALLEL
+    name: 并行分析流水线 v2
+    description: 多角度并行分析流水线（文档、视觉、搜索）
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    subAgents:
+      - agentId: doc-expert
+        description: 文档专家，处理文档内容分析
+      - agentId: vision-expert
+        description: 视觉专家，处理图片和图表分析
+      - agentId: search-expert
+        description: 搜索专家，获取实时网络信息
+    parallel: true
+    samplePrompts:
+      - prompt: "从多个角度分析这份商业计划书"
+        expectedBehavior: "三个专家并行分析不同维度，最后聚合结果"
+      - prompt: "综合分析这个产品的技术文档、市场数据和用户反馈"
+        expectedBehavior: "文档专家分析文档，视觉专家分析图表，搜索专家查找市场信息"
+
+  - agentId: debate-review-v2
+    category: collaboration
+    type: DEBATE
+    name: 辩论评审流水线 v2
+    description: 多专家辩论模式，乐观派、批评家、分析师讨论后由裁判总结
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    subAgents:
+      - agentId: debate-optimist
+        description: 乐观派分析师，从积极角度分析优势
+      - agentId: debate-critic
+        description: 批评家，从风险角度分析问题
+      - agentId: debate-analyst
+        description: 数据分析师，从客观角度分析
+      - agentId: debate-judge
+        description: 裁判，综合各方观点做出最终裁决
+    msgHubConfig:
+      rounds: 2
+      summaryRole: debate-judge
+    samplePrompts:
+      - prompt: "辩论这个方案：引入 AI Agent 替代 80% 的人工客服"
+        expectedBehavior: "乐观派、批评家、分析师各抒己见，经过两轮讨论，最后裁判给出综合裁决"
+      - prompt: "从多个角度评估这个技术选型：使用微服务架构重构现有系统"
+        expectedBehavior: "专家们进行多轮辩论，裁判总结共识和分歧"
+
+  - agentId: copywriter-refiner-v2
+    category: collaboration
+    type: LOOP
+    name: 文案优化循环流水线 v2
+    description: 写作 → 评审 → 修改的迭代优化循环
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    subAgents:
+      - agentId: writer
+        description: 文案写手，负责撰写和修改内容
+      - agentId: critic
+        description: 文案评审，负责评审质量并给出建议
+    loopConfig:
+      maxIterations: 3
+      exitCondition: "质量达标或达到最大迭代次数"
+    samplePrompts:
+      - prompt: "帮我写一篇关于 AI Agent 的产品介绍文案"
+        expectedBehavior: "写手撰写初稿，评审提出修改建议，写手修改，循环直到质量达标"
+      - prompt: "优化这段营销文案，让它更有说服力"
+        expectedBehavior: "多轮迭代优化，每次改进都基于评审意见"
+
+  - agentId: expert-roundtable-v2
+    category: collaboration
+    type: MSG_HUB
+    name: 专家圆桌会议 v2
+    description: 多轮专家讨论，架构师、DBA、安全专家各抒己见，主持人总结
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    subAgents:
+      - agentId: architect
+        description: 架构师，从系统架构角度评审
+      - agentId: dba-expert
+        description: DBA专家，从数据库角度评审
+      - agentId: security-expert
+        description: 安全专家，从安全合规角度评审
+      - agentId: moderator
+        description: 主持人，综合专家意见并总结
+    msgHubConfig:
+      rounds: 3
+      summaryRole: moderator
+    samplePrompts:
+      - prompt: "专家们请评审这个技术方案：使用 Spring Boot + MySQL 搭建企业级应用"
+        expectedBehavior: "架构师、DBA、安全专家进行三轮讨论，主持人总结各方观点"
+      - prompt: "从技术、数据、安全三个角度评估这个系统架构"
+        expectedBehavior: "多轮圆桌讨论，每位专家都能看到之前的发言"
+
+  - agentId: report-generator-v2
+    category: collaboration
+    type: SUBAGENT_SEQ
+    name: 报告生成流水线 v2
+    description: 调研 → 分析 → 报告撰写的顺序任务委托流水线
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    subAgents:
+      - agentId: researcher
+        description: 调研员
+        taskTemplate: "请调研以下主题并提供全面的背景信息和最新进展：{userInput}"
+      - agentId: analyst
+        description: 分析师
+        taskTemplate: "请对以下调研结果进行深度分析，提取关键洞察和趋势：{prevOutput}"
+      - agentId: report-writer
+        description: 报告撰写员
+        taskTemplate: "请根据以下分析结果撰写结构清晰、内容完整的最终报告：{prevOutput}"
+    samplePrompts:
+      - prompt: "帮我生成一份关于大语言模型在企业应用现状的研究报告"
+        expectedBehavior: "调研员收集信息 → 分析师提取洞察 → 报告员撰写最终报告"
+      - prompt: "研究 AI Agent 市场并生成分析报告"
+        expectedBehavior: "三个子任务顺序执行，每个环节都使用上一环节的输出"
+
+  - agentId: project-manager-v2
+    category: collaboration
+    type: SUBAGENT_PAR
+    name: 项目管理流水线 v2
+    description: 并行执行调研、设计、评估，最后聚合结果
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    subAgents:
+      - agentId: pm-researcher
+        description: 项目调研员
+        taskTemplate: "请调研项目的技术可行性和市场情况：{userInput}"
+      - agentId: pm-designer
+        description: 方案设计师
+        taskTemplate: "请根据需求设计技术方案和系统架构：{userInput}"
+      - agentId: pm-evaluator
+        description: 风险评估员
+        taskTemplate: "请评估项目的风险和资源需求：{userInput}"
+    samplePrompts:
+      - prompt: "评估这个项目的可行性：搭建一个企业级知识库问答系统"
+        expectedBehavior: "调研员、设计师、评估员并行工作，最后聚合三方面的结果"
+      - prompt: "从技术、设计、风险三个角度同时评估这个项目"
+        expectedBehavior: "三个子任务并行执行，最终汇总完整的项目评估报告"
+
+# ============================================================
 # P6: Advanced Multi-Agent Patterns
 # ============================================================
 
