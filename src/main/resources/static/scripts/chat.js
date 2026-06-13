@@ -384,11 +384,41 @@ async function sendMessage() {
                         case 'pipeline_step_end':
                             handlePipelineStepEnd(payload);
                             break;
+                        case 'pipeline_step_result':
+                            // Per-step intermediate output (new in AgentScope 2.0 runtimes)
+                            if (currentRound) {
+                                addTimelineRow('phase',
+                                    'Step ' + ((payload.stepIndex ?? 0) + 1) + ' Result',
+                                    escapeHtml(payload.agentId || '') + ': ' +
+                                        truncate(payload.output || '', 60), 'ok');
+                            }
+                            break;
+                        case 'pipeline_end':
+                            if (currentRound) {
+                                addTimelineRow('phase', 'Pipeline End',
+                                    (payload.totalSteps || 0) + ' steps' +
+                                        (payload.duration_ms ? ' (' + formatDuration(payload.duration_ms) + ')' : ''),
+                                    'ok');
+                            }
+                            break;
                         case 'routing_decision':
                             handleRoutingDecision(payload);
                             break;
+                        case 'routing_end':
+                            if (currentRound) {
+                                addTimelineRow('phase', 'Routing End',
+                                    '→ ' + escapeHtml(payload.selectedAgent || ''), 'ok');
+                            }
+                            break;
                         case 'handoff_start':
                             handleHandoffStart(payload);
+                            break;
+                        case 'handoff_complete':
+                            if (currentRound) {
+                                addTimelineRow('phase', 'Handoff Complete',
+                                    escapeHtml(payload.fromAgent || '') + ' → ' +
+                                        escapeHtml(payload.toAgent || ''), 'ok');
+                            }
                             break;
 
                         // ===== P6 ADVANCED PATTERN EVENTS =====
@@ -401,6 +431,14 @@ async function sendMessage() {
                             break;
                         case 'loop_iteration_result':
                             handleLoopIterationResult(payload);
+                            break;
+                        case 'loop_writer_output':
+                            // Writer output for current loop iteration (new in LoopRuntime)
+                            if (currentRound) {
+                                addTimelineRow('phase',
+                                    '✍ Writer #' + (payload.iteration ?? '?'),
+                                    truncate(payload.content || '', 60), 'ok');
+                            }
                             break;
                         case 'graph_transition':
                             handleGraphTransition(payload);
@@ -443,6 +481,14 @@ async function sendMessage() {
                             break;
                         case 'task_end':
                             handleTaskEnd(payload);
+                            break;
+                        case 'task_result':
+                            // Per-task output result (new in SubAgent runtimes)
+                            if (currentRound) {
+                                addTimelineRow('phase',
+                                    'Task Result: ' + (payload.agentId || ''),
+                                    truncate(payload.output || '', 60), 'ok');
+                            }
                             break;
                         case 'task_aggregate':
                             if (currentRound) {
