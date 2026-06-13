@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Spring Boot 3.5.13 + Java 17 demo for AgentScope (v1.0.11), a Java agent framework with LLM-backed ReAct agents. Features multiple agent types: basic chat, tool-calling, document analysis, multi-modal support (vision/audio), RAG knowledge base, session management, web search, and multi-agent collaboration (10 patterns: sequential, parallel, routing, handoffs, debate, loop, state graph, msg hub, subagents-sequential, subagents-parallel).
+Spring Boot 3.5.13 + Java 17 demo for AgentScope (v2.0.0-RC3), a Java agent framework with LLM-backed ReAct agents. Features multiple agent types: basic chat, tool-calling, document analysis, multi-modal support (vision/audio), RAG knowledge base, session management (AgentStateStore), web search, multi-agent collaboration (10 patterns: sequential, parallel, routing, handoffs, debate, loop, state graph, msg hub, subagents-sequential, subagents-parallel), and advanced capabilities via the AgentScope Harness (context compaction, sandbox execution).
 
 ## Build & Run
 
@@ -56,18 +56,19 @@ public String parseDocx(
 ) { ... }
 ```
 
-Register directly via `toolkit.registerTool(new SimpleTools())` or bind via SkillBox.
+Register directly via `toolkit.registerTool(new SimpleTools())` or bind skills via `ClasspathSkillRepository` + `DynamicSkillMiddleware` (the 2.0 replacement for the legacy SkillBox API).
 
 ### Session Management
 
-`SessionManagerService` manages conversation persistence:
+`SessionManagerService` manages conversation persistence on top of the 2.0 `AgentStateStore` API:
 
-- **SessionContext**: Holds `ReActAgent`, `Memory`, `SessionManager`
-- **Storage**: JSON files in `${user.home}/.agentscope/demo-sessions/`
+- **State store**: `AgentStateStore` implementations (`InMemoryAgentStateStore`, `JsonFileAgentStateStore`) replace the legacy `Session`/`SessionManager` API
+- **SessionContext**: Holds the `ReActAgent`, memory, and bound `AgentStateStore`
+- **Storage**: JSON files in `${user.home}/.agentscope/demo-sessions/` (via `JsonFileAgentStateStore`)
 - **Lifecycle**: Create → Cache → Auto-save on completion
 - **API**: `/api/sessions` for list/create/delete
 
-Each session maintains its own agent instance with isolated memory.
+Each session maintains its own agent instance with isolated memory and state.
 
 ### Knowledge Service (RAG)
 
@@ -81,57 +82,56 @@ Each session maintains its own agent instance with isolated memory.
 
 ### Reactive Streaming Architecture
 
-`ChatController.sendMessage` returns `Flux<ServerSentEvent<String>>` directly. `AgentService.streamEvents` uses `AgentRuntime` which merges hook events with agent text stream:
+`ChatController.sendMessage` returns `Flux<ServerSentEvent<String>>` directly. `AgentService.streamEvents` uses `AgentRuntime`, which merges automatic agent lifecycle events (from `agent.streamEvents()` returning `Flux<AgentEvent>`) with manual multi-agent events emitted via `EventSink`.
 
-**AgentRuntime lifecycle:**
-1. `AgentRuntimeFactory.createRuntime(agentId)` creates fresh `ObservabilityHook` + `ReActAgent`
+**AgentRuntime lifecycle (AgentScope 2.0):**
+1. `AgentRuntimeFactory.createRuntime(agentId)` creates a fresh `ObservabilityHook` (now an EventSink bridge, not a `Hook` implementation) + `ReActAgent`
 2. `AgentRuntime.stream(Msg)` returns `Flux<Map<String, Object>>` merging:
-   - Hook events (timeline/metrics via `ObservabilityHook`)
-   - Agent text stream (incremental `TextBlock` from `agent.stream()`)
-3. `ChatController` converts events to SSE and completes the flux
-4. `AgentRuntime.close()` cleans up hook consumer and completes sink
+   - **Automatic lifecycle events** produced by `agent.streamEvents()` and mapped from `AgentEvent` types (`AGENT_START`, `LLM_START`, `REASONING_DELTA`, `LLM_END`, `TOOL_CALL_START`, `TOOL_CALL_END`, `AGENT_END`, `TEXT_BLOCK_DELTA`, ...)
+   - **Manual multi-agent events** published through `EventSink` (pipeline, routing, handoff, loop, graph, msg hub, subagent task events)
+3. `ChatController` converts the merged events to SSE and completes the flux
+4. `AgentRuntime.close()` cleans up sink consumers and completes the flux
+
+> Note: The deprecated `agent.stream()` (raw `TextBlock` iterator) is no longer used; `streamEvents()` is the single source of agent-side events.
 
 | Event Type | Source | Content | Frontend Display |
 |------------|--------|---------|------------------|
-| `agent_start` | Hook (PreCallEvent) | agent name, input count | Debug panel |
-| `llm_start` | Hook (PreReasoningEvent) | model name, call number | Debug panel |
-| `thinking` | Hook (ReasoningChunkEvent) | incremental thinking content | Debug panel |
-| `llm_end` | Hook (PostReasoningEvent) | token usage, tool calls | Debug panel |
-| `tool_start` | Hook (PreActingEvent) | tool name, params | Debug panel |
-| `tool_end` | Hook (PostActingEvent) | tool result, duration | Debug panel |
-| `agent_end` | Hook (PostCallEvent) | total LLM/tool calls, duration | Debug panel |
-| `pipeline_start` | Multi-agent | pipeline ID, step count | Debug panel |
-| `pipeline_step_start` | Multi-agent | step index, agent ID | Debug panel |
-| `pipeline_step_end` | Multi-agent | step completion | Debug panel |
-| `routing_decision` | Multi-agent | selected agent, reasoning | Debug panel |
-| `handoff_start` | Multi-agent | from/to agent, reason | Debug panel |
-| `loop_start` | P6 Loop | iteration number | Debug panel |
-| `loop_end` | P6 Loop | total iterations, final status | Debug panel |
-| `loop_iteration_result` | P6 Loop | iteration, approved status | Debug panel |
-| `graph_transition` | P6 StateGraph | from state, to state, trigger | Debug panel |
-| `graph_agent_call` | P6 StateGraph | state name, agent ID | Debug panel |
-| `roundtable_start` | P6 MsgHub | participants, rounds | Debug panel |
-| `round_start` | P6 MsgHub | round number | Debug panel |
-| `round_end` | P6 MsgHub | round completion | Debug panel |
-| `round_message` | P6 MsgHub | agent, message content | Debug panel |
-| `roundtable_summary` | P6 MsgHub | summary content | Debug panel |
-| `task_delegate` | P6 Subagents | from, to, task | Debug panel |
-| `task_start` | P6 Subagents | agent ID | Debug panel |
-| `task_end` | P6 Subagents | agent, output preview | Debug panel |
-| `task_aggregate` | P6 Subagents | total tasks | Debug panel |
-| `text` | Agent stream | incremental response text | Main chat area |
-| `error` | Hook/ErrorEvent | error message | Alert |
+| `agent_start` | AgentEvent (AGENT_START) | agent name, input count | Debug panel |
+| `llm_start` | AgentEvent (LLM_START) | model name, call number | Debug panel |
+| `thinking` | AgentEvent (REASONING_DELTA) | incremental thinking content | Debug panel |
+| `llm_end` | AgentEvent (LLM_END) | token usage, tool calls | Debug panel |
+| `tool_start` | AgentEvent (TOOL_CALL_START) | tool name, params | Debug panel |
+| `tool_end` | AgentEvent (TOOL_CALL_END) | tool result, duration | Debug panel |
+| `agent_end` | AgentEvent (AGENT_END) | total LLM/tool calls, duration | Debug panel |
+| `pipeline_start` | EventSink (Multi-agent) | pipeline ID, step count | Debug panel |
+| `pipeline_step_start` | EventSink (Multi-agent) | step index, agent ID | Debug panel |
+| `pipeline_step_end` | EventSink (Multi-agent) | step completion | Debug panel |
+| `routing_decision` | EventSink (Multi-agent) | selected agent, reasoning | Debug panel |
+| `handoff_start` | EventSink (Multi-agent) | from/to agent, reason | Debug panel |
+| `loop_start` | EventSink (Loop runtime) | iteration number | Debug panel |
+| `loop_end` | EventSink (Loop runtime) | total iterations, final status | Debug panel |
+| `loop_iteration_result` | EventSink (Loop runtime) | iteration, approved status | Debug panel |
+| `graph_transition` | EventSink (StateGraph runtime) | from state, to state, trigger | Debug panel |
+| `graph_agent_call` | EventSink (StateGraph runtime) | state name, agent ID | Debug panel |
+| `roundtable_start` | EventSink (MsgHub runtime) | participants, rounds | Debug panel |
+| `round_start` | EventSink (MsgHub runtime) | round number | Debug panel |
+| `round_end` | EventSink (MsgHub runtime) | round completion | Debug panel |
+| `round_message` | EventSink (MsgHub runtime) | agent, message content | Debug panel |
+| `roundtable_summary` | EventSink (MsgHub runtime) | summary content | Debug panel |
+| `task_delegate` | EventSink (Subagent runtime) | from, to, task | Debug panel |
+| `task_start` | EventSink (Subagent runtime) | agent ID | Debug panel |
+| `task_end` | EventSink (Subagent runtime) | agent, output preview | Debug panel |
+| `task_aggregate` | EventSink (Subagent runtime) | total tasks | Debug panel |
+| `text` | AgentEvent (TEXT_BLOCK_DELTA) | incremental response text | Main chat area |
+| `error` | AgentEvent / EventSink | error message | Alert |
 
-### ObservabilityHook
+### ObservabilityHook (EventSink bridge)
 
-`hook/ObservabilityHook.java` captures the full agent lifecycle and emits structured events for the debug panel:
+`hook/ObservabilityHook.java` is no longer an AgentScope `Hook` implementation. In 2.0 it is a thin bridge that exposes an `EventSink` used to publish **manual** multi-agent events for the debug panel. Automatic per-agent lifecycle events (LLM, reasoning, tool calls, text deltas) are emitted directly by `agent.streamEvents()` as `AgentEvent`s and processed by `AgentRuntime`.
 
-- **Timeline tracking**: agent_start → llm_start → thinking → llm_end → tool_start → tool_end → agent_end
-- **Metrics collection**: token counts (input/output/total), LLM time, tool durations
-- **Tool call details**: name, parameters, result preview, success status
+- **Timeline & metrics**: derived from `AgentEvent` types in `AgentRuntime` (AGENT_START → LLM_START → REASONING_DELTA → LLM_END → TOOL_CALL_START → TOOL_CALL_END → AGENT_END)
+- **Manual multi-agent events**: pipeline, routing, handoff, loop, state graph, msg hub (roundtable), and subagent task events are forwarded to the `EventSink` and merged into the SSE stream
 - **Skill identification**: recognizes `load_skill_through_path` and extracts skill names
-- **Multi-agent events**: pipeline, routing, handoff, and debate tracking
-- **P6 advanced pattern events**: loop, state graph, msg hub (roundtable), and subagents (task orchestration/dispatch) tracking
 
 ### File Upload Flow
 
@@ -162,14 +162,24 @@ Each session maintains its own agent instance with isolated memory.
 
 ### Multi-Agent Collaboration
 
-`CompositeAgentFactory` creates multi-agent compositions:
+`CompositeAgentFactory` creates multi-agent compositions. The legacy `Pipeline<Msg>` interface was removed in 2.0; each collaboration pattern is now backed by a dedicated `StreamingAgentRuntime` implementation:
 
-**Sequential Pipeline** (`type: SEQUENTIAL`):
+- **SEQUENTIAL** → `SequentialRuntime`
+- **PARALLEL** → `ParallelRuntime`
+- **DEBATE** → `DebateRuntime`
+- **LOOP** → `LoopRuntime`
+- **MSG_HUB** → `MsgHubRuntime`
+- **SUBAGENT_SEQ** → `SubAgentSeqRuntime`
+- **SUBAGENT_PAR** → `SubAgentParRuntime`
+- **ROUTING / HANDOFFS** → `AgentRuntime` with sub-agent tool binding
+- **STATE_GRAPH** → `StateGraphRuntime` (driven by `OrderFulfillmentGraph`)
+
+**Sequential Pipeline** (`type: SEQUENTIAL`, `SequentialRuntime`):
 - Sub-agents execute in series
 - Output of one agent feeds into the next
 - Example: `doc-analysis-pipeline` → doc-expert → search-expert
 
-**Parallel Pipeline** (`type: PARALLEL`):
+**Parallel Pipeline** (`type: PARALLEL`, `ParallelRuntime`):
 - All sub-agents receive the same message
 - Execute concurrently (configurable via `parallel` flag)
 - Results are aggregated
@@ -185,30 +195,39 @@ Each session maintains its own agent instance with isolated memory.
 - Trigger types: `INTENT` (keywords match), `EXPLICIT` (user requests)
 - Example: `customer-service` handoffs to sales-agent on "价格/购买" keywords
 
-**Loop Pipeline** (`type: LOOP`):
+**Loop Pipeline** (`type: LOOP`, `LoopRuntime`):
 - Write-review-revise pattern with iterative refinement
 - Writer produces content, critic reviews, loop continues until quality threshold or max iterations
 - Example: `copywriter-refiner` → writer → critic → (optional revision)
 
-**StateGraph** (`type: STATE_GRAPH`):
+**StateGraph** (`type: STATE_GRAPH`, `StateGraphRuntime`):
 - Custom state machine with mixed deterministic and agent-driven transitions
 - Event-driven transitions (user actions) and condition-driven transitions (agent decisions)
 - Example: `order-fulfillment` → CREATED → SUBMITTED → REVIEWING → APPROVED → PAID → DONE
 
-**MsgHub RoundTable** (`type: MSG_HUB`):
+**MsgHub RoundTable** (`type: MSG_HUB`, `MsgHubRuntime`):
 - Multi-round expert discussion with moderator synthesis
 - Each expert speaks in sequence across multiple rounds, seeing all previous messages
 - Example: `expert-roundtable` → architect, DBA, security-expert discuss, moderator summarizes
 
-**Subagents Sequential** (`type: SUBAGENT_SEQ`):
+**Subagents Sequential** (`type: SUBAGENT_SEQ`, `SubAgentSeqRuntime`):
 - TaskOrchestrator pattern with sequential task handoff and {prevOutput} chaining
 - Each step receives previous step's output via template variables
 - Example: `report-generator` → research → analysis → report writing
 
-**Subagents Parallel** (`type: SUBAGENT_PAR`):
+**Subagents Parallel** (`type: SUBAGENT_PAR`, `SubAgentParRuntime`):
 - TaskDispatcher pattern with parallel task delegation and result aggregation
 - All sub-agents receive same input concurrently, results collected and combined
 - Example: `project-manager` → research, design, evaluation run in parallel
+
+### AgentScope Harness (advanced demos)
+
+Two `type: HARNESS` agents demonstrate 2.0 capabilities wired up through `HarnessAgentFactory` + `HarnessRuntime` and configured via `harness/CompactionConfigFactory` and `harness/FilesystemSpecFactory`:
+
+- **compaction-demo**: Long conversations with automatic context compaction (CLAW execution mode, LOCAL filesystem) — triggers compaction after N messages while keeping the most recent K messages.
+- **sandbox-demo**: Safe code execution in a local sandbox (BUILDER execution mode, `/tmp/agentscope-sandbox` workspace) — runs user-supplied code through an isolated filesystem backend.
+
+> Note: AgUI and A2A protocol extensions are not yet available in 2.0.0-RC3 and are not wired into this demo.
 
 **Configuration format:**
 ```yaml
@@ -275,7 +294,7 @@ src/main/java/com/skloda/agentscope/
 │   ├── AgentConfig.java              # Agent config entity
 │   ├── AgentConfigService.java       # Config loading and query service
 │   ├── AgentFactory.java             # Single agent creation from config
-│   ├── AgentType.java                # Enum: SINGLE, SEQUENTIAL, PARALLEL, ROUTING, HANDOFFS, DEBATE, LOOP, STATE_GRAPH, MSG_HUB, SUBAGENT_SEQ, SUBAGENT_PAR
+│   ├── AgentType.java                # Enum: SINGLE, SEQUENTIAL, PARALLEL, ROUTING, HANDOFFS, DEBATE, LOOP, STATE_GRAPH, MSG_HUB, SUBAGENT_SEQ, SUBAGENT_PAR, HARNESS
 │   ├── TriggerType.java              # Enum: INTENT, EXPLICIT (for handoff triggers)
 │   ├── SubAgentConfig.java           # Sub-agent configuration with description
 │   └── HandoffTrigger.java           # Handoff trigger rules (type, keywords, target)
@@ -284,12 +303,7 @@ src/main/java/com/skloda/agentscope/
 │   ├── StateTransition.java          # StateGraph transition definition
 │   └── MsgHubConfig.java             # MsgHub roundtable configuration
 ├── composite/
-│   └── CompositeAgentFactory.java    # Multi-agent composition factory (all 10 patterns)
-│   ├── pipeline/
-│   │   ├── LoopPipeline.java         # Write-review-revise pattern
-│   │   ├── RoundTablePipeline.java   # Expert roundtable discussion
-│   │   ├── TaskOrchestratorPipeline.java  # Sequential task delegation
-│   │   └── TaskDispatcherPipeline.java   # Parallel task dispatch
+│   ├── CompositeAgentFactory.java    # Multi-agent composition factory (all 10 patterns)
 │   └── graph/
 │       └── OrderFulfillmentGraph.java     # Custom state machine example
 ├── controller/
@@ -297,23 +311,61 @@ src/main/java/com/skloda/agentscope/
 │   └── KnowledgeController.java      # Knowledge base management API
 ├── service/
 │   ├── AgentService.java             # Agent routing with instance cache
-│   ├── SessionManagerService.java    # Session lifecycle management
-│   └── KnowledgeService.java         # RAG knowledge base
+│   ├── SessionManagerService.java    # Session lifecycle management (AgentStateStore-backed)
+│   ├── ApprovalService.java          # Human-in-the-loop approval workflow
+│   ├── WorkflowRunService.java       # Workflow run tracking
+│   ├── ChatHistoryRepository.java + InMemoryChatHistoryRepository.java  # Chat history
+│   ├── KnowledgeService.java         # RAG knowledge base
+│   └── KnowledgeProperties.java      # Knowledge config properties
 ├── model/
 │   ├── ChatRequest.java              # Request payload (agentId, message, file info)
 │   ├── ChatEvent.java                # SSE event wrapper (type, content)
 │   ├── SessionInfo.java              # Session metadata
 │   └── MultiModalMessage.java        # Multi-modal message wrapper
 ├── hook/
-│   └── ObservabilityHook.java        # Hook for agent lifecycle events (with P6 events)
+│   ├── ObservabilityHook.java        # EventSink bridge for manual multi-agent events (no longer a Hook impl)
+│   └── ApprovalHook.java             # Human-in-the-loop approval hook
 ├── runtime/
-│   ├── AgentRuntime.java             # Runtime container (Agent + Hook + Sink)
-│   ├── AgentRuntimeFactory.java      # Factory for all runtime types (10 patterns)
-│   ├── PipelineAgentRuntime.java     # Runtime for Pipeline-based agents
-│   ├── StateGraphRuntime.java        # Runtime for StateGraph agents
-│   └── MsgHubRuntime.java            # Runtime for MsgHub agents
-│   ├── AgentRuntimeFactory.java      # Factory for AgentRuntime instances
-│   └── PipelineAgentRuntime.java     # Runtime for sequential/parallel pipelines
+│   ├── AgentRuntime.java             # Runtime container (Agent + ObservabilityHook + EventSink)
+│   ├── StreamingAgentRuntime.java    # Common interface for stream-based runtimes
+│   ├── StructuredOutputAgentRuntime.java + StructuredOutputValidator.java  # Structured output runtime
+│   ├── AgentRuntimeFactory.java      # Factory for all runtime types (11 patterns incl. HARNESS)
+│   ├── SequentialRuntime.java        # Runtime for SEQUENTIAL pipeline
+│   ├── ParallelRuntime.java          # Runtime for PARALLEL pipeline
+│   ├── DebateRuntime.java            # Runtime for DEBATE pattern
+│   ├── LoopRuntime.java              # Runtime for LOOP (write-review-revise) pattern
+│   ├── MsgHubRuntime.java            # Runtime for MSG_HUB roundtable pattern
+│   ├── SubAgentSeqRuntime.java       # Runtime for SUBAGENT_SEQ orchestration
+│   ├── SubAgentParRuntime.java       # Runtime for SUBAGENT_PAR dispatch
+│   ├── StateGraphRuntime.java        # Runtime for STATE_GRAPH agents
+│   └── EventSink.java                # Manual multi-agent event publisher (Flux-backed)
+├── harness/
+│   ├── HarnessAgentFactory.java      # Factory for HARNESS-type agents (compaction, sandbox)
+│   ├── HarnessAgentService.java      # Service wrapper for harness agents
+│   ├── HarnessRuntime.java           # Runtime for harness agents
+│   ├── CompactionConfigFactory.java  # Builds compaction config for long-conversation agents
+│   ├── FilesystemSpecFactory.java    # Builds sandbox filesystem spec
+│   └── WorkspaceInitializer.java     # Initializes sandbox workspace
+├── middleware/
+│   ├── MiddlewareRegistry.java       # Middleware chain registry (DynamicSkillMiddleware, etc.)
+│   ├── AuditLoggingMiddleware.java   # Audit logging middleware
+│   ├── DetailedAuditMiddleware.java  # Detailed audit middleware
+│   ├── ContextEnrichmentMiddleware.java  # Context enrichment middleware
+│   ├── MetricsCollectorMiddleware.java   # Metrics collection middleware
+│   └── RateLimitMiddleware.java      # Rate limiting middleware
+├── mcp/                              # MCP (Model Context Protocol) integration
+│   ├── McpClientService.java         # MCP client
+│   ├── McpDemoServer.java            # Demo MCP server
+│   ├── McpServerConfig.java          # MCP server configuration
+│   ├── McpServersWrapper.java        # MCP servers wrapper
+│   ├── McpTransport.java             # MCP transport abstraction
+│   └── ToolGroupConfig.java          # Tool group configuration
+├── permission/
+│   └── PermissionContextFactory.java # Permission context factory
+├── schema/
+│   ├── ContractMetadata.java         # Contract metadata schema
+│   ├── IDCardData.java               # ID card data schema
+│   └── InvoiceData.java              # Invoice data schema
 ├── config/
 │   ├── CorrectSkillDiagnostic.java  # Skill loading diagnostic utility
 │   ├── JarEnvironmentDiagnostic.java # JAR environment diagnostic
@@ -387,13 +439,21 @@ src/main/resources/
 - **task-document-analysis**: Document analysis (.docx, .pdf, .xlsx)
 - **task-template-docx-editor**: Word template variable replacement
 - **bank-invoice**: Bank invoice generator (Excel + Word)
-- **rag-chat**: RAG-based knowledge base Q&A
+- **rag-chat / rag-agent**: RAG-based knowledge base Q&A
 - **vision-analyzer**: Image understanding (OCR, charts, scenes)
 - **voice-assistant**: Speech-to-text voice assistant
 - **invoice-extractor**: Invoice information extraction from images
 - **idcard-extractor**: ID card information extraction from images
+- **contract-extractor**: Contract metadata extraction
+- **contract-review-workflow**: Multi-step contract review workflow
 - **search-assistant**: Web search assistant (news, weather, stocks)
 - **project-planner**: Project planning and task breakdown
+- **long-conversation**: Long-context conversation agent
+- **personal-assistant**: Personal assistant agent
+
+### Harness Demos (AgentScope 2.0)
+- **compaction-demo** (`type: HARNESS`): Long-conversation demo with automatic context compaction
+- **sandbox-demo** (`type: HARNESS`): Safe code execution in a local sandbox (BUILDER mode)
 
 ### Expert Agents (for multi-agent compositions)
 - **doc-expert**: Document parsing and analysis
@@ -445,14 +505,15 @@ src/main/resources/
 
 ### Multi-Agent Composition
 1. Create expert agents first (as single agents)
-2. Add composition agent with `type: SEQUENTIAL|PARALLEL|ROUTING|HANDOFFS|DEBATE|LOOP|STATE_GRAPH|MSG_HUB|SUBAGENT_SEQ|SUBAGENT_PAR`
+2. Add composition agent with `type: SEQUENTIAL|PARALLEL|ROUTING|HANDOFFS|DEBATE|LOOP|STATE_GRAPH|MSG_HUB|SUBAGENT_SEQ|SUBAGENT_PAR|HARNESS`
 3. Define `subAgents` list with `agentId` and `description`
 4. For HANDOFFS type, add `handoffTriggers` with `type`, `keywords`, and `target`
 5. For LOOP type, add `loopConfig` with `maxIterations` and `exitCondition`
 6. For STATE_GRAPH type, add `states` list with name, agent, and transitions
 7. For MSG_HUB type, add `msgHubConfig` with `rounds` and `summaryRole`
 8. For SUBAGENT_SEQ/PAR type, add `taskTemplate` to each subAgent for task delegation
-9. Restart — composition agent appears in UI with sub-agent dispatch logic
+9. For HARNESS type, add `harnessConfig` with `executionMode`, `isolationScope`, `filesystemMode`, optional `workspace`, and `compaction` settings
+10. Restart — composition agent appears in UI with sub-agent dispatch logic
 
 ## API Endpoints
 
@@ -475,8 +536,11 @@ src/main/resources/
 
 ## Dependencies
 
-- `agentscope-spring-boot-starter` 1.0.11
-- `agentscope-core` 1.0.11
+- `agentscope-spring-boot-starter` 2.0.0-RC3
+- `agentscope-core` 2.0.0-RC3
+- `agentscope-harness` 2.0.0-RC3 (context compaction + sandbox demos)
+- `agentscope-extensions-rag-simple` 2.0.0-RC3 (RAG extension; v2 alternative retained for now)
+- `agentscope-extensions-memory-bailian` 2.0.0-RC3 (Bailian memory extension; v2 alternative retained for now)
 - Apache POI 5.5.1 (DOCX/XLSX parsing and generation)
 - Apache PDFBox 3.0.7 (PDF parsing)
 - Spring Boot 3.5.13
@@ -501,7 +565,7 @@ Key config in `application.yml`:
 **Backend debugging:**
 - Check logs for `Session {} saved` messages
 - Enable `DEBUG` logging for `io.agentscope`
-- Monitor AgentScope hook events in console
+- Monitor `AgentEvent`s (from `agent.streamEvents()`) and `EventSink` payloads in console
 
 **Common issues:**
 - File upload not working: Check browser console for CORS or network errors
@@ -511,7 +575,7 @@ Key config in `application.yml`:
 ## Auxiliary Directories
 
 ### `agent-harness/`
-Experimental agent harness implementations (not part of main Spring Boot app).
+Experimental agent harness implementations (not part of main Spring Boot app). Harness-type demo agents live under `src/main/java/.../harness/` and are configured in `src/main/resources/config/harness-agents.yml`.
 
 ### `skills/`
 Python-based skill development environment for AgentScope skills (separate from Java resources under `src/main/resources/skills/`).
