@@ -1,6 +1,7 @@
 package com.skloda.agentscope.middleware;
 
 import io.agentscope.core.agent.Agent;
+import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.AgentEventType;
 import io.agentscope.core.event.TextBlockDeltaEvent;
@@ -22,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class AuditLoggingMiddlewareTest {
 
     private final AuditLoggingMiddleware mw = new AuditLoggingMiddleware();
+    private final RuntimeContext ctx = RuntimeContext.empty();
 
     @Test
     void onAgentDelegatesToNext() {
@@ -32,7 +34,7 @@ class AuditLoggingMiddlewareTest {
         TextBlockDeltaEvent fakeEvent = new TextBlockDeltaEvent("r1", "b1", "hi");
 
         Flux<AgentEvent> result = mw.onAgent(
-                null, input,
+                null, ctx, input,
                 in -> Flux.just(fakeEvent)
         );
 
@@ -47,7 +49,7 @@ class AuditLoggingMiddlewareTest {
         TextBlockDeltaEvent fakeEvent = new TextBlockDeltaEvent("r1", "b1", "thinking");
 
         Flux<AgentEvent> result = mw.onReasoning(
-                null, input,
+                null, ctx, input,
                 in -> Flux.just(fakeEvent)
         );
 
@@ -63,7 +65,7 @@ class AuditLoggingMiddlewareTest {
         TextBlockDeltaEvent fakeEvent = new TextBlockDeltaEvent("r1", "b1", "result");
 
         Flux<AgentEvent> result = mw.onActing(
-                null, input,
+                null, ctx, input,
                 in -> Flux.just(fakeEvent)
         );
 

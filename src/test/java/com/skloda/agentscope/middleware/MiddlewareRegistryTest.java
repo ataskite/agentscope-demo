@@ -1,6 +1,7 @@
 package com.skloda.agentscope.middleware;
 
 import io.agentscope.core.agent.Agent;
+import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.middleware.*;
 import org.junit.jupiter.api.Test;
@@ -52,27 +53,27 @@ class MiddlewareRegistryTest {
 
     static class StubMiddleware implements MiddlewareBase {
         @Override
-        public Flux<AgentEvent> onAgent(Agent agent, AgentInput input, Function<AgentInput, Flux<AgentEvent>> next) {
+        public Flux<AgentEvent> onAgent(Agent agent, RuntimeContext ctx, AgentInput input, Function<AgentInput, Flux<AgentEvent>> next) {
             return next.apply(input);
         }
 
         @Override
-        public Flux<AgentEvent> onReasoning(Agent agent, ReasoningInput input, Function<ReasoningInput, Flux<AgentEvent>> next) {
+        public Flux<AgentEvent> onReasoning(Agent agent, RuntimeContext ctx, ReasoningInput input, Function<ReasoningInput, Flux<AgentEvent>> next) {
             return next.apply(input);
         }
 
         @Override
-        public Flux<AgentEvent> onActing(Agent agent, ActingInput input, Function<ActingInput, Flux<AgentEvent>> next) {
+        public Flux<AgentEvent> onActing(Agent agent, RuntimeContext ctx, ActingInput input, Function<ActingInput, Flux<AgentEvent>> next) {
             return next.apply(input);
         }
 
         @Override
-        public Flux<AgentEvent> onModelCall(Agent agent, ModelCallInput input, Function<ModelCallInput, Flux<AgentEvent>> next) {
+        public Flux<AgentEvent> onModelCall(Agent agent, RuntimeContext ctx, ModelCallInput input, Function<ModelCallInput, Flux<AgentEvent>> next) {
             return next.apply(input);
         }
 
         @Override
-        public Mono<String> onSystemPrompt(Agent agent, String prompt) {
+        public Mono<String> onSystemPrompt(Agent agent, RuntimeContext ctx, String prompt) {
             return Mono.just(prompt);
         }
     }
