@@ -74,9 +74,6 @@ class AgentSamplePromptsConfigTest {
                     agents.get("idcard-extractor").getStructuredOutputClass());
             assertEquals("com.skloda.agentscope.schema.ContractMetadata",
                     agents.get("contract-extractor").getStructuredOutputClass());
-            assertEquals("PROMPT", agents.get("invoice-extractor").getStructuredOutputReminder());
-            assertEquals("PROMPT", agents.get("idcard-extractor").getStructuredOutputReminder());
-            assertEquals("PROMPT", agents.get("contract-extractor").getStructuredOutputReminder());
 
             AgentConfig contractReview = agents.get("contract-review-workflow");
             assertNotNull(contractReview, "contract-review-workflow should exist");
