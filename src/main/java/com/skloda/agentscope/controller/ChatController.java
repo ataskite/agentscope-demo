@@ -356,7 +356,6 @@ public class ChatController {
         target.setApprovalRequired(source.isApprovalRequired());
         target.setApprovalTools(new ArrayList<>(source.getApprovalTools()));
         target.setStructuredOutputClass(source.getStructuredOutputClass());
-        target.setStructuredOutputReminder(source.getStructuredOutputReminder());
         target.setType(source.getType());
         target.setHarnessConfig(source.getHarnessConfig());
         target.setPermissionConfig(source.getPermissionConfig());

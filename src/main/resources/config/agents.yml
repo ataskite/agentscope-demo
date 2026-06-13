@@ -315,7 +315,6 @@ agents:
     enableThinking: false
     modality: vision
     structuredOutputClass: com.skloda.agentscope.schema.InvoiceData
-    structuredOutputReminder: PROMPT
     skills: []
     userTools: []
     systemTools: []
@@ -349,7 +348,6 @@ agents:
     enableThinking: false
     modality: vision
     structuredOutputClass: com.skloda.agentscope.schema.IDCardData
-    structuredOutputReminder: PROMPT
     skills: []
     userTools: []
     systemTools: []
@@ -386,7 +384,6 @@ agents:
     streaming: true
     enableThinking: true
     structuredOutputClass: com.skloda.agentscope.schema.ContractMetadata
-    structuredOutputReminder: PROMPT
     skills:
       - docx
       - pdf

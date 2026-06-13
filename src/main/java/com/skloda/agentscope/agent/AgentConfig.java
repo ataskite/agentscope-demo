@@ -47,7 +47,6 @@ public class AgentConfig {
 
     // Structured output settings
     private String structuredOutputClass;
-    private String structuredOutputReminder = "TOOL_CHOICE"; // TOOL_CHOICE or PROMPT
 
     // PlanNotebook settings
     private boolean planEnabled = false;
