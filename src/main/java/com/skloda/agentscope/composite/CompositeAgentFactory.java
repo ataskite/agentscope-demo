@@ -8,7 +8,7 @@ import com.skloda.agentscope.agent.HandoffTrigger;
 import com.skloda.agentscope.agent.StateConfig;
 import com.skloda.agentscope.agent.SubAgentConfig;
 import com.skloda.agentscope.agent.TriggerType;
-import com.skloda.agentscope.hook.ApprovalHook;
+import com.skloda.agentscope.middleware.ApprovalMiddleware;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.AgentBase;
 import io.agentscope.core.agent.StreamOptions;
@@ -61,23 +61,23 @@ public class CompositeAgentFactory {
         return singleAgentFactory.createAgent(agentId, null);
     }
 
-    public ReActAgent createSingleAgent(String agentId, ApprovalHook approvalHook) {
-        return singleAgentFactory.createAgent(agentId, approvalHook);
+    public ReActAgent createSingleAgent(String agentId, ApprovalMiddleware approvalMiddleware) {
+        return singleAgentFactory.createAgent(agentId, approvalMiddleware);
     }
 
-    public ReActAgent createSingleAgent(String agentId, String permissionMode, ApprovalHook approvalHook) {
-        return singleAgentFactory.createAgent(agentId, permissionMode, approvalHook);
+    public ReActAgent createSingleAgent(String agentId, String permissionMode, ApprovalMiddleware approvalMiddleware) {
+        return singleAgentFactory.createAgent(agentId, permissionMode, approvalMiddleware);
     }
 
     /**
      * Create a single agent for session use (with externally provided AgentStateStore).
      */
-    public ReActAgent createSingleAgentForSession(String agentId, AgentStateStore stateStore, ApprovalHook approvalHook) {
-        return singleAgentFactory.createAgentForSession(agentId, stateStore, approvalHook);
+    public ReActAgent createSingleAgentForSession(String agentId, AgentStateStore stateStore, ApprovalMiddleware approvalMiddleware) {
+        return singleAgentFactory.createAgentForSession(agentId, stateStore, approvalMiddleware);
     }
 
-    public ReActAgent createSingleAgentForSession(String agentId, AgentStateStore stateStore, String permissionMode, ApprovalHook approvalHook) {
-        return singleAgentFactory.createAgentForSession(agentId, stateStore, permissionMode, approvalHook);
+    public ReActAgent createSingleAgentForSession(String agentId, AgentStateStore stateStore, String permissionMode, ApprovalMiddleware approvalMiddleware) {
+        return singleAgentFactory.createAgentForSession(agentId, stateStore, permissionMode, approvalMiddleware);
     }
 
     public AgentStateStore createStateStore() {
@@ -88,7 +88,7 @@ public class CompositeAgentFactory {
         return config.getSubAgents().stream()
                 .map(sub -> {
                     log.info("Creating sub-agent: {} for composite: {}", sub.getAgentId(), config.getAgentId());
-                    return singleAgentFactory.createAgent(sub.getAgentId(), (ApprovalHook) null);
+                    return singleAgentFactory.createAgent(sub.getAgentId(), (ApprovalMiddleware) null);
                 })
                 .map(ReActAgent.class::cast)
                 .map(AgentBase.class::cast)

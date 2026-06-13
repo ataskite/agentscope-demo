@@ -8,7 +8,7 @@ import com.skloda.agentscope.agent.MsgHubConfig;
 import com.skloda.agentscope.agent.SubAgentConfig;
 import com.skloda.agentscope.composite.CompositeAgentFactory;
 import com.skloda.agentscope.composite.graph.OrderFulfillmentGraph;
-import com.skloda.agentscope.hook.ApprovalHook;
+import com.skloda.agentscope.middleware.ApprovalMiddleware;
 import com.skloda.agentscope.hook.ObservabilityHook;
 import com.skloda.agentscope.service.ApprovalService;
 import io.agentscope.core.ReActAgent;
@@ -193,14 +193,14 @@ public class AgentRuntimeFactory {
     private StreamingAgentRuntime createSingleRuntimeWithSession(String agentId, AgentStateStore stateStore) {
         AgentConfig config = configService.getAgentConfig(agentId);
         ObservabilityHook hook = new ObservabilityHook();
-        ApprovalHook approvalHook = createApprovalHookIfNeeded(config);
+        ApprovalMiddleware approvalMiddleware = createApprovalMiddlewareIfNeeded(config);
 
-        ReActAgent agent = compositeFactory.createSingleAgentForSession(agentId, stateStore, approvalHook);
+        ReActAgent agent = compositeFactory.createSingleAgentForSession(agentId, stateStore, approvalMiddleware);
 
         if (hasStructuredOutput(config)) {
             return new StructuredOutputAgentRuntime(agent, hook, config.getStructuredOutputClass());
         }
-        return new AgentRuntime(agent, hook, approvalHook, approvalService, agentId);
+        return new AgentRuntime(agent, hook, approvalMiddleware, approvalService, agentId);
     }
 
     private AgentRuntime createRoutingRuntimeWithSession(String agentId, AgentStateStore stateStore) {
@@ -272,27 +272,27 @@ public class AgentRuntimeFactory {
     private StreamingAgentRuntime createSingleRuntimeWithPermission(String agentId, String permissionMode) {
         AgentConfig config = configService.getAgentConfig(agentId);
         ObservabilityHook hook = new ObservabilityHook();
-        ApprovalHook approvalHook = createApprovalHookIfNeeded(config);
+        ApprovalMiddleware approvalMiddleware = createApprovalMiddlewareIfNeeded(config);
 
-        ReActAgent agent = compositeFactory.createSingleAgent(agentId, permissionMode, approvalHook);
+        ReActAgent agent = compositeFactory.createSingleAgent(agentId, permissionMode, approvalMiddleware);
 
         if (hasStructuredOutput(config)) {
             return new StructuredOutputAgentRuntime(agent, hook, config.getStructuredOutputClass());
         }
-        return new AgentRuntime(agent, hook, approvalHook, approvalService, agentId);
+        return new AgentRuntime(agent, hook, approvalMiddleware, approvalService, agentId);
     }
 
     private StreamingAgentRuntime createSingleRuntimeWithSessionAndPermission(String agentId, AgentStateStore stateStore, String permissionMode) {
         AgentConfig config = configService.getAgentConfig(agentId);
         ObservabilityHook hook = new ObservabilityHook();
-        ApprovalHook approvalHook = createApprovalHookIfNeeded(config);
+        ApprovalMiddleware approvalMiddleware = createApprovalMiddlewareIfNeeded(config);
 
-        ReActAgent agent = compositeFactory.createSingleAgentForSession(agentId, stateStore, permissionMode, approvalHook);
+        ReActAgent agent = compositeFactory.createSingleAgentForSession(agentId, stateStore, permissionMode, approvalMiddleware);
 
         if (hasStructuredOutput(config)) {
             return new StructuredOutputAgentRuntime(agent, hook, config.getStructuredOutputClass());
         }
-        return new AgentRuntime(agent, hook, approvalHook, approvalService, agentId);
+        return new AgentRuntime(agent, hook, approvalMiddleware, approvalService, agentId);
     }
 
     // ---- Shared helpers ----
@@ -308,29 +308,29 @@ public class AgentRuntimeFactory {
     private StreamingAgentRuntime createSingleRuntime(String agentId) {
         AgentConfig config = configService.getAgentConfig(agentId);
         ObservabilityHook hook = new ObservabilityHook();
-        ApprovalHook approvalHook = createApprovalHookIfNeeded(config);
+        ApprovalMiddleware approvalMiddleware = createApprovalMiddlewareIfNeeded(config);
 
-        ReActAgent agent = compositeFactory.createSingleAgent(agentId, approvalHook);
+        ReActAgent agent = compositeFactory.createSingleAgent(agentId, approvalMiddleware);
 
         if (hasStructuredOutput(config)) {
             return new StructuredOutputAgentRuntime(agent, hook, config.getStructuredOutputClass());
         }
-        return new AgentRuntime(agent, hook, approvalHook, approvalService, agentId);
+        return new AgentRuntime(agent, hook, approvalMiddleware, approvalService, agentId);
     }
 
     private boolean hasStructuredOutput(AgentConfig config) {
         return config.getStructuredOutputClass() != null && !config.getStructuredOutputClass().isBlank();
     }
 
-    private ApprovalHook createApprovalHookIfNeeded(AgentConfig config) {
+    private ApprovalMiddleware createApprovalMiddlewareIfNeeded(AgentConfig config) {
         boolean hasApproval = config.isApprovalRequired() ||
                 (config.getApprovalTools() != null && !config.getApprovalTools().isEmpty());
         if (!hasApproval) {
             return null;
         }
-        log.info("  ApprovalHook enabled for agent: {} (required={}, tools={})",
+        log.info("  ApprovalMiddleware enabled for agent: {} (required={}, tools={})",
                 config.getAgentId(), config.isApprovalRequired(), config.getApprovalTools());
-        return new ApprovalHook(config.isApprovalRequired(), config.getApprovalTools());
+        return new ApprovalMiddleware(config.isApprovalRequired(), config.getApprovalTools());
     }
 
     // ---- Pipeline runtime helpers (SEQUENTIAL, PARALLEL, DEBATE, LOOP, SUBAGENT_SEQ, SUBAGENT_PAR) ----

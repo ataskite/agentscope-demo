@@ -3,7 +3,7 @@ package com.skloda.agentscope.runtime;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.skloda.agentscope.hook.ApprovalHook;
+import com.skloda.agentscope.middleware.ApprovalMiddleware;
 import com.skloda.agentscope.hook.ObservabilityHook;
 import com.skloda.agentscope.service.ApprovalService;
 import io.agentscope.core.ReActAgent;
@@ -33,7 +33,7 @@ public class AgentRuntime implements StreamingAgentRuntime {
     private final ReActAgent agent;
     @Getter
     private final ObservabilityHook hook;
-    private final ApprovalHook approvalHook;
+    private final ApprovalMiddleware approvalMiddleware;
     private final ApprovalService approvalService;
     private final String agentId;
     private final String sessionId;
@@ -43,17 +43,17 @@ public class AgentRuntime implements StreamingAgentRuntime {
         this(agent, hook, null, null, null, null, null);
     }
 
-    public AgentRuntime(ReActAgent agent, ObservabilityHook hook, ApprovalHook approvalHook,
+    public AgentRuntime(ReActAgent agent, ObservabilityHook hook, ApprovalMiddleware approvalMiddleware,
                         ApprovalService approvalService, String agentId) {
-        this(agent, hook, approvalHook, approvalService, agentId, null, null);
+        this(agent, hook, approvalMiddleware, approvalService, agentId, null, null);
     }
 
-    public AgentRuntime(ReActAgent agent, ObservabilityHook hook, ApprovalHook approvalHook,
+    public AgentRuntime(ReActAgent agent, ObservabilityHook hook, ApprovalMiddleware approvalMiddleware,
                         ApprovalService approvalService, String agentId, String sessionId,
                         Runnable onClose) {
         this.agent = agent;
         this.hook = hook;
-        this.approvalHook = approvalHook;
+        this.approvalMiddleware = approvalMiddleware;
         this.approvalService = approvalService;
         this.agentId = agentId;
         this.sessionId = sessionId;
@@ -90,7 +90,7 @@ public class AgentRuntime implements StreamingAgentRuntime {
         return Flux.merge(sinkEvents, agentEvents)
                 .concatWith(Mono.fromCallable(() -> {
                     // On completion, check if approval was triggered
-                    if (approvalHook != null && approvalHook.isApprovalTriggered()) {
+                    if (approvalMiddleware != null && approvalMiddleware.isApprovalTriggered()) {
                         return handleApprovalCompletion();
                     }
                     return Map.of("type", "done");
@@ -149,12 +149,12 @@ public class AgentRuntime implements StreamingAgentRuntime {
      */
     private Map<String, Object> handleApprovalCompletion() {
         String approvalId = approvalService.registerPendingApproval(
-                agent, hook, approvalHook.getPendingToolUseBlocks(), agentId, sessionId);
+                agent, hook, approvalMiddleware.getPendingToolUseBlocks(), agentId, sessionId);
         return Map.of(
                 "type", "pending_approval",
                 "approvalId", approvalId,
                 "agentId", agentId != null ? agentId : "",
-                "toolCalls", approvalHook.getPendingToolCallsForSse(),
+                "toolCalls", approvalMiddleware.getPendingToolCallsForSse(),
                 "timestamp", System.currentTimeMillis()
         );
     }

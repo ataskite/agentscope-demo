@@ -8,7 +8,7 @@ import com.skloda.agentscope.mcp.McpServerRef;
 import com.skloda.agentscope.mcp.ToolGroupConfig;
 import com.skloda.agentscope.service.KnowledgeService;
 import com.skloda.agentscope.tool.ToolRegistry;
-import com.skloda.agentscope.hook.ApprovalHook;
+import com.skloda.agentscope.middleware.ApprovalMiddleware;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.formatter.dashscope.DashScopeChatFormatter;
 import io.agentscope.core.middleware.MiddlewareBase;
@@ -78,43 +78,43 @@ public class AgentFactory {
     }
 
     /**
-     * Create agent for a persistent session (with shared stateStore, no ApprovalHook).
+     * Create agent for a persistent session (with shared stateStore, no ApprovalMiddleware).
      */
     public ReActAgent createAgentForSession(String agentId, AgentStateStore stateStore) {
         return buildAgent(agentId, stateStore, null);
     }
 
     /**
-     * Create agent for a persistent session (with shared stateStore + optional ApprovalHook).
+     * Create agent for a persistent session (with shared stateStore + optional ApprovalMiddleware).
      * ObservabilityHook is no longer a Hook; lifecycle events come from agent.streamEvents().
      */
-    public ReActAgent createAgentForSession(String agentId, AgentStateStore stateStore, ApprovalHook approvalHook) {
-        return buildAgent(agentId, stateStore, approvalHook);
+    public ReActAgent createAgentForSession(String agentId, AgentStateStore stateStore, ApprovalMiddleware approvalMiddleware) {
+        return buildAgent(agentId, stateStore, approvalMiddleware);
     }
 
     /**
-     * Create agent without ApprovalHook (stateless, creates fresh AgentStateStore each time).
+     * Create agent without ApprovalMiddleware (stateless, creates fresh AgentStateStore each time).
      */
     public ReActAgent createAgent(String agentId) {
         return buildAgent(agentId, new InMemoryAgentStateStore(), null);
     }
 
     /**
-     * Create agent with optional ApprovalHook (stateless, creates fresh AgentStateStore each time).
+     * Create agent with optional ApprovalMiddleware (stateless, creates fresh AgentStateStore each time).
      */
-    public ReActAgent createAgent(String agentId, ApprovalHook approvalHook) {
-        return buildAgent(agentId, new InMemoryAgentStateStore(), approvalHook);
+    public ReActAgent createAgent(String agentId, ApprovalMiddleware approvalMiddleware) {
+        return buildAgent(agentId, new InMemoryAgentStateStore(), approvalMiddleware);
     }
 
-    public ReActAgent createAgentForSession(String agentId, AgentStateStore stateStore, String permissionMode, ApprovalHook approvalHook) {
-        return buildAgentWithPermission(agentId, stateStore, permissionMode, approvalHook);
+    public ReActAgent createAgentForSession(String agentId, AgentStateStore stateStore, String permissionMode, ApprovalMiddleware approvalMiddleware) {
+        return buildAgentWithPermission(agentId, stateStore, permissionMode, approvalMiddleware);
     }
 
-    public ReActAgent createAgent(String agentId, String permissionMode, ApprovalHook approvalHook) {
-        return buildAgentWithPermission(agentId, new InMemoryAgentStateStore(), permissionMode, approvalHook);
+    public ReActAgent createAgent(String agentId, String permissionMode, ApprovalMiddleware approvalMiddleware) {
+        return buildAgentWithPermission(agentId, new InMemoryAgentStateStore(), permissionMode, approvalMiddleware);
     }
 
-    private ReActAgent buildAgent(String agentId, AgentStateStore stateStore, ApprovalHook approvalHook) {
+    private ReActAgent buildAgent(String agentId, AgentStateStore stateStore, ApprovalMiddleware approvalMiddleware) {
         AgentConfig config = configService.getAgentConfig(agentId);
         log.info("Creating agent: {} ({})", config.getName(), agentId);
 
@@ -170,10 +170,10 @@ public class AgentFactory {
             }
         }
 
-        // Register ApprovalHook if provided
-        if (approvalHook != null) {
-            builder.hooks(List.of(approvalHook));
-            log.info("  Registered ApprovalHook for agent: {}", agentId);
+        // Register ApprovalMiddleware if provided
+        if (approvalMiddleware != null) {
+            builder.middlewares(List.of(approvalMiddleware));
+            log.info("  Registered ApprovalMiddleware for agent: {}", agentId);
         }
 
         // Register middlewares if configured
@@ -193,7 +193,7 @@ public class AgentFactory {
         return builder.build();
     }
 
-    private ReActAgent buildAgentWithPermission(String agentId, AgentStateStore stateStore, String permissionMode, ApprovalHook approvalHook) {
+    private ReActAgent buildAgentWithPermission(String agentId, AgentStateStore stateStore, String permissionMode, ApprovalMiddleware approvalMiddleware) {
         AgentConfig config = configService.getAgentConfig(agentId);
         log.info("Creating agent: {} ({}) [permissionMode={}]", config.getName(), agentId, permissionMode);
 
@@ -243,9 +243,9 @@ public class AgentFactory {
             }
         }
 
-        if (approvalHook != null) {
-            builder.hooks(List.of(approvalHook));
-            log.info("  Registered ApprovalHook for agent: {}", agentId);
+        if (approvalMiddleware != null) {
+            builder.middlewares(List.of(approvalMiddleware));
+            log.info("  Registered ApprovalMiddleware for agent: {}", agentId);
         }
 
         if (config.getMiddlewares() != null && !config.getMiddlewares().isEmpty()) {
