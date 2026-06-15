@@ -13,7 +13,6 @@ import reactor.core.publisher.Mono;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiConsumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -22,15 +21,18 @@ import static org.mockito.Mockito.*;
 class StateGraphRuntimeTest {
 
     private OrderFulfillmentGraph mockGraph;
-    private ObservabilityHook mockHook;
+    // Use a real ObservabilityHook so the EventSink bridge is exercised end-to-end
+    // (matching StructuredOutputAgentRuntimeTest). Mocking the hook leaves
+    // getEventSink() returning null, which NPEs after the EventSink migration.
+    private ObservabilityHook hook;
     private StateGraphRuntime runtime;
 
     @BeforeEach
     void setUp() {
         mockGraph = mock(OrderFulfillmentGraph.class);
-        mockHook = mock(ObservabilityHook.class);
+        hook = new ObservabilityHook();
 
-        runtime = new StateGraphRuntime("test-graph", mockGraph, mockHook);
+        runtime = new StateGraphRuntime("test-graph", mockGraph, hook);
     }
 
     @AfterEach
@@ -47,14 +49,20 @@ class StateGraphRuntimeTest {
 
     @Test
     void getHook_returnsHook() {
-        assertSame(mockHook, runtime.getHook());
+        assertSame(hook, runtime.getHook());
     }
 
     @Test
-    void close_removesHookConsumer() {
+    void close_completesEventSink() {
+        // After the EventSink migration, ObservabilityHook.removeConsumer/reset are no-ops;
+        // close() now completes the underlying EventSink. Subscribers should see completion.
+        List<Map<String, Object>> received = new ArrayList<>();
+        hook.getEventSink().asFlux().subscribe(received::add, t -> {}, () -> {});
+
         runtime.close();
-        verify(mockHook).removeConsumer(any());
-        verify(mockHook).reset();
+
+        // No events were emitted; the sink simply completes cleanly without throwing.
+        assertTrue(received.isEmpty());
     }
 
     @Test

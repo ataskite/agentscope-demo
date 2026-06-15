@@ -21,7 +21,9 @@ class ChatFrontendApprovalLayoutTest {
     void chatPageUsesCurrentStaticAssetVersion() throws Exception {
         String chatHtml = Files.readString(Path.of("src/main/resources/templates/chat.html"));
 
-        assertTrue(chatHtml.contains("/scripts/chat.js?v=2.6"),
+        // Asset versions are bumped together whenever the approval/2.0-event UI changes;
+        // JS was bumped to v=2.7 in the AgentScope 2.0 debug-panel adaptation (commit 912021f).
+        assertTrue(chatHtml.contains("/scripts/chat.js?v=2.7"),
                 "chat.html should bump the script version so browsers stop using the stale approval UI");
         assertTrue(chatHtml.contains("/styles/chat.css?v=2.6"),
                 "chat.html should bump the stylesheet version so browsers stop using stale approval card styles");
