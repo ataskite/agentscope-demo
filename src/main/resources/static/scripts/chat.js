@@ -627,6 +627,23 @@ window.submitApproval = async function(approvalId, approved) {
                     try { payload = JSON.parse(evt.data); } catch (e) { return; }
 
                     switch (payload.type) {
+                        // ===== Lifecycle events now emitted by the streamEvents resume path =====
+                        // (previously the resume used agent.call() and only the final text arrived)
+                        case 'thinking':
+                            if (typeof updateThinkingBox === 'function' && payload.content) {
+                                updateThinkingBox(payload.content);
+                            }
+                            break;
+                        case 'tool_start':
+                            if (typeof updateThinkingBox === 'function') {
+                                updateThinkingBox('🔧 ' + (payload.toolName || 'tool'));
+                            }
+                            break;
+                        case 'tool_end':
+                            if (typeof updateThinkingBox === 'function') {
+                                updateThinkingBox('✓ ' + (payload.toolName || 'tool'));
+                            }
+                            break;
                         case 'text':
                             if (!agentBubble) {
                                 removeTypingIndicator();
