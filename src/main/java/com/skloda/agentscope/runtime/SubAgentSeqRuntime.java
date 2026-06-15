@@ -15,6 +15,9 @@ import java.util.Map;
 /**
  * Sequential sub-agent runtime — chains agent outputs via {prevOutput} template.
  * Each agent receives the previous agent's output via template variables.
+ *
+ * <p>Each sub-agent runs via {@code streamEvents()} (bridged by {@link MultiAgentStreamSupport}),
+ * so the frontend receives every thinking/tool/text delta from every step.
  */
 public class SubAgentSeqRuntime implements StreamingAgentRuntime {
 
@@ -36,7 +39,7 @@ public class SubAgentSeqRuntime implements StreamingAgentRuntime {
         Flux<Map<String, Object>> sinkEvents = hook.getEventSink().asFlux();
 
         Flux<Map<String, Object>> pipelineFlux = Flux.create(fluxSink -> {
-            String originalInput = extractText(userMsg);
+            String originalInput = MultiAgentStreamSupport.extractText(userMsg);
 
             Mono<String> chain = Mono.just(originalInput);
 
@@ -58,14 +61,14 @@ public class SubAgentSeqRuntime implements StreamingAgentRuntime {
                             .name("user").role(MsgRole.USER)
                             .textContent(task).build();
 
-                    return step.agent.call(taskMsg).map(response -> {
-                        String output = extractText(response);
-                        hook.emitTaskEnd(step.agentId, truncate(output, 200));
-                        fluxSink.next(Map.of("type", "task_result",
-                                "stepIndex", stepIndex, "agentId", step.agentId,
-                                "output", truncate(output, 500)));
-                        return output;
-                    });
+                    return MultiAgentStreamSupport.runSubAgent(step.agent, taskMsg, step.agentId, fluxSink, null)
+                            .map(output -> {
+                                hook.emitTaskEnd(step.agentId, truncate(output, 200));
+                                fluxSink.next(Map.of("type", "task_result",
+                                        "stepIndex", stepIndex, "agentId", step.agentId,
+                                        "output", truncate(output, 500)));
+                                return output;
+                            });
                 });
             }
 
@@ -85,16 +88,8 @@ public class SubAgentSeqRuntime implements StreamingAgentRuntime {
             );
         });
 
-        return Flux.merge(sinkEvents, pipelineFlux).doOnCancel(this::close);
-    }
-
-    private String extractText(Msg msg) {
-        if (msg == null || msg.getContent() == null) return "";
-        StringBuilder sb = new StringBuilder();
-        for (ContentBlock block : msg.getContent()) {
-            if (block instanceof TextBlock tb) sb.append(tb.getText());
-        }
-        return sb.toString();
+        return Flux.merge(sinkEvents, pipelineFlux.doFinally(s -> close()))
+                .doOnCancel(this::close);
     }
 
     private String truncate(String s, int maxLen) {

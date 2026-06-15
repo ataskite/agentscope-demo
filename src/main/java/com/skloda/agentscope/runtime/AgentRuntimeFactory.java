@@ -4,8 +4,6 @@ import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.AgentConfigService;
 import com.skloda.agentscope.agent.AgentType;
 import com.skloda.agentscope.agent.LoopConfig;
-import com.skloda.agentscope.agent.MsgHubConfig;
-import com.skloda.agentscope.agent.SubAgentConfig;
 import com.skloda.agentscope.composite.CompositeAgentFactory;
 import com.skloda.agentscope.composite.graph.OrderFulfillmentGraph;
 import com.skloda.agentscope.middleware.ApprovalMiddleware;
@@ -147,26 +145,13 @@ public class AgentRuntimeFactory {
     }
 
     public MsgHubRuntime createMsgHubRuntime(String agentId) {
+        // Delegate to CompositeAgentFactory (which uses createAgentForSession with a shared
+        // AgentStateStore), consistent with the other 6 pipeline patterns. Previously this
+        // was built inline with the stateless createSingleAgent, an inconsistency that left
+        // MSG_HUB sub-agents without a shared session store.
         AgentConfig config = configService.getAgentConfig(agentId);
         ObservabilityHook hook = new ObservabilityHook();
-
-        List<SubAgentConfig> subAgentConfigs = config.getSubAgents();
-        if (subAgentConfigs == null || subAgentConfigs.size() < 2) {
-            throw new IllegalArgumentException("MSG_HUB agent requires at least 2 sub-agents (experts + moderator). Got: " + subAgentConfigs);
-        }
-
-        // Last sub-agent is the moderator, all others are experts
-        List<ReActAgent> experts = new ArrayList<>();
-        for (int i = 0; i < subAgentConfigs.size() - 1; i++) {
-            experts.add(compositeFactory.createSingleAgent(subAgentConfigs.get(i).getAgentId()));
-        }
-        ReActAgent moderator = compositeFactory.createSingleAgent(
-                subAgentConfigs.get(subAgentConfigs.size() - 1).getAgentId());
-
-        MsgHubConfig msgHubConfig = config.getMsgHubConfig();
-        int rounds = msgHubConfig != null ? msgHubConfig.getRounds() : 3;
-
-        return new MsgHubRuntime(experts, moderator, hook, agentId, rounds);
+        return compositeFactory.createMsgHubRuntime(config, hook, null);
     }
 
     public StreamingAgentRuntime createHarnessRuntime(String agentId) {
@@ -225,27 +210,11 @@ public class AgentRuntimeFactory {
     }
 
     private MsgHubRuntime createMsgHubRuntimeWithSession(String agentId, AgentStateStore stateStore) {
+        // Delegate to CompositeAgentFactory (shared AgentStateStore), consistent with the
+        // other 6 pipeline patterns and the no-session createMsgHubRuntime above.
         AgentConfig config = configService.getAgentConfig(agentId);
         ObservabilityHook hook = new ObservabilityHook();
-
-        List<SubAgentConfig> subAgentConfigs = config.getSubAgents();
-        if (subAgentConfigs == null || subAgentConfigs.size() < 2) {
-            throw new IllegalArgumentException("MSG_HUB agent requires at least 2 sub-agents (experts + moderator). Got: " + subAgentConfigs);
-        }
-
-        // Last sub-agent is the moderator, all others are experts
-        List<ReActAgent> experts = new ArrayList<>();
-        for (int i = 0; i < subAgentConfigs.size() - 1; i++) {
-            experts.add(compositeFactory.createSingleAgentForSession(
-                    subAgentConfigs.get(i).getAgentId(), stateStore, null));
-        }
-        ReActAgent moderator = compositeFactory.createSingleAgentForSession(
-                subAgentConfigs.get(subAgentConfigs.size() - 1).getAgentId(), stateStore, null);
-
-        MsgHubConfig msgHubConfig = config.getMsgHubConfig();
-        int rounds = msgHubConfig != null ? msgHubConfig.getRounds() : 3;
-
-        return new MsgHubRuntime(experts, moderator, hook, agentId, rounds);
+        return compositeFactory.createMsgHubRuntime(config, hook, stateStore);
     }
 
     private StreamingAgentRuntime createHarnessRuntimeWithSession(String agentId, AgentStateStore stateStore) {

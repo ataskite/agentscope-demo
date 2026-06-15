@@ -17,6 +17,10 @@ import java.util.Map;
  * MsgHub runtime — multi-round expert roundtable discussion with moderator synthesis.
  * Each expert speaks in sequence across multiple rounds, seeing all previous messages.
  * The moderator summarizes the discussion at the end.
+ *
+ * <p>Each sub-agent (experts and moderator) runs via {@code streamEvents()} (bridged by
+ * {@link MultiAgentStreamSupport}), so the frontend receives every thinking/tool/text delta
+ * from every participant across all rounds.
  */
 public class MsgHubRuntime implements StreamingAgentRuntime {
 
@@ -48,7 +52,7 @@ public class MsgHubRuntime implements StreamingAgentRuntime {
             participantNames.add(moderator.getName());
             hook.emitRoundtableStart(pipelineId, participantNames, rounds);
 
-            String topic = extractText(userMsg);
+            String topic = MultiAgentStreamSupport.extractText(userMsg);
             List<String> discussionLog = new ArrayList<>();
 
             Mono<Void> chain = Mono.empty();
@@ -67,13 +71,14 @@ public class MsgHubRuntime implements StreamingAgentRuntime {
                                     .name("user").role(MsgRole.USER)
                                     .textContent(prompt).build();
 
-                            return expert.call(expertMsg).doOnNext(response -> {
-                                String content = extractText(response);
-                                discussionLog.add("【" + expertName + "】(第" + roundNum + "轮): " + content);
-                                hook.emitRoundMessage(expertName, content);
-                                fluxSink.next(Map.of("type", "round_message",
-                                        "round", roundNum, "agent", expertName, "content", content));
-                            }).then();
+                            return MultiAgentStreamSupport.runSubAgent(expert, expertMsg, expertName, fluxSink, null)
+                                    .doOnNext(content -> {
+                                        discussionLog.add("【" + expertName + "】(第" + roundNum + "轮): " + content);
+                                        hook.emitRoundMessage(expertName, content);
+                                        fluxSink.next(Map.of("type", "round_message",
+                                                "round", roundNum, "agent", expertName, "content", content));
+                                    })
+                                    .then();
                         }));
                     }
 
@@ -88,15 +93,16 @@ public class MsgHubRuntime implements StreamingAgentRuntime {
                         .name("user").role(MsgRole.USER)
                         .textContent(moderatorPrompt).build();
 
-                return moderator.call(moderatorMsg).doOnNext(response -> {
-                    String synthesis = extractText(response);
-                    hook.emitRoundtableSummary(moderator.getName(), synthesis);
-                    fluxSink.next(Map.of("type", "roundtable_summary",
-                            "agent", moderator.getName(), "content", synthesis));
-                    fluxSink.next(Map.of("type", "text", "content", synthesis));
-                    fluxSink.next(Map.of("type", "done"));
-                    fluxSink.complete();
-                }).then();
+                return MultiAgentStreamSupport.runSubAgent(moderator, moderatorMsg, moderator.getName(), fluxSink, null)
+                        .doOnNext(synthesis -> {
+                            hook.emitRoundtableSummary(moderator.getName(), synthesis);
+                            fluxSink.next(Map.of("type", "roundtable_summary",
+                                    "agent", moderator.getName(), "content", synthesis));
+                            fluxSink.next(Map.of("type", "text", "content", synthesis));
+                            fluxSink.next(Map.of("type", "done"));
+                            fluxSink.complete();
+                        })
+                        .then();
             })).subscribe(
                     v -> {},
                     error -> {
@@ -108,7 +114,8 @@ public class MsgHubRuntime implements StreamingAgentRuntime {
             );
         });
 
-        return Flux.merge(sinkEvents, roundtableFlux).doOnCancel(this::close);
+        return Flux.merge(sinkEvents, roundtableFlux.doFinally(s -> close()))
+                .doOnCancel(this::close);
     }
 
     private String buildExpertPrompt(String topic, List<String> discussionLog, int round, String expertName) {
@@ -136,15 +143,6 @@ public class MsgHubRuntime implements StreamingAgentRuntime {
         }
         sb.append("\n## 你的任务\n");
         sb.append("你是讨论主持人。请综合所有参与者的观点，给出全面、客观的总结。\n");
-        return sb.toString();
-    }
-
-    private String extractText(Msg msg) {
-        if (msg == null || msg.getContent() == null) return "";
-        StringBuilder sb = new StringBuilder();
-        for (ContentBlock block : msg.getContent()) {
-            if (block instanceof TextBlock tb) sb.append(tb.getText());
-        }
         return sb.toString();
     }
 

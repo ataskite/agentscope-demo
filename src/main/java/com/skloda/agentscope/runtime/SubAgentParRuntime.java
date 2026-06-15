@@ -15,6 +15,9 @@ import java.util.Map;
 
 /**
  * Parallel sub-agent runtime — dispatches tasks concurrently, aggregates results.
+ *
+ * <p>Each sub-agent runs via {@code streamEvents()} (bridged by {@link MultiAgentStreamSupport}),
+ * so the frontend receives every thinking/tool/text delta from every concurrent task.
  */
 public class SubAgentParRuntime implements StreamingAgentRuntime {
 
@@ -36,7 +39,7 @@ public class SubAgentParRuntime implements StreamingAgentRuntime {
         Flux<Map<String, Object>> sinkEvents = hook.getEventSink().asFlux();
 
         Flux<Map<String, Object>> pipelineFlux = Flux.create(fluxSink -> {
-            String input = extractText(userMsg);
+            String input = MultiAgentStreamSupport.extractText(userMsg);
 
             List<Mono<Map<String, Object>>> taskMonos = new ArrayList<>();
             for (SubAgentTask task : tasks) {
@@ -48,11 +51,12 @@ public class SubAgentParRuntime implements StreamingAgentRuntime {
                         .name("user").role(MsgRole.USER)
                         .textContent(taskContent).build();
 
-                Mono<Map<String, Object>> taskMono = task.agent.call(taskMsg).map(response -> {
-                    String output = extractText(response);
-                    hook.emitTaskEnd(task.agentId, truncate(output, 200));
-                    return Map.<String, Object>of("agentId", task.agentId, "output", output);
-                });
+                Mono<Map<String, Object>> taskMono = MultiAgentStreamSupport
+                        .runSubAgent(task.agent, taskMsg, task.agentId, fluxSink, null)
+                        .map(output -> {
+                            hook.emitTaskEnd(task.agentId, truncate(output, 200));
+                            return Map.<String, Object>of("agentId", task.agentId, "output", output);
+                        });
                 taskMonos.add(taskMono);
             }
 
@@ -82,16 +86,8 @@ public class SubAgentParRuntime implements StreamingAgentRuntime {
                     );
         });
 
-        return Flux.merge(sinkEvents, pipelineFlux).doOnCancel(this::close);
-    }
-
-    private String extractText(Msg msg) {
-        if (msg == null || msg.getContent() == null) return "";
-        StringBuilder sb = new StringBuilder();
-        for (ContentBlock block : msg.getContent()) {
-            if (block instanceof TextBlock tb) sb.append(tb.getText());
-        }
-        return sb.toString();
+        return Flux.merge(sinkEvents, pipelineFlux.doFinally(s -> close()))
+                .doOnCancel(this::close);
     }
 
     private String truncate(String s, int maxLen) {

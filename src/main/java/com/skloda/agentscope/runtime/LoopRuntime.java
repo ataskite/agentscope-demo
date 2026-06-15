@@ -14,6 +14,17 @@ import java.util.Map;
 /**
  * Loop runtime — iterative write-review-refine pattern.
  * Writer produces content, critic reviews, loop continues until approved or max iterations.
+ *
+ * <p>Each sub-agent runs via {@code streamEvents()} (bridged by {@link MultiAgentStreamSupport}),
+ * so the frontend receives every thinking/tool/text delta from both the writer and the critic.
+ *
+ * <p>Bug fixes vs the prior {@code agent.call()} version:
+ * <ul>
+ *   <li>The {@code max-iterations} exit path now emits the last writer output as a {@code text}
+ *       event (previously dropped entirely — the user saw no final content on exhaustion).</li>
+ *   <li>Nested {@code .subscribe()} inside {@code Flux.create} (writer→critic) replaced by a
+ *       {@code Mono} {@code flatMap} chain, eliminating fire-and-forget race conditions.</li>
+ * </ul>
  */
 public class LoopRuntime implements StreamingAgentRuntime {
 
@@ -44,69 +55,83 @@ public class LoopRuntime implements StreamingAgentRuntime {
 
         Flux<Map<String, Object>> loopFlux = Flux.create(fluxSink -> {
             hook.emitLoopStart(0);
-            String originalRequest = extractText(userMsg);
-            iterate(originalRequest, "", 0, fluxSink);
+            String originalRequest = MultiAgentStreamSupport.extractText(userMsg);
+
+            iterate(originalRequest, "", 0, fluxSink)
+                    .subscribe();  // single subscription at the top of the chain
         });
 
-        return Flux.merge(sinkEvents, loopFlux).doOnCancel(this::close);
+        // doFinally completes the EventSink so Flux.merge(sinkEvents, loopFlux) can terminate.
+        return Flux.merge(sinkEvents, loopFlux.doFinally(s -> close()))
+                .doOnCancel(this::close);
     }
 
-    private void iterate(String originalRequest, String previousFeedback, int iteration,
-                         reactor.core.publisher.FluxSink<Map<String, Object>> fluxSink) {
+    /**
+     * One write→review iteration, returning a {@link Mono} that completes when the loop
+     * terminates (approved or max iterations). Replaces the old recursive nested-subscribe.
+     */
+    private Mono<Void> iterate(String originalRequest, String previousFeedback, int iteration,
+                               reactor.core.publisher.FluxSink<Map<String, Object>> fluxSink) {
+        // Max iterations reached: emit the last writer output (BUG FIX — was dropped) and finish.
         if (iteration >= maxIterations) {
-            finishLoop(iteration, false, "达到最大迭代次数", fluxSink);
-            return;
+            // We have no new writer output here; the previous iteration's writer output is the
+            // best final content. The caller (approved/else branch) emits text before recursing,
+            // so on the max-iter boundary we emit a final "best-effort" note only if we never
+            // emitted one. To keep it simple and correct, finish without a duplicate text here.
+            return finishLoop(iteration, false, "达到最大迭代次数", fluxSink);
         }
 
         // Writer step
         String writerPrompt = buildWriterPrompt(originalRequest, previousFeedback, iteration);
         Msg writerMsg = Msg.builder().name("user").role(MsgRole.USER).textContent(writerPrompt).build();
 
-        writer.call(writerMsg).subscribe(writerResponse -> {
-            String writerOutput = extractText(writerResponse);
-            fluxSink.next(Map.of("type", "loop_writer_output",
-                    "iteration", iteration, "content", writerOutput));
+        return MultiAgentStreamSupport.runSubAgent(writer, writerMsg, writer.getName(), fluxSink, null)
+                .flatMap(writerOutput -> {
+                    fluxSink.next(Map.of("type", "loop_writer_output",
+                            "iteration", iteration, "content", writerOutput));
 
-            // Critic step
-            String criticPrompt = buildCriticPrompt(originalRequest, writerOutput);
-            Msg criticMsg = Msg.builder().name("user").role(MsgRole.USER).textContent(criticPrompt).build();
+                    // Critic step
+                    String criticPrompt = buildCriticPrompt(originalRequest, writerOutput);
+                    Msg criticMsg = Msg.builder().name("user").role(MsgRole.USER).textContent(criticPrompt).build();
 
-            critic.call(criticMsg).subscribe(criticResponse -> {
-                String criticOutput = extractText(criticResponse);
-                boolean approved = containsApproval(criticOutput);
+                    return MultiAgentStreamSupport.runSubAgent(critic, criticMsg, critic.getName(), fluxSink, null)
+                            .flatMap(criticOutput -> {
+                                boolean approved = containsApproval(criticOutput);
 
-                hook.emitLoopIterationResult(iteration, approved, criticOutput);
-                fluxSink.next(Map.of("type", "loop_iteration_result",
-                        "iteration", iteration, "approved", approved,
-                        "feedback", criticOutput));
+                                hook.emitLoopIterationResult(iteration, approved, criticOutput);
+                                fluxSink.next(Map.of("type", "loop_iteration_result",
+                                        "iteration", iteration, "approved", approved,
+                                        "feedback", criticOutput));
 
-                if (approved) {
-                    fluxSink.next(Map.of("type", "text", "content", writerOutput));
-                    finishLoop(iteration + 1, true, criticOutput, fluxSink);
-                } else {
-                    iterate(originalRequest, criticOutput, iteration + 1, fluxSink);
-                }
-            }, error -> {
-                log.error("Critic error at iteration {}", iteration, error);
-                fluxSink.next(Map.of("type", "error", "message", "Critic error: " + error.getMessage()));
-                fluxSink.next(Map.of("type", "done"));
-                fluxSink.complete();
-            });
-        }, error -> {
-            log.error("Writer error at iteration {}", iteration, error);
-            fluxSink.next(Map.of("type", "error", "message", "Writer error: " + error.getMessage()));
-            fluxSink.next(Map.of("type", "done"));
-            fluxSink.complete();
-        });
+                                if (approved) {
+                                    // Approved: emit the writer's output as the final text.
+                                    fluxSink.next(Map.of("type", "text", "content", writerOutput));
+                                    return finishLoop(iteration + 1, true, criticOutput, fluxSink);
+                                }
+                                // Keep the last writer output on hand so the max-iter path can emit it.
+                                lastWriterOutput = writerOutput;
+                                return iterate(originalRequest, criticOutput, iteration + 1, fluxSink);
+                            });
+                });
     }
 
-    private void finishLoop(int totalIterations, boolean approved, String feedback,
-                            reactor.core.publisher.FluxSink<Map<String, Object>> fluxSink) {
+    // Holds the most recent writer output so the max-iterations exit path can emit it.
+    // Set on every non-approved iteration; read once when iteration budget is exhausted.
+    private volatile String lastWriterOutput = "";
+
+    private Mono<Void> finishLoop(int totalIterations, boolean approved, String feedback,
+                                  reactor.core.publisher.FluxSink<Map<String, Object>> fluxSink) {
+        // BUG FIX: on the max-iterations path, emit the last writer output as the final text
+        // so the user sees content even when the critic never approved.
+        if (!approved && lastWriterOutput != null && !lastWriterOutput.isEmpty()) {
+            fluxSink.next(Map.of("type", "text", "content", lastWriterOutput));
+        }
         hook.emitLoopEnd(totalIterations, approved);
         fluxSink.next(Map.of("type", "loop_end",
                 "totalIterations", totalIterations, "approved", approved));
         fluxSink.next(Map.of("type", "done"));
         fluxSink.complete();
+        return Mono.empty();
     }
 
     private String buildWriterPrompt(String originalRequest, String feedback, int iteration) {
@@ -132,15 +157,6 @@ public class LoopRuntime implements StreamingAgentRuntime {
             if (text.contains(keyword)) return true;
         }
         return false;
-    }
-
-    private String extractText(Msg msg) {
-        if (msg == null || msg.getContent() == null) return "";
-        StringBuilder sb = new StringBuilder();
-        for (ContentBlock block : msg.getContent()) {
-            if (block instanceof TextBlock tb) sb.append(tb.getText());
-        }
-        return sb.toString();
     }
 
     @Override

@@ -16,6 +16,10 @@ import java.util.Map;
 /**
  * Debate runtime — multi-expert debate with judge synthesis.
  * All agents except the last are experts; the last agent is the judge.
+ *
+ * <p>Each sub-agent (experts and judge) runs via {@code streamEvents()} (bridged by
+ * {@link MultiAgentStreamSupport}), so the frontend receives every thinking/tool/text delta
+ * from every participant, not just a single final text per turn.
  */
 public class DebateRuntime implements StreamingAgentRuntime {
 
@@ -47,7 +51,7 @@ public class DebateRuntime implements StreamingAgentRuntime {
             allAgents.add(judge.getName());
             hook.emitPipelineStart(pipelineId, allAgents);
 
-            String topic = extractText(userMsg);
+            String topic = MultiAgentStreamSupport.extractText(userMsg);
             List<String> allArguments = new ArrayList<>();
             Mono<Void> chain = Mono.empty();
 
@@ -61,15 +65,13 @@ public class DebateRuntime implements StreamingAgentRuntime {
                                 .name("user").role(MsgRole.USER)
                                 .textContent(debateContext).build();
 
-                        return expert.call(debateMsg).doOnNext(response -> {
-                            String argument = extractText(response);
-                            allArguments.add(expertName + ": " + argument);
-                            hook.getEventSink().emit(Events.ROUND_MESSAGE,
-                                    Map.of("round", roundNum, "agent", expertName,
-                                            "content", argument, "timestamp", System.currentTimeMillis()));
-                            fluxSink.next(Map.of("type", "round_message",
-                                    "round", roundNum, "agent", expertName, "content", argument));
-                        }).then();
+                        return MultiAgentStreamSupport.runSubAgent(expert, debateMsg, expertName, fluxSink, null)
+                                .doOnNext(argument -> {
+                                    allArguments.add(expertName + ": " + argument);
+                                    fluxSink.next(Map.of("type", "round_message",
+                                            "round", roundNum, "agent", expertName, "content", argument));
+                                })
+                                .then();
                     }));
                 }
             }
@@ -79,18 +81,16 @@ public class DebateRuntime implements StreamingAgentRuntime {
                 Msg judgeMsg = Msg.builder()
                         .name("user").role(MsgRole.USER)
                         .textContent(judgeInput).build();
-                return judge.call(judgeMsg).doOnNext(response -> {
-                    String synthesis = extractText(response);
-                    hook.getEventSink().emit(Events.ROUNDTABLE_SUMMARY,
-                            Map.of("agent", judge.getName(), "content", synthesis,
-                                    "timestamp", System.currentTimeMillis()));
-                    fluxSink.next(Map.of("type", "roundtable_summary",
-                            "agent", judge.getName(), "content", synthesis));
-                    fluxSink.next(Map.of("type", "text", "content", synthesis));
-                    hook.emitPipelineEnd(pipelineId, experts.size() * rounds + 1, 0);
-                    fluxSink.next(Map.of("type", "done"));
-                    fluxSink.complete();
-                }).then();
+                return MultiAgentStreamSupport.runSubAgent(judge, judgeMsg, judge.getName(), fluxSink, null)
+                        .doOnNext(synthesis -> {
+                            fluxSink.next(Map.of("type", "roundtable_summary",
+                                    "agent", judge.getName(), "content", synthesis));
+                            fluxSink.next(Map.of("type", "text", "content", synthesis));
+                            hook.emitPipelineEnd(pipelineId, experts.size() * rounds + 1, 0);
+                            fluxSink.next(Map.of("type", "done"));
+                            fluxSink.complete();
+                        })
+                        .then();
             })).subscribe(
                     v -> {},
                     error -> {
@@ -102,7 +102,8 @@ public class DebateRuntime implements StreamingAgentRuntime {
             );
         });
 
-        return Flux.merge(sinkEvents, debateFlux).doOnCancel(this::close);
+        return Flux.merge(sinkEvents, debateFlux.doFinally(s -> close()))
+                .doOnCancel(this::close);
     }
 
     private String buildDebateContext(String topic, List<String> previousArgs, int round, String expertName) {
@@ -131,21 +132,6 @@ public class DebateRuntime implements StreamingAgentRuntime {
         sb.append("\n## 你的任务\n");
         sb.append("你是裁判。请综合所有辩论者的观点，给出客观的总结和评判。\n");
         return sb.toString();
-    }
-
-    private String extractText(Msg msg) {
-        if (msg == null || msg.getContent() == null) return "";
-        StringBuilder sb = new StringBuilder();
-        for (ContentBlock block : msg.getContent()) {
-            if (block instanceof TextBlock tb) sb.append(tb.getText());
-        }
-        return sb.toString();
-    }
-
-    /** Inner constants for event type names */
-    private static class Events {
-        static final String ROUND_MESSAGE = "round_message";
-        static final String ROUNDTABLE_SUMMARY = "roundtable_summary";
     }
 
     @Override

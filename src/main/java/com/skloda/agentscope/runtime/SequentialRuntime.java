@@ -14,6 +14,10 @@ import java.util.Map;
 
 /**
  * Sequential pipeline runtime — executes agents in order, chaining outputs.
+ *
+ * <p>Each sub-agent runs via {@code streamEvents()} (bridged by {@link MultiAgentStreamSupport}),
+ * so the frontend receives every thinking/tool/text delta from every step, not just a single
+ * final text per step as in the old {@code agent.call()} version.
  */
 public class SequentialRuntime implements StreamingAgentRuntime {
 
@@ -37,7 +41,7 @@ public class SequentialRuntime implements StreamingAgentRuntime {
         Flux<Map<String, Object>> pipelineFlux = Flux.create(fluxSink -> {
             hook.emitPipelineStart(pipelineId, agents.stream().map(ReActAgent::getName).toList());
 
-            Mono<String> chain = Mono.just(extractText(userMsg));
+            Mono<String> chain = Mono.just(MultiAgentStreamSupport.extractText(userMsg));
 
             for (int i = 0; i < agents.size(); i++) {
                 final int stepIndex = i;
@@ -51,15 +55,16 @@ public class SequentialRuntime implements StreamingAgentRuntime {
                             .name("user").role(MsgRole.USER)
                             .textContent(prevOutput).build();
 
-                    return agent.call(stepMsg).map(response -> {
-                        String output = extractText(response);
-                        long duration = System.currentTimeMillis() - start;
-                        hook.emitPipelineStepEnd(pipelineId, stepIndex, agent.getName(), duration);
-                        fluxSink.next(Map.of("type", "pipeline_step_result",
-                                "stepIndex", stepIndex, "agentId", agent.getName(),
-                                "output", truncate(output, 500)));
-                        return output;
-                    });
+                    String sourceLabel = agent.getName();
+                    return MultiAgentStreamSupport.runSubAgent(agent, stepMsg, sourceLabel, fluxSink, null)
+                            .map(output -> {
+                                long duration = System.currentTimeMillis() - start;
+                                hook.emitPipelineStepEnd(pipelineId, stepIndex, agent.getName(), duration);
+                                fluxSink.next(Map.of("type", "pipeline_step_result",
+                                        "stepIndex", stepIndex, "agentId", agent.getName(),
+                                        "output", truncate(output, 500)));
+                                return output;
+                            });
                 });
             }
 
@@ -79,16 +84,8 @@ public class SequentialRuntime implements StreamingAgentRuntime {
             );
         });
 
-        return Flux.merge(sinkEvents, pipelineFlux).doOnCancel(this::close);
-    }
-
-    private String extractText(Msg msg) {
-        if (msg == null || msg.getContent() == null) return "";
-        StringBuilder sb = new StringBuilder();
-        for (ContentBlock block : msg.getContent()) {
-            if (block instanceof TextBlock tb) sb.append(tb.getText());
-        }
-        return sb.toString();
+        return Flux.merge(sinkEvents, pipelineFlux.doFinally(s -> close()))
+                .doOnCancel(this::close);
     }
 
     private String truncate(String s, int maxLen) {
