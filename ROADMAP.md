@@ -1,7 +1,8 @@
 # AgentScope Java 2.0 Evolution Roadmap
 
-> Last reviewed: 2026-06-11  
-> Current local baseline: Spring Boot 3.5.14, Java 17, `agentscope.version=2.0.0-RC1`
+> Last reviewed: 2026-06-22（RC4 评估）
+> Current local baseline: Spring Boot 3.5.14, Java 17, `agentscope.version=2.0.0-RC3`
+> 上游最新: `2.0.0-RC4`（2026-06-18 发布于 GitHub，Maven Central 暂未同步）
 
 ## 参考来源
 
@@ -9,27 +10,35 @@
 - AgentScope Java V1 迁移指南: https://java.agentscope.io/v2/zh/docs/change-log.html
 - AgentScope Java Release Notes: https://java.agentscope.io/v2/zh/docs/others/release-notes.html
 - AgentScope Java GitHub: https://github.com/agentscope-ai/agentscope-java
+- RC4 Release: https://github.com/agentscope-ai/agentscope-java/releases/tag/v2.0.0-RC4
 - 用户给出的公众号文章: https://mp.weixin.qq.com/s/X2p4olp1gPzQlmIMVKN2rw
 
 > 说明: 当前环境无法直接读取公众号正文，本文以官方文档、Release Notes、GitHub README 与本地代码为准；公众号文章可作为后续人工复核材料。
 
-## 当前项目状态
+## 当前项目状态（2026-06-22）
 
-项目已经不是一个简单 1.x demo，而是一个混合态的 2.0 迁移项目：
+项目已完成到 RC3 的迁移，核心功能稳定运行：
 
-- 已升级到 `2.0.0-RC1`，`mvn -q -DskipTests compile` 当前通过。
-- 已有 Spring Boot UI、SSE、文档解析、结构化输出、RAG、长期记忆、MCP、权限 demo、middleware demo、Harness 适配层、多模态上传、工作流记录等能力。
-- 仍大量依赖 1.x/RC1 兼容 API：`Hook`、`SkillBox`、`agent.stream()`、`Event/EventType`、`Session/SessionKey`、`RAGMode/Knowledge/RetrieveConfig`、`LongTermMemory`、`StructuredOutputReminder`。
-- `AgentRuntimeFactory` 中 `HARNESS` 分支仍 fallback 到 SINGLE，但 `AgentService` 已经能绕过它走 `HarnessAgentService`。
-- Pipeline 包删除后，`SEQUENTIAL/PARALLEL/DEBATE/LOOP/MSG_HUB/SUBAGENT_SEQ/SUBAGENT_PAR` 已禁用，尚未用 2.0 subagent/middleware/event stream 重建。
-- `docs/superpowers/specs/2026-06-09-agentscope-2.0-upgrade-design.md` 已明确把 Hook、SkillBox、Memory、streamEvents、Harness、Permission、Workspace 等作为后续工作。
+- ✅ 已升级到 `2.0.0-RC3`，`mvn clean test` 通过（341 测试全绿）。
+- ✅ 已完成废弃 API 清理: Hook→EventSink/Middleware、SkillBox→SkillRepository、Memory 清理、structuredOutputReminder 移除（0 残留）。
+- ✅ `streamEvents()` 已迁移: AgentRuntime（单 agent）+ 7 个 pipeline runtime（多 agent）。
+- ✅ `AgentEventMapper` 覆盖全量 30 种 `AgentEventType`。
+- ✅ 7 种 pipeline 模式（SEQUENTIAL/PARALLEL/DEBATE/LOOP/MSG_HUB/SUBAGENT_SEQ/SUBAGENT_PAR）已全部恢复 + 流式化。
+- ⏸ RAG/LongTermMemory 仍是 v1 API（官方 v2 替代方案未上线）。
+- ⚠️ `HarnessRuntime` 仍用 `agent.stream()`（RC3 的 `HarnessAgent.streamEvents()` 不转发子 agent 事件）。
+- ⚠️ Phase 3 compaction/sandbox 的 Factory 已建但 `HarnessAgentFactory` 未引用（配了没用）。
+- ⚠️ Phase 4 前端 7 个新 SSE 事件类型未渲染（后端发、前端静默丢弃）。
+- 设计文档: `docs/superpowers/specs/2026-06-12-agentscope-2.0-upgrade-design.md`（已据实纠偏到 RC3 基准）。
+
+**关键现实（RC3 实测）:** RC3 无多 agent 编排原语（Middleware 不能调用其他 agent；SubAgentTool 是 LLM 驱动；pipeline 包已移除；无 MsgHub）。7 个 pipeline 模式采用手写 runtime + streamEvents，而非原设计文档的 Middleware 方案。详见设计文档的"RC3 多 Agent 编排能力实测结论"。
 
 ## 优先级原则
 
-1. 先追 RC3/stable API，避免继续在 RC1 兼容层上扩功能。
-2. 先迁移事件、状态、权限这些横切契约，再做展示型 demo。
-3. 保留当前可运行 UI 和样例，不一次性重写全部 agent。
-4. 每一阶段都要有一个前端可演示场景和一组回归测试。
+1. **锁定当前 RC3 稳定基线**，不主动追正式版或新 RC（除非已评估且 Maven 可用）。
+2. RC4 已发布到 GitHub（2026-06-18）但 **Maven Central 未同步**，RC4 升级作为 gate（见"下一步"）。
+3. 先迁移事件、状态、权限这些横切契约，再做展示型 demo（已完成）。
+4. 保留当前可运行 UI 和样例，不一次性重写全部 agent。
+5. 每一阶段都要有一个前端可演示场景和一组回归测试。
 
 ## P0: 版本基线与破坏性迁移
 
@@ -260,15 +269,84 @@
 
 ## 近期不建议做
 
-- 不建议继续基于 RC1 的 `Session`、`SkillBox`、`Hook` 扩新功能。
-- 不建议立刻恢复旧 pipeline 代码；应以 2.0 subagent/event source 重新建模。
-- 不建议把 RAG/LongTermMemory 深绑在旧 `builder.knowledge()` / `builder.longTermMemory()` 上。
+- 不建议继续基于 RC1 的 `Session`、`SkillBox`、`Hook` 扩新功能（已清理完毕）。
+- 不建议立刻恢复旧 pipeline 代码；应以 2.0 subagent/event source 重新建模（已完成手写方案）。
+- 不建议把 RAG/LongTermMemory 深绑在旧 `builder.knowledge()` / `builder.longTermMemory()` 上（等官方 v2）。
 - 不建议先做大 UI 改版；事件契约稳定后再做展示优化。
+- **不建议在 RC4 Maven artifact 可用前改 pom.xml** —— 会导致项目编译断裂、341 测试无法运行。
+
+---
+
+## RC4 升级评估（2026-06-22 调研）
+
+### 发布状态
+- **GitHub:** 2026-06-18 发布，tag `v2.0.0-RC4`，标为 "Latest release"。
+- **Maven Central / 阿里云镜像:** ❌ **未同步**（2026-06-22 实测，直查 `repo1.maven.org` 也无）。
+- **升级 gate:** 必须等 `mvn dependency:get -Dartifact=io.agentscope:agentscope-core:2.0.0-RC4` 成功才能启动升级。
+
+### RC4 Release Notes 要点（来源：GitHub release 页面）
+
+**新功能:**
+- ✨ **Harness 异步工具执行 + 通知**（message bus、async tool registry、scheduled wakeup dispatching）#1802
+  - 🔎 **对项目的影响:** 直接利好 Phase 3 的 Harness 主线。RC3 的 HarnessRuntime 仍用 `agent.stream()`，异步工具能力可能让 Harness 的事件流/恢复更强。
+- ✨ **持久化 spawn registry**（子 agent 跨副本路由 + session 恢复）#1817
+  - 🔎 **对项目的影响:** 利好多 agent 场景的 session 恢复（RC3 的痛点之一）。
+- ✨ DynamicSkillMiddleware 实现 ToolkitAware（动态拿 toolkit）#1828
+- ✨ String/Message 便利重载 + 所有 formatter 支持 HintBlock #1802
+- ✨ Kubernetes sandbox 支持注入环境变量到 pods #1789
+
+**Bug 修复（与我们相关的）:**
+- 🐛 **`RuntimeContext` 复制时 typed attributes 丢失** #1813
+  - 🔎 我们在 `MultiAgentStreamSupport` 用过 `ctx.put(Class<T>, T)`，这个 bug 可能影响过我们（但未观察到症状）。
+- 🐛 **超时子 agent 重试时未中断导致资源泄漏** #1784
+  - 🔎 影响 Loop/Runtime 的多 agent 调用稳定性。
+- 🐛 `getToolName() → getToolCallName()` 文档错误 #1760
+  - 🔎 我们在 Step 2 探索时确认过 getter 名（踩过同类坑）。
+- 🐛 SkillFilter 用 composite ID 而非 skill name 匹配 #1771
+- 🐛 JdbcStore 表初始化在 MySQL utf8mb4 下失败 #1781
+- 🐛 OpenTelemetry context propagation、OllamaChatModel NPE、sandbox glob `**/` 等若干。
+
+### RC4 升级后的 ROADMAP 影响（待 Maven 可用后执行）
+
+| 项目 | RC3 现状 | RC4 可能改善 | 优先级 |
+|------|---------|------------|--------|
+| **HarnessRuntime 迁移 streamEvents** | 仍用 `agent.stream()` | ✨ 异步工具 + spawn registry 可能提供更好事件流 | 高（升级后立即评估） |
+| **多 agent session 恢复** | 无持久化 spawn | ✨ 持久化 spawn registry | 中 |
+| **RuntimeContext typed attributes** | 可能丢数据 | 🐛 已修 #1813 | 中（验证是否影响我们） |
+| **Loop/Runtime 资源泄漏** | 嵌套 subscribe 已重写 | 🐛 子 agent 超时修复 #1784 | 低（我们已部分修复） |
+| **SkillFilter 匹配** | 未深度使用 | 🐛 已修 #1771 | 低 |
+| **Phase 3 Harness 主线（ROADMAP P2）** | 阻塞于 streamEvents | ✨ 异步工具能力解锁 | 高（升级后重启 Phase 3 Harness 工作） |
+
+---
 
 ## 下一步可执行任务
 
-1. 建 `docs/superpowers/specs/2026-06-11-agentscope-2-roadmap-execution.md`，把 P0/P1 细化为可执行规格。
-2. 开分支 `codex/agentscope-2-roadmap-p0`。
-3. 先升级到 RC3/stable 并修编译。
-4. 为 `streamEvents()` 写事件转换器测试，再替换运行时。
-5. 跑 `mvn test`，再补 UI 手测清单。
+### 🚦 Gate: RC4 升级（必须等 Maven 同步）
+
+**前置条件:** `mvn dependency:get -Dartifact=io.agentscope:agentscope-core:2.0.0-RC4` 成功。
+
+**升级步骤（条件满足后执行）:**
+1. 改 `pom.xml` 的 `agentscope.version` → `2.0.0-RC4`
+2. `mvn clean compile -U`，修复 breaking change（参考设计文档的 javap 核对法）
+3. `mvn test`，确保 341 测试全绿
+4. 评估 RC4 新能力（上表），更新设计文档 + ROADMAP
+5. commit
+
+**检查 Maven 同步的命令:**
+```bash
+mvn dependency:get -Dartifact=io.agentscope:agentscope-core:2.0.0-RC4 -U
+```
+
+### 待办（与 RC4 升级并行或之后）
+
+1. **🔴 Phase 4.1 前端新事件处理** — Step 2 的 7 个新 SSE 类型（`data_block_delta`/`subagent_exposed`/`tool_call_delta`/`tool_result_start`/`tool_result_delta`/`require_external_execution`/`external_execution_result`）前端完全不渲染。收益最高，不依赖 RC4。
+2. **🟡 Phase 3.1/3.2 接线验证** — compaction/sandbox 的 Factory 接入 HarnessAgentFactory + 端到端验证。**建议在 RC4 升级后做**（RC4 的 sandbox 改进可能影响接线方式）。
+3. **🟡 Phase 2.9 端到端手测** — 起服务跑 pipeline/loop/approval 真实路径（单测已绿）。
+4. **🟡 CLAUDE.md 同步** — Phase 2/3 收尾后更新架构描述。
+5. **🔴 Phase 3.3/3.4 AgUI/A2A** — 加 artifact 依赖 + 最小 demo（需确认 RC3/RC4 兼容）。
+
+### 已完成（本会话）
+
+- ✅ Phase 1 基础升级 & 废弃清理（commit `3dc928a`, `fabbc7d`）
+- ✅ Phase 2 Pipeline 流式化 + Loop bug 修复（commit `bcc435c`）
+- ✅ 设计文档纠偏到 RC3 基准（commit `dd99500`）
