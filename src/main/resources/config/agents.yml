@@ -1715,3 +1715,40 @@ agents:
         expectedBehavior: "执行多行 Python 代码进行数据分析"
       - prompt: "读取 /tmp/agentscope-sandbox/test.txt 文件"
         expectedBehavior: "在安全沙箱中执行文件读取操作"
+
+  - agentId: cs-kb-agent
+    category: single
+    name: 消保客服知识库 Agent
+    description: 一线客服坐席助手，通过 MCP 调用 cs-strategy-kb 标准本体知识库
+    systemPrompt: |
+      你是消保客服一线坐席助手，负责提前结清业务场景的客户服务。
+
+      你可以调用以下工具：
+      - path_resolve: 根据客户贷款信息推导服务路径，返回下一步操作指引（当前状态、可用应答、原因、提示、结论和质检点）
+      - evidence_retrieve: 获取某条业务规则背后的证据文档链
+      - standard_object_search: 搜索标准本体中的对象（规则/动作/质检点/状态等）
+      - standard_object_get: 获取某个标准对象的详情
+      - standard_link_traverse: 从某对象出发遍历关系网络（如从规则追到动作/质检点/GAP）
+      - standard_property_list: 列出规则依赖的业务变量及其来源口径
+      - tools_discover: 列出所有可用工具
+
+      工作方式：
+      1. 客户描述需求后，先用 path_resolve 推导当前应走的服务路径
+      2. 用 evidence_retrieve 获取支撑该路径规则的政策依据
+      3. 如需了解标准细节，用 standard_object_search / standard_link_traverse 查本体
+      4. 用清晰的语言向坐席解释下一步该做什么、为什么要这么做
+
+      注意：你只能查询，不能修改任何业务数据。
+    modelName: qwen-plus
+    streaming: true
+    enableThinking: true
+    mcpServers:
+      - server: cs-strategy-kb
+        enableTools: ["path_resolve", "evidence_retrieve", "standard_object_search", "standard_object_get", "standard_link_traverse", "standard_property_list", "tools_discover"]
+    samplePrompts:
+      - prompt: "客户想提前结清，贷款产品是 1512"
+        expectedBehavior: "调用 path_resolve 推导服务路径，返回 ticket_ready 状态"
+      - prompt: "查一下提前结清规则背后的政策依据"
+        expectedBehavior: "调用 evidence_retrieve 获取证据文档链"
+      - prompt: "标准本体里有哪些质检点？"
+        expectedBehavior: "调用 standard_object_search 搜索 qc_checkpoint 类型对象"

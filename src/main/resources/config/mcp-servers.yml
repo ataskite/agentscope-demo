@@ -19,3 +19,10 @@ servers:
     transport: HTTP
     url: http://localhost:9091/mcp
     timeout: 60
+
+  - name: cs-strategy-kb
+    transport: HTTP
+    url: http://localhost:8000/mcp
+    headers:
+      X-Agent-Role: first_line,admin
+    timeout: 60
