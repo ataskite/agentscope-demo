@@ -311,6 +311,30 @@ export function showAgentConfig(agentId) {
         systemToolsHtml = '<div class="config-field-value tags"><span class="config-tag none">None</span></div>';
     }
 
+    // MCP Servers: render each server as a labeled block with its enabled tools.
+    var mcpHtml = '';
+    if (config.mcpServers && config.mcpServers.length > 0) {
+        mcpHtml = config.mcpServers.map(function(s) {
+            var serverName = escapeHtml(s.server || 'unknown');
+            var toolsHtml;
+            if (s.enableTools && s.enableTools.length > 0) {
+                toolsHtml = s.enableTools.map(function(t) {
+                    return '<span class="config-tag tool">' + escapeHtml(t) + '</span>';
+                }).join('');
+            } else if (s.disableTools && s.disableTools.length > 0) {
+                toolsHtml = '<span class="config-tag none">All except: ' +
+                    s.disableTools.map(function(t) { return escapeHtml(t); }).join(', ') +
+                    '</span>';
+            } else {
+                toolsHtml = '<span class="config-tag none">All tools enabled</span>';
+            }
+            return '<div class="config-field" style="margin-left: 12px;">' +
+                '<div class="config-field-label">Server: ' + serverName + '</div>' +
+                '<div class="config-field-value tags">' + toolsHtml + '</div>' +
+                '</div>';
+        }).join('');
+    }
+
     var knowledgeHtml = '';
     if (config.ragEnabled) {
         knowledgeHtml =
@@ -373,6 +397,13 @@ export function showAgentConfig(agentId) {
                     '<div class="config-field-label">System Tools</div>' +
                     systemToolsHtml +
                 '</div>' +
+                (mcpHtml ? (
+                    '<hr class="config-divider">' +
+                    '<div class="config-field">' +
+                    '<div class="config-field-label">MCP Servers</div>' +
+                    mcpHtml +
+                    '</div>'
+                ) : '') +
                 knowledgeHtml +
                 '<hr class="config-divider">' +
                 '<div class="config-field">' +

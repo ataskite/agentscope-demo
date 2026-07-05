@@ -367,6 +367,8 @@ public class ChatController {
                 .map(sample -> new SamplePrompt(preview(sample.getPrompt()),
                         sample.getExpectedBehavior() != null ? sample.getExpectedBehavior() : ""))
                 .toList());
+        target.setMcpServers(source.getMcpServers() != null
+                ? new ArrayList<>(source.getMcpServers()) : new ArrayList<>());
         return target;
     }
 
