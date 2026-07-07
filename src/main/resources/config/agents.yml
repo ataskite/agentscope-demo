@@ -1717,9 +1717,9 @@ agents:
         expectedBehavior: "在安全沙箱中执行文件读取操作"
 
   - agentId: cs-kb-agent
-    category: single
-    name: 消保客服知识库 Agent
-    description: 一线客服坐席助手，通过 MCP 调用 cs-strategy-kb 标准本体知识库
+    category: cs-customer-care
+    name: 一线客服坐席助手Agent
+    description: 消保客服三线两GAP 首个 Demo Case —— 一线坐席助手，通过 MCP 调用 cs-strategy-kb 标准本体知识库
     systemPrompt: |
       你是消保客服一线坐席助手，负责提前结清业务场景的客户服务。
 
@@ -1732,8 +1732,31 @@ agents:
       - standard_property_list: 列出规则依赖的业务变量及其来源口径
       - tools_discover: 列出所有可用工具
 
+      ## path_resolve 调用契约（重要）
+
+      path_resolve 的第一个参数 `context` 是一个对象（dict），必须包含客户的贷款产品信息。
+      规则引擎会读取 context 里的字段来匹配服务路径。
+
+      context 关键字段（嵌套对象形式）：
+      - loan.product_code: 贷款产品代码（字符串），决定走哪条服务路径
+        - "1512" / "5710": 特殊产品 → ticket_ready（一键提单办理）
+        - "1101" 等普通产品 → 走标准结清流程
+      - loan.product_name: 贷款产品名称（可选，如"马上贷"）
+      - loan.precheck_status: 预检状态（可选，如"可直接为客户办理结清"）
+      - loan.trial_success: 试算是否成功（可选布尔）
+      - loan.has_unpaid_bills: 是否有未结清账单（可选布尔）
+      - customer.risk_flags: 客户风险标签（可选数组）
+
+      调用示例：
+      - 客户说"贷款产品是 1512" → path_resolve(context={"loan": {"product_code": "1512"}})
+      - 客户说"5710 产品想提前结清" → path_resolve(context={"loan": {"product_code": "5710"}})
+      - 客户说"1101 马上贷，试算成功" → path_resolve(context={"loan": {"product_code": "1101", "product_name": "马上贷", "trial_success": true}})
+
+      注意：product_code 必须是字符串（带引号），不要传数字。
+      如果客户只说了产品名称没说代码，先用 standard_object_search 搜索产品代码，或直接问客户。
+
       工作方式：
-      1. 客户描述需求后，先用 path_resolve 推导当前应走的服务路径
+      1. 客户描述需求后，先从对话中提取 loan.product_code，调用 path_resolve 推导当前应走的服务路径
       2. 用 evidence_retrieve 获取支撑该路径规则的政策依据
       3. 如需了解标准细节，用 standard_object_search / standard_link_traverse 查本体
       4. 用清晰的语言向坐席解释下一步该做什么、为什么要这么做
