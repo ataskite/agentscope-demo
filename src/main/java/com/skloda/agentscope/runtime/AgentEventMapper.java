@@ -171,8 +171,11 @@ public class AgentEventMapper {
 
     private Map<String, Object> toolStart(AgentEvent event) {
         if (event instanceof ToolCallStartEvent tcse) {
+            String toolName = tcse.getToolCallName() != null ? tcse.getToolCallName() : "";
             Map<String, Object> data = base("tool_start");
-            data.put("toolName", tcse.getToolCallName() != null ? tcse.getToolCallName() : "");
+            data.put("toolName", toolName);
+            // Frontend chat.js reads payload.name for timeline rows; keep both for compatibility
+            data.put("name", toolName);
             data.put("toolCallId", tcse.getToolCallId() != null ? tcse.getToolCallId() : "");
             return data;
         }
@@ -195,8 +198,11 @@ public class AgentEventMapper {
 
     private Map<String, Object> toolEnd(AgentEvent event) {
         if (event instanceof ToolCallEndEvent tcee) {
+            String toolName = tcee.getToolCallName() != null ? tcee.getToolCallName() : "";
             Map<String, Object> data = base("tool_end");
-            data.put("toolName", tcee.getToolCallName() != null ? tcee.getToolCallName() : "");
+            data.put("toolName", toolName);
+            // Frontend chat.js reads payload.name for timeline rows; keep both for compatibility
+            data.put("name", toolName);
             data.put("toolCallId", tcee.getToolCallId() != null ? tcee.getToolCallId() : "");
             return data;
         }
@@ -207,8 +213,11 @@ public class AgentEventMapper {
 
     private Map<String, Object> toolResultStart(AgentEvent event) {
         if (event instanceof ToolResultStartEvent trse) {
+            String toolName = trse.getToolCallName() != null ? trse.getToolCallName() : "";
             Map<String, Object> data = base("tool_result_start");
-            data.put("toolName", trse.getToolCallName() != null ? trse.getToolCallName() : "");
+            data.put("toolName", toolName);
+            // Frontend chat.js reads payload.name for timeline rows; keep both for compatibility
+            data.put("name", toolName);
             data.put("toolCallId", trse.getToolCallId() != null ? trse.getToolCallId() : "");
             return data;
         }
@@ -249,6 +258,8 @@ public class AgentEventMapper {
         if (event instanceof ToolResultEndEvent tree) {
             if (tree.getToolCallName() != null) {
                 data.put("toolName", tree.getToolCallName());
+                // Frontend chat.js reads payload.name for timeline rows; keep both for compatibility
+                data.put("name", tree.getToolCallName());
             }
             if (tree.getState() != null) {
                 data.put("state", tree.getState().name());

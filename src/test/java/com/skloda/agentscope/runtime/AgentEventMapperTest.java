@@ -162,6 +162,7 @@ class AgentEventMapperTest {
 
         assertEquals("tool_start", out.get("type"));
         assertEquals("parse_docx", out.get("toolName"));
+        assertEquals("parse_docx", out.get("name")); // frontend chat.js reads payload.name
         assertEquals("call-1", out.get("toolCallId"));
     }
 
@@ -182,6 +183,7 @@ class AgentEventMapperTest {
 
         assertEquals("tool_end", out.get("type"));
         assertEquals("parse_docx", out.get("toolName"));
+        assertEquals("parse_docx", out.get("name")); // frontend chat.js reads payload.name
     }
 
     // ---- tool results ----
@@ -193,6 +195,7 @@ class AgentEventMapperTest {
 
         assertEquals("tool_result_start", out.get("type"));
         assertEquals("parse_docx", out.get("toolName"));
+        assertEquals("parse_docx", out.get("name")); // frontend chat.js reads payload.name
     }
 
     @Test
@@ -212,6 +215,7 @@ class AgentEventMapperTest {
 
         assertEquals("tool_result_end", out.get("type"));
         assertEquals("parse_docx", out.get("toolName"));
+        assertEquals("parse_docx", out.get("name")); // frontend chat.js reads payload.name
         assertEquals("SUCCESS", out.get("state"));
     }
 
