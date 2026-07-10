@@ -22,7 +22,7 @@ public class MiddlewareRegistry {
     /**
      * Auto-register all built-in middlewares
      */
-    @javax.annotation.PostConstruct
+    @jakarta.annotation.PostConstruct
     public void registerBuiltInMiddlewares() {
         // Basic middlewares
         register("audit-logging", AuditLoggingMiddleware::new);

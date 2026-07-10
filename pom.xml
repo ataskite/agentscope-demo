@@ -22,7 +22,7 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <agentscope.version>2.0.0-RC5</agentscope.version>
+        <agentscope.version>2.0.0</agentscope.version>
     </properties>
 
     <dependencies>
@@ -37,6 +37,13 @@
         <dependency>
             <groupId>io.agentscope</groupId>
             <artifactId>agentscope-core</artifactId>
+            <version>${agentscope.version}</version>
+        </dependency>
+
+        <!-- AgentScope DashScope Model Provider (RC5+ 模块化：从 core 拆出) -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-model-dashscope</artifactId>
             <version>${agentscope.version}</version>
         </dependency>
 

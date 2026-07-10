@@ -2,7 +2,7 @@ package com.skloda.agentscope.harness;
 
 import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.HarnessConfig;
-import io.agentscope.core.model.DashScopeChatModel;
+import io.agentscope.extensions.model.dashscope.DashScopeChatModel;
 import io.agentscope.core.model.Model;
 import io.agentscope.harness.agent.HarnessAgent;
 import io.agentscope.harness.agent.filesystem.spec.LocalFilesystemSpec;

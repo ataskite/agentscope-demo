@@ -4,6 +4,7 @@ import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.AgentEventType;
 import io.agentscope.core.event.AgentResultEvent;
 import io.agentscope.core.event.AgentStartEvent;
+import io.agentscope.core.event.AllToolsDeniedEvent;
 import io.agentscope.core.event.CustomEvent;
 import io.agentscope.core.event.DataBlockDeltaEvent;
 import io.agentscope.core.event.ExceedMaxItersEvent;
@@ -90,6 +91,7 @@ public class AgentEventMapper {
                 case REQUEST_STOP -> base("request_stop");
                 case HINT_BLOCK -> hintBlock(event);
                 case SUBAGENT_EXPOSED -> subagentExposed(event);
+                case ALL_TOOLS_DENIED -> allToolsDenied(event);
                 case CUSTOM -> custom(event);
                 // Block boundaries: useful for streaming coordination, but no SSE content for the UI.
                 case TEXT_BLOCK_START, TEXT_BLOCK_END,
@@ -356,6 +358,14 @@ public class AgentEventMapper {
             data.put("subagentId", see.getSubagentId() != null ? see.getSubagentId() : "");
             data.put("agentId", see.getAgentId() != null ? see.getAgentId() : "");
             data.put("label", see.getLabel() != null ? see.getLabel() : "");
+        }
+        return data;
+    }
+
+    private Map<String, Object> allToolsDenied(AgentEvent event) {
+        Map<String, Object> data = base("all_tools_denied");
+        if (event instanceof AllToolsDeniedEvent atde) {
+            data.put("toolCalls", summarizeToolUseBlocks(atde.getDeniedToolCalls()));
         }
         return data;
     }
