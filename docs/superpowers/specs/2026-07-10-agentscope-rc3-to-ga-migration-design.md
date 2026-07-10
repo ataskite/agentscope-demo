@@ -1,7 +1,7 @@
 # AgentScope 2.0.0-RC3 → 2.0.0 GA 迁移设计
 
 > 日期: 2026-07-10
-> 状态: 设计已确认，待实现
+> 状态: 已实现（2.0.0 GA，commit abad612，mvn test 343 全绿）
 > 目标版本: `agentscope 2.0.0`（GA，2026-07-10 发布）
 > 当前基线: pom 锁定 `2.0.0-RC5`、Java 代码仍是 RC3 import 路径；RC3 下 341 测试全绿
 

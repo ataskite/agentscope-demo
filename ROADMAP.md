@@ -1,8 +1,8 @@
 # AgentScope Java 2.0 Evolution Roadmap
 
-> Last reviewed: 2026-06-22（RC4 评估）
-> Current local baseline: Spring Boot 3.5.14, Java 17, `agentscope.version=2.0.0-RC3`
-> 上游最新: `2.0.0-RC4`（2026-06-18 发布于 GitHub，Maven Central 暂未同步）
+> Last reviewed: 2026-07-10（GA 迁移）
+> Current local baseline: Spring Boot 3.5.14, Java 17, `agentscope.version=2.0.0`
+> 上游最新: `2.0.0` GA（2026-07-10 发布，项目已迁至 GA）
 
 ## 参考来源
 
