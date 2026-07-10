@@ -70,21 +70,47 @@ export async function selectSession(sessionId, agentId) {
 }
 
 export async function deleteSession(sessionId) {
-    if (window.isStreaming) return;
+    // 与 clearSession 一致：流式传输中也允许删除，先中止并复位。
+    if (window.isStreaming) {
+        if (window.currentAbortController) {
+            try { window.currentAbortController.abort(); } catch (e) { /* already aborted */ }
+            window.currentAbortController = null;
+        }
+        window.isStreaming = false;
+        var sendBtn = document.getElementById('sendBtn');
+        var messageInput = document.getElementById('messageInput');
+        if (sendBtn) sendBtn.disabled = false;
+        if (messageInput) messageInput.disabled = false;
+    }
     try {
         await deleteSessionApi(sessionId);
-        if (window.currentSessionId === sessionId) {
-            window.currentSessionId = null;
-            clearChatArea();
-        }
-        loadSessions();
     } catch (err) {
         console.error('Failed to delete session', err);
     }
+    // 无论 API 是否成功（session 不存在、网络错误等），都清空当前界面，
+    // 否则用户会看到 CLEAR 按钮点击无反应。
+    if (window.currentSessionId === sessionId) {
+        window.currentSessionId = null;
+        clearChatArea();
+    }
+    loadSessions();
 }
 
 export function clearSession() {
-    if (window.isStreaming) return;
+    // 流式传输中也允许清空：先中止当前请求并复位状态。
+    // 否则一旦 isStreaming 卡在 true（如 SSE 异常断流、网络中断），
+    // CLEAR 按钮会永久失灵，因为没有其他路径能把 isStreaming 复位回 false。
+    if (window.isStreaming) {
+        if (window.currentAbortController) {
+            try { window.currentAbortController.abort(); } catch (e) { /* already aborted */ }
+            window.currentAbortController = null;
+        }
+        window.isStreaming = false;
+        var sendBtn = document.getElementById('sendBtn');
+        var messageInput = document.getElementById('messageInput');
+        if (sendBtn) sendBtn.disabled = false;
+        if (messageInput) messageInput.disabled = false;
+    }
     if (window.currentSessionId) {
         deleteSession(window.currentSessionId);
     } else {

@@ -9,6 +9,8 @@ import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.ToolResultBlock;
 import io.agentscope.core.message.ToolUseBlock;
+import io.agentscope.core.tool.AgentTool;
+import io.agentscope.core.tool.ToolBase;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -172,9 +174,42 @@ public class AgentRuntime implements StreamingAgentRuntime {
      * Convert an AgentEvent from streamEvents() into an SSE-compatible Map.
      * Delegates to {@link AgentEventMapper} which covers all 30 AgentEventType values.
      * Returns null for events that should be silently consumed.
+     *
+     * <p>For {@code tool_start} events, post-processes the mapper output to inject MCP
+     * provenance ({@code isMcp}, {@code mcpName}) by reverse-looking-up the tool name in
+     * the agent's toolkit. The mapper itself is a pure function without toolkit access, so
+     * this enrichment happens here where the agent (and its toolkit) is in scope.
      */
     private Map<String, Object> mapAgentEvent(AgentEvent event) {
-        return eventMapper.apply(event);
+        Map<String, Object> map = eventMapper.apply(event);
+        if (map != null && "tool_start".equals(map.get("type"))) {
+            enrichWithMcpProvenance(map);
+        }
+        return map;
+    }
+
+    /**
+     * If the tool named in the event map is an MCP tool (registered via McpClientManager),
+     * inject {@code isMcp=true} and {@code mcpName=<server name>} so the frontend trace
+     * panel can distinguish MCP calls from local @Tool calls.
+     */
+    private void enrichWithMcpProvenance(Map<String, Object> map) {
+        String toolName = (String) map.get("toolName");
+        if (toolName == null || toolName.isEmpty()) {
+            return;
+        }
+        try {
+            AgentTool tool = agent.getToolkit().getTool(toolName);
+            if (tool instanceof ToolBase tb && tb.isMcp()) {
+                map.put("isMcp", true);
+                String mcpName = tb.getMcpName();
+                if (mcpName != null && !mcpName.isEmpty()) {
+                    map.put("mcpName", mcpName);
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Could not resolve MCP provenance for tool '{}': {}", toolName, e.getMessage());
+        }
     }
 
     /**

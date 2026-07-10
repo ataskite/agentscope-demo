@@ -6,7 +6,7 @@ agents:
     systemPrompt: |
       你是一个友好的AI助手。
       请保持简洁、清晰地回答用户的问题。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     skills: []
@@ -35,7 +35,7 @@ agents:
       你是一个拥有多种工具的AI助手。
       当需要时，请使用合适的工具来准确回答问题。
       使用工具时，请向用户说明你正在做什么。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     autoContext: true
@@ -68,7 +68,7 @@ agents:
       当用户上传文档时，使用相应的技能解析文档内容，然后根据解析结果满足用户的需求。
       支持 .docx、.pdf 和 .xlsx 文件的分析。
       当用户需要生成银行发票时，收集所需的12个参数（姓名、身份证号、手机号、邮箱、合同号、借据号、放款日期、贷款总额、银行放款金额、费用类型、发票金额、流水号），然后使用 generate_bank_invoice 工具生成文件。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     skills:
@@ -144,7 +144,7 @@ agents:
       - 生成的文件名会自动对客户姓名进行脱敏处理（如：张三丰 → 张某某）
       - Word 文档会自动添加当前日期作为提交日期
       - 必须使用 Markdown 链接格式展示下载地址，确保用户可以直接点击下载
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     skills:
@@ -177,7 +177,7 @@ agents:
       当用户提问时，优先从知识库中检索相关文档内容来回答问题。
       如果知识库中没有相关信息，请明确告知用户。
       回答时引用知识库中的原文，保持准确性。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     autoContext: true
@@ -213,7 +213,7 @@ agents:
 
       检索到内容后，基于检索结果回答，并标注引用来源。
       如果检索结果与问题不相关，说明知识库中没有相关信息，基于自身知识回答。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     autoContext: true
@@ -380,7 +380,7 @@ agents:
       - summary: 合同审查摘要
 
       如果字段无法从合同中确认，请不要编造；但 keyClauses、risks、overallRiskLevel 和 summary 必须基于已知文本给出审查结论。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     structuredOutputClass: com.skloda.agentscope.schema.ContractMetadata
@@ -418,7 +418,7 @@ agents:
 
       风险等级使用 LOW、MEDIUM、HIGH 或 CRITICAL。不要编造合同中不存在的编号、日期或金额。
       不要把完整 ContractMetadata JSON 字符串作为工具参数传入；keyClausesSummary 和 risksSummary 使用普通文本。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     skills:
@@ -481,7 +481,7 @@ agents:
       - get_current_weather: 获取天气信息
       - get_stock_price: 获取股票价格
       - get_news: 获取最新新闻
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     autoContext: true
@@ -527,7 +527,7 @@ agents:
       - 标注优先级（高/中/低）
       - 标注预估时间
       - 提供必要的说明和建议
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     planEnabled: true
@@ -555,7 +555,7 @@ agents:
       你能够进行长时间的多轮对话，始终保持连贯性和准确性。
       当对话变得很长时，系统会自动管理上下文，你不需要特殊处理。
       请专注于提供准确、有深度的技术解答。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     autoContext: true
@@ -586,7 +586,7 @@ agents:
 
       当用户表达偏好时，认真记住并在之后的对话中遵循。
       如果用户问起，主动说明你记住的偏好。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     skills: []
@@ -621,7 +621,7 @@ agents:
       2. 关键发现（3-5 条）
       3. 风险点（如有）
       4. 建议行动（如有）
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     skills: [docx, pdf, xlsx]
@@ -649,7 +649,7 @@ agents:
       1. 搜索来源列表
       2. 补充信息摘要
       3. 与文档内容的关联分析
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     userTools: [web_search, get_current_weather, get_news]
@@ -687,7 +687,7 @@ agents:
     systemPrompt: |
       你是一个销售专家。
       你可以回答产品相关问题，提供报价和购买建议。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     samplePrompts:
@@ -716,7 +716,7 @@ agents:
       - 使用指导和操作步骤
       - 文件上传和 Agent 使用帮助
       - 系统功能概览
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     samplePrompts:
@@ -745,7 +745,7 @@ agents:
       - 中型团队（10-50 人）推荐专业版
       - 企业客户（50+ 人）推荐企业版
       - 根据实际需求灵活推荐，不要过度推销
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     samplePrompts:
@@ -775,7 +775,7 @@ agents:
       - 客户要求法律途径解决
       - 重复投诉 3 次以上未解决
       → 建议客户升级到高级投诉处理
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     samplePrompts:
@@ -794,7 +794,7 @@ agents:
       你是一个乐观派分析师。你的职责是从积极的角度分析提案。
       总是寻找提案中的亮点、机会和潜在收益。
       提出建设性的改进建议，但基调是支持和鼓励。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     samplePrompts:
@@ -809,7 +809,7 @@ agents:
       你是一个批评家。你的职责是从风险和问题的角度审视提案。
       指出潜在隐患、实施风险、成本超支可能性和失败模式。
       态度要犀利但基于事实，不是为了反对而反对。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     samplePrompts:
@@ -824,7 +824,7 @@ agents:
       你是一个数据分析师。你的职责是从客观数据和事实的角度分析提案。
       关注数据支撑、量化指标、行业基准和可衡量的结果。
       避免主观判断，用数据说话。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     samplePrompts:
@@ -858,7 +858,7 @@ agents:
 
       ### 最终裁决
       [你的综合判断和建议]
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     samplePrompts:
@@ -872,7 +872,7 @@ agents:
     type: ROUTING
     name: 智能路由器
     description: 根据用户问题自动分发到专家 Agent
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     subAgents:
@@ -902,7 +902,7 @@ agents:
     type: HANDOFFS
     name: 智能客服
     description: 支持智能体交接的客服系统
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     systemPrompt: |
@@ -960,7 +960,7 @@ agents:
     type: ROUTING
     name: 超级主管
     description: 综合调度多个专家，协同完成复杂任务
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     systemPrompt: |
@@ -1010,7 +1010,7 @@ agents:
     type: SEQUENTIAL
     name: 文档分析流水线 v2
     description: 文档解析 → 信息搜索的顺序处理流水线
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     subAgents:
@@ -1030,7 +1030,7 @@ agents:
     type: PARALLEL
     name: 并行分析流水线 v2
     description: 多角度并行分析流水线（文档、视觉、搜索）
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     subAgents:
@@ -1052,7 +1052,7 @@ agents:
     type: DEBATE
     name: 辩论评审流水线 v2
     description: 多专家辩论模式，乐观派、批评家、分析师讨论后由裁判总结
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     subAgents:
@@ -1078,7 +1078,7 @@ agents:
     type: LOOP
     name: 文案优化循环流水线 v2
     description: 写作 → 评审 → 修改的迭代优化循环
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     subAgents:
@@ -1100,7 +1100,7 @@ agents:
     type: MSG_HUB
     name: 专家圆桌会议 v2
     description: 多轮专家讨论，架构师、DBA、安全专家各抒己见，主持人总结
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     subAgents:
@@ -1126,7 +1126,7 @@ agents:
     type: SUBAGENT_SEQ
     name: 报告生成流水线 v2
     description: 调研 → 分析 → 报告撰写的顺序任务委托流水线
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     subAgents:
@@ -1150,7 +1150,7 @@ agents:
     type: SUBAGENT_PAR
     name: 项目管理流水线 v2
     description: 并行执行调研、设计、评估，最后聚合结果
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     subAgents:
@@ -1180,7 +1180,7 @@ agents:
     type: STATE_GRAPH
     name: 订单履约
     description: 模拟完整的订单履约流程（提交→审核→支付→发货）
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     states:
@@ -1251,7 +1251,7 @@ agents:
       你是一位专业的文案写手。你需要根据用户的需求撰写高质量的内容。
       如果收到评审意见，请根据意见修改你的内容，保留核心内容同时改进不足之处。
       直接输出文案内容，不要添加额外说明。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: false
     samplePrompts:
@@ -1267,7 +1267,7 @@ agents:
       - 如果内容质量足够好，回复中包含【通过】
       - 如果需要修改，给出具体的修改建议
       评审要点：逻辑清晰、内容完整、语言流畅、符合需求。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: false
     samplePrompts:
@@ -1285,7 +1285,7 @@ agents:
       审核标准：信息完整、金额合理、无异常。
       用【决策:approved】表示通过，【决策:rejected】表示拒绝。
       简要说明审核结果和原因。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: false
     samplePrompts:
@@ -1301,7 +1301,7 @@ agents:
       大部分情况支付成功，偶尔可能失败。
       用【决策:success】表示支付成功，【决策:fail】表示支付失败。
       简要说明支付处理结果。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: false
     samplePrompts:
@@ -1317,7 +1317,7 @@ agents:
       大部分情况发货成功，偶尔可能丢失。
       用【决策:delivered】表示送达，【决策:lost】表示丢失。
       简要说明物流处理结果。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: false
     samplePrompts:
@@ -1333,7 +1333,7 @@ agents:
     systemPrompt: |
       你是技术方案评审的主持人。你需要综合所有专家的意见，给出最终的评审报告。
       报告应包括：各专家核心观点摘要、共识与分歧、最终建议。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: false
     samplePrompts:
@@ -1347,7 +1347,7 @@ agents:
     systemPrompt: |
       你是资深架构师。从系统架构、技术选型、可扩展性等角度评审技术方案。
       给出具体的架构建议和潜在风险。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: false
     samplePrompts:
@@ -1361,7 +1361,7 @@ agents:
     systemPrompt: |
       你是数据库管理专家。从数据模型、存储方案、查询性能、数据安全等角度评审技术方案。
       给出具体的数据库优化建议。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: false
     samplePrompts:
@@ -1375,7 +1375,7 @@ agents:
     systemPrompt: |
       你是信息安全专家。从安全架构、权限控制、数据保护、合规性等角度评审技术方案。
       给出具体的安全改进建议。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: false
     samplePrompts:
@@ -1389,7 +1389,7 @@ agents:
     name: 调研员
     description: 负责主题调研
     systemPrompt: 你是专业调研员。根据给定主题进行深入调研，提供全面的背景信息和最新进展。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: false
     samplePrompts:
@@ -1401,7 +1401,7 @@ agents:
     name: 分析师
     description: 负责数据分析
     systemPrompt: 你是数据分析专家。对给定的调研结果进行深度分析，提取关键洞察和趋势。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: false
     samplePrompts:
@@ -1413,7 +1413,7 @@ agents:
     name: 报告撰写员
     description: 负责撰写最终报告
     systemPrompt: 你是专业报告撰写员。根据给定的分析结果，撰写结构清晰、内容完整的最终报告。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: false
     samplePrompts:
@@ -1425,7 +1425,7 @@ agents:
     name: 项目调研员
     description: 调研项目可行性
     systemPrompt: 你是项目调研员。调研项目的技术可行性和市场情况，提供全面的可行性分析。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: false
     samplePrompts:
@@ -1437,7 +1437,7 @@ agents:
     name: 方案设计师
     description: 设计技术方案
     systemPrompt: 你是技术方案设计师。根据需求设计技术方案和系统架构，提供详细的设计文档。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: false
     samplePrompts:
@@ -1449,7 +1449,7 @@ agents:
     name: 风险评估员
     description: 评估项目风险
     systemPrompt: 你是项目风险评估员。评估项目的风险和资源需求，提供全面的风险分析报告。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: false
     samplePrompts:
@@ -1468,7 +1468,7 @@ agents:
       你是一个文件管理助手。
       你可以使用工具读取、写入和列出 /tmp 目录下的文件。
       请注意：你没有删除文件的权限。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     mcpServers:
@@ -1491,7 +1491,7 @@ agents:
       你是一个远程工具调用助手。
       你可以通过 SSE 传输调用远程 MCP 服务器上的工具。
       可用的工具包括：echo（回显消息）、add（加法计算）、sampleLLM（示例 LLM 调用）。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     mcpServers:
@@ -1510,7 +1510,7 @@ agents:
       你是一个 HTTP API 工具调用助手。
       你可以通过 HTTP 传输调用 MCP API 工具。
       可用的工具包括：echo（回显消息）、add（加法计算）。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     mcpServers:
@@ -1526,7 +1526,7 @@ agents:
     systemPrompt: |
       你是一个多模式助手，拥有文件操作和网络搜索两组工具。
       文件操作工具用于读写本地文件，网络搜索工具用于远程调用。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     mcpServers:
@@ -1555,7 +1555,7 @@ agents:
     systemPrompt: |
       你是一个只读文件查看助手。
       你只能读取文件和列出目录，没有写入权限。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     mcpServers:
@@ -1575,7 +1575,7 @@ agents:
     type: SINGLE
     name: 中间件演示助手
     description: 展示 AgentScope 2.0 中间件系统：详细审计、指标收集、限流、上下文注入
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     middlewares:
@@ -1600,7 +1600,7 @@ agents:
     type: SINGLE
     name: 权限沙箱助手
     description: 展示 AgentScope 2.0 工具权限控制 — 只读/编辑/无限制三种模式实时切换
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     systemPrompt: |
@@ -1633,7 +1633,7 @@ agents:
     type: SINGLE
     name: 会话持久化助手
     description: 展示 AgentScope 2.0 会话持久化 — 内存/文件两种模式实时切换，重启后历史恢复
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     systemPrompt: |
@@ -1667,7 +1667,7 @@ agents:
     systemPrompt: |
       你是一个对话助手。在多轮对话中，你会处理大量信息。
       当对话历史过长时，系统会自动压缩上下文，保留关键信息。
-    modelName: qwen-max
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     harnessConfig:
@@ -1696,7 +1696,7 @@ agents:
     systemPrompt: |
       你是一个代码执行助手。你可以在安全的沙箱环境中执行 Python 代码。
       用户可以要求你执行计算、数据分析、文件操作等任务。
-    modelName: qwen-max
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     harnessConfig:
@@ -1762,7 +1762,7 @@ agents:
       4. 用清晰的语言向坐席解释下一步该做什么、为什么要这么做
 
       注意：你只能查询，不能修改任何业务数据。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     mcpServers:
@@ -1823,7 +1823,7 @@ agents:
       - reasoning_trace 记录推理步骤（读了哪些事实、用了什么判定逻辑）。
       - confidence 反映整体归因置信度（0.0-1.0）。
       - 只能查询和推理，不能修改任何业务数据。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     mcpServers:

@@ -21,11 +21,10 @@ class ChatFrontendApprovalLayoutTest {
     void chatPageUsesCurrentStaticAssetVersion() throws Exception {
         String chatHtml = Files.readString(Path.of("src/main/resources/templates/chat.html"));
 
-        // Asset versions are bumped together whenever the approval/2.0-event UI changes;
-        // JS bumped to v=2.8 for the resume-path lifecycle events (thinking/tool_start/tool_end).
-        assertTrue(chatHtml.contains("/scripts/chat.js?v=2.8"),
-                "chat.html should bump the script version so browsers stop using the stale approval UI");
-        assertTrue(chatHtml.contains("/styles/chat.css?v=2.6"),
+        // Asset versions are bumped together whenever the trace/2.0-event UI changes.
+        assertTrue(chatHtml.contains("/scripts/chat.js?v=2.11"),
+                "chat.html should bump the script version so browsers stop using the stale trace UI");
+        assertTrue(chatHtml.contains("/styles/chat.css?v=2.8"),
                 "chat.html should bump the stylesheet version so browsers stop using stale approval card styles");
         assertTrue(chatHtml.contains("rel=\"icon\" href=\"data:,\""),
                 "chat.html should avoid a noisy /favicon.ico 404 in the browser console");
@@ -70,5 +69,29 @@ class ChatFrontendApprovalLayoutTest {
                 "collapsed approval cards should show a rotated disclosure indicator");
         assertTrue(chatCss.contains(".approval-approved .approval-status"),
                 "approved state should be styled visibly");
+    }
+
+    @Test
+    void traceToolRowsUseToolResultEndForFinalStatus() throws Exception {
+        String chatJs = Files.readString(Path.of("src/main/resources/static/scripts/chat.js"));
+
+        assertTrue(chatJs.contains("case 'tool_result_end':"),
+                "tool/MCP trace rows should wait for tool_result_end before deciding success or failure");
+        assertTrue(chatJs.contains("payload.state === 'SUCCESS'"),
+                "tool_result_end SUCCESS should mark the trace row as ok instead of relying on missing duration");
+    }
+
+    @Test
+    void agentEndStopsTraceCardRunningAnimation() throws Exception {
+        String chatJs = Files.readString(Path.of("src/main/resources/static/scripts/chat.js"));
+        String debugJs = Files.readString(Path.of("src/main/resources/static/scripts/modules/debug.js"));
+        String debugCss = Files.readString(Path.of("src/main/resources/static/styles/modules/debug.css"));
+
+        assertTrue(chatJs.contains("completeRoundTrace(targetRound, 'success')"),
+                "agent_end should stop the trace card running animation even before the terminal done event");
+        assertTrue(debugJs.contains("export function completeRoundTrace"),
+                "debug.js should expose a helper that completes the visual trace without clearing currentRound");
+        assertTrue(debugCss.contains(".round-card.running::after"),
+                "running trace cards should keep the sweep animation scoped to the running class");
     }
 }

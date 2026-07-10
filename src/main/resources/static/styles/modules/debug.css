@@ -505,3 +505,27 @@
     color: var(--neon-green);
     font-size: 10px;
 }
+
+/* MCP tool calls — distinct from local @Tool calls (purple vs cyan) */
+.rtl-row.type-mcp {
+    background: rgba(168, 85, 247, 0.05);
+    border-radius: 4px;
+    margin: 2px 0;
+    padding: var(--space-xs) 0;
+}
+
+.rtl-row.type-mcp .rtl-icon {
+    color: var(--neon-purple);
+    text-shadow: 0 0 8px rgba(168, 85, 247, 0.7), 0 0 15px rgba(168, 85, 247, 0.3);
+    font-size: 12px;
+}
+
+.rtl-row.type-mcp .rtl-label {
+    color: var(--neon-purple);
+    font-weight: 500;
+}
+
+.rtl-row.type-mcp .rtl-metrics {
+    color: var(--neon-green);
+    font-size: 10px;
+}

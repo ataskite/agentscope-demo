@@ -97,8 +97,7 @@ export function endRound(status) {
     });
 
     // Update round card status
-    roundCard.classList.remove('running');
-    roundCard.classList.add(status === 'success' ? 'success' : 'error');
+    completeRoundTrace(round, status);
     console.log('[endRound] Updated card classes, running removed, ' + (status === 'success' ? 'success' : 'error') + ' added');
 
     window.currentRound = null;
@@ -130,6 +129,24 @@ export function updateRoundMetricsForRound(r) {
     }
 
     metricsEl.innerHTML = html;
+}
+
+export function completeRoundTrace(round, status) {
+    if (!round) return;
+
+    if (!round.endTime) {
+        round.endTime = Date.now();
+    }
+    round.status = status;
+    updateRoundMetricsForRound(round);
+
+    var roundCard = document.getElementById('round-' + round.number);
+    if (!roundCard) return;
+
+    roundCard.classList.remove('running');
+    roundCard.classList.remove('success');
+    roundCard.classList.remove('error');
+    roundCard.classList.add(status === 'success' ? 'success' : 'error');
 }
 
 export function addTimelineRow(type, label, metrics, status) {
@@ -170,6 +187,7 @@ function getTimelineIcon(type) {
         case 'memory': return '◈';
         case 'skill': return '◉';
         case 'rag': return '🔍';
+        case 'mcp': return '🔌';
         case 'tool': return '⚡';
         case 'error': return '⚠';
         default: return '·';
@@ -182,6 +200,8 @@ function getTimelineConnector(type) {
         case 'llm': return '├';
         case 'memory': return '├';
         case 'skill': return '├';
+        case 'rag': return '├';
+        case 'mcp': return '├';
         case 'tool': return '│';
         default: return '│';
     }

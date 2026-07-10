@@ -2,9 +2,9 @@ import './state.js?v=2.4';
 import { createSSEParser, uploadFile, fetchAgents, fetchSessions, createSession as createSessionApi, deleteSession as deleteSessionApi, fetchKnowledgeDocs, uploadKnowledgeDoc, removeKnowledgeDoc as removeKnowledgeDocApi, fetchSkillInfo, fetchToolInfo } from './api.js?v=2.5';
 import { renderMarkdown, escapeHtml, getTimestamp, formatDuration, scrollToBottom, createFileList } from './modules/utils.js?v=2.4';
 import { chatMessages, messageInput, sendBtn, chatEmpty, chatHeaderName, chatHeaderDesc, debugPanel, debugRounds, debugToggle, appendMessage, createThinkingBox, updateThinkingBox, collapseThinkingBox, completeThinkingBox, addAgentBubble, addAgentBubbleAfter, removeTypingIndicator, setStreamingState, showTypingIndicator, createAgentMessageWrapper } from './modules/ui.js?v=2.4';
-import { startRound, endRound, addTimelineRow, addTimelineRowForRound, clearDebug, toggleDebug, handlePipelineStart, handlePipelineStepStart, handlePipelineStepEnd, handleRoutingDecision, handleHandoffStart, updateRoundMetrics, updateRoundMetricsForRound, handleLoopStart, handleLoopEnd, handleLoopIterationResult, handleGraphTransition, handleRoundtableStart, handleRoundMessage, handleTaskDelegate, handleTaskEnd } from './modules/debug.js?v=2.6';
+import { startRound, endRound, completeRoundTrace, addTimelineRow, addTimelineRowForRound, clearDebug, toggleDebug, handlePipelineStart, handlePipelineStepStart, handlePipelineStepEnd, handleRoutingDecision, handleHandoffStart, updateRoundMetrics, updateRoundMetricsForRound, handleLoopStart, handleLoopEnd, handleLoopIterationResult, handleGraphTransition, handleRoundtableStart, handleRoundMessage, handleTaskDelegate, handleTaskEnd } from './modules/debug.js?v=2.8';
 import { loadAgents, selectAgent, showAgentConfig, showSkillInfo, showToolInfo } from './modules/agents.js?v=2.6';
-import { loadSessions, createNewSession, selectSession, deleteSession, clearSession as clearSessionFn } from './modules/session.js?v=2.5';
+import { loadSessions, createNewSession, selectSession, deleteSession, clearSession as clearSessionFn } from './modules/session.js?v=2.6';
 import { loadKnowledgeDocs, uploadToKnowledge, removeKnowledgeDoc } from './modules/knowledge.js?v=2.4';
 import { initUpload } from './modules/upload.js?v=2.5';
 
@@ -149,7 +149,7 @@ async function sendMessage() {
                         case 'agent_start':
                             console.log('[SSE] agent_start received, currentRound:', currentRound ? '#' + currentRound.number : 'null');
                             if (currentRound) {
-                                addTimelineRow('phase', 'Agent Start', payload.agentName || '', 'running');
+                                currentRound._agentStartRow = addTimelineRow('phase', 'Agent Start', payload.agentName || '', 'running');
                             } else {
                                 console.warn('[agent_start] No currentRound available!');
                             }
@@ -159,11 +159,21 @@ async function sendMessage() {
                             console.log('[SSE] agent_end received, currentRound:', currentRound ? '#' + currentRound.number : 'null', 'payload:', payload);
                             var targetRound = currentRound || (rounds.length > 0 ? rounds[rounds.length - 1] : null);
                             if (targetRound) {
+                                // Close the Agent Start row now that the agent has finished —
+                                // don't wait for the 'done' event, which may be delayed.
+                                if (targetRound._agentStartRow) {
+                                    targetRound._agentStartRow.classList.remove('status-running');
+                                    targetRound._agentStartRow.classList.add('status-ok');
+                                    var asStatus = targetRound._agentStartRow.querySelector('.rtl-status');
+                                    if (asStatus) asStatus.textContent = '✓';
+                                    targetRound._agentStartRow = null;
+                                }
                                 var totalDur = payload.duration_ms || 0;
                                 addTimelineRowForRound(targetRound, 'phase', 'Agent End', formatDuration(totalDur), 'ok');
                                 targetRound.totalLlmCalls = payload.totalLlmCalls || 0;
                                 targetRound.totalToolCalls = payload.totalToolCalls || 0;
                                 updateRoundMetricsForRound(targetRound);
+                                completeRoundTrace(targetRound, 'success');
                             } else {
                                 console.error('[agent_end] No round available! payload:', payload);
                             }
@@ -247,8 +257,10 @@ async function sendMessage() {
                             var tParams = payload.params || '{}';
                             var tParamsPreview = payload.paramsPreview || tParams.substring(0, 50);
                             var isSkill = payload.isSkill === true;
+                            var isMcp = payload.isMcp === true;
                             var isRag = payload.name === 'retrieve_knowledge';
                             var tSkillName = payload.displayName || '';
+                            var tMcpName = payload.mcpName || '';
 
                             if (enableThinking) {
                                 if (isRag) {
@@ -262,6 +274,8 @@ async function sendMessage() {
                                     updateThinkingBox('🔍 RAG检索: ' + ragQuery, fileInfo);
                                 } else if (isSkill) {
                                     updateThinkingBox('📖 Loading skill: ' + (tSkillName || '...'), fileInfo);
+                                } else if (isMcp) {
+                                    updateThinkingBox('🔌 MCP ' + (tMcpName ? tMcpName + '/' : '') + tName + '(' + tParamsPreview + ')', fileInfo);
                                 } else {
                                     updateThinkingBox('⚡ ' + tName + '(' + tParamsPreview + ')', fileInfo);
                                 }
@@ -270,11 +284,21 @@ async function sendMessage() {
                             if (currentRound) {
                                 currentRound.toolCallCount++;
                                 currentRound._currentToolStart = Date.now();
-                                var rowType = isRag ? 'rag' : (isSkill ? 'skill' : 'tool');
-                                var rowLabel = isRag ? 'RAG → retrieve_knowledge' : (isSkill ? ('Skill → ' + (tSkillName || '')) : ('Tool → ' + tName));
+                                var rowType = isRag ? 'rag' : (isMcp ? 'mcp' : (isSkill ? 'skill' : 'tool'));
+                                var rowLabel;
+                                if (isRag) {
+                                    rowLabel = 'RAG → retrieve_knowledge';
+                                } else if (isMcp) {
+                                    rowLabel = 'MCP → ' + (tMcpName ? tMcpName + '/' : '') + tName;
+                                } else if (isSkill) {
+                                    rowLabel = 'Skill → ' + (tSkillName || '');
+                                } else {
+                                    rowLabel = 'Tool → ' + tName;
+                                }
                                 currentRound._currentToolRow = addTimelineRow(rowType, rowLabel, '...', 'running');
                                 currentRound._currentToolIsSkill = isSkill;
                                 currentRound._currentToolIsRag = isRag;
+                                currentRound._currentToolIsMcp = isMcp;
                                 updateRoundMetrics();
                             } else {
                                 console.warn('[tool_start] No currentRound available!', payload);
@@ -283,49 +307,57 @@ async function sendMessage() {
 
                         case 'tool_end':
                             var teName = payload.name || 'unknown';
-                            var teResult = payload.result || '';
-                            var teDurMs = payload.duration_ms || -1;
-                            var tePreview = payload.resultPreview || (teResult.length > 100 ? teResult.substring(0, 100) + '...' : teResult);
-                            var teIsSkill = payload.isSkill === true;
-                            updateThinkingBox('✓ ' + teName + ': ' + tePreview, fileInfo);
-
                             var targetRound = currentRound || (rounds.length > 0 ? rounds[rounds.length - 1] : null);
                             if (targetRound) {
-                                if (teDurMs > 0) {
-                                    targetRound.toolTime += teDurMs;
-                                } else if (targetRound._currentToolStart) {
-                                    targetRound.toolTime += Date.now() - targetRound._currentToolStart;
-                                }
-                                targetRound._currentToolStart = null;
-
                                 if (targetRound._currentToolRow) {
                                     var tRow = targetRound._currentToolRow;
                                     var tmEl = tRow.querySelector('.rtl-metrics');
-                                    var tsEl = tRow.querySelector('.rtl-status');
-                                    var durStr = teDurMs >= 0 ? formatDuration(teDurMs) : '';
                                     if (tmEl) {
-                                        if (targetRound._currentToolIsRag && payload.isRagRetrieval) {
-                                            var ragInfo = (payload.ragHitCount || 0) + ' hits';
-                                            if (payload.ragScoreRange) ragInfo += ' (' + payload.ragScoreRange + ')';
-                                            tmEl.textContent = ragInfo;
-                                            tRow.title = 'Query: ' + (payload.ragQuery || '');
-                                        } else {
-                                            tmEl.textContent = durStr;
-                                        }
+                                        tmEl.textContent = 'executing...';
                                     }
-                                    if (tsEl) tsEl.textContent = teDurMs >= 0 ? '✓' : '✗';
-                                    tRow.classList.remove('status-running');
-                                    tRow.classList.add(teDurMs >= 0 ? 'status-ok' : 'status-fail');
-                                    targetRound._currentToolRow = null;
                                 } else {
                                     console.warn('[tool_end] No _currentToolRow for round #' + targetRound.number, 'payload:', payload);
                                 }
-
-                                var metricsEl2 = document.getElementById('round-metrics-' + targetRound.number);
-                                if (metricsEl2) updateRoundMetricsForRound(targetRound);
                             } else {
                                 console.warn('[tool_end] No targetRound available!', 'payload:', payload);
                             }
+                            break;
+
+                        case 'tool_result_delta':
+                            var trdRound = currentRound || (rounds.length > 0 ? rounds[rounds.length - 1] : null);
+                            if (trdRound) {
+                                trdRound._currentToolResultPreview = ((trdRound._currentToolResultPreview || '') + (payload.content || '')).substring(0, 120);
+                            }
+                            break;
+
+                        case 'tool_result_end':
+                            var treName = payload.name || payload.toolName || 'unknown';
+                            var treRound = currentRound || (rounds.length > 0 ? rounds[rounds.length - 1] : null);
+                            var resultOk = payload.state === 'SUCCESS' || !payload.state;
+                            if (treRound) {
+                                var treDurMs = treRound._currentToolStart ? (Date.now() - treRound._currentToolStart) : 0;
+                                treRound.toolTime += treDurMs;
+                                treRound._currentToolStart = null;
+
+                                if (treRound._currentToolRow) {
+                                    var trRow = treRound._currentToolRow;
+                                    var trMetrics = trRow.querySelector('.rtl-metrics');
+                                    var trStatus = trRow.querySelector('.rtl-status');
+                                    if (trMetrics) trMetrics.textContent = treDurMs > 0 ? formatDuration(treDurMs) : '';
+                                    if (trStatus) trStatus.textContent = resultOk ? '✓' : '✗';
+                                    trRow.classList.remove('status-running');
+                                    trRow.classList.add(resultOk ? 'status-ok' : 'status-fail');
+                                    treRound._currentToolRow = null;
+                                } else {
+                                    console.warn('[tool_result_end] No _currentToolRow for round #' + treRound.number, 'payload:', payload);
+                                }
+
+                                treRound._currentToolResultPreview = '';
+                                updateRoundMetricsForRound(treRound);
+                            } else {
+                                console.warn('[tool_result_end] No targetRound available!', 'payload:', payload);
+                            }
+                            updateThinkingBox((resultOk ? '✓ ' : '✗ ') + treName, fileInfo);
                             break;
 
                         // ===== STREAM CONTENT EVENTS =====

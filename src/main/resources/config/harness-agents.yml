@@ -5,7 +5,7 @@ agents:
     type: HARNESS
     name: 投诉复盘分析师
     description: 基于事实链的投诉根因复盘与处置ROI测算平台。上传每日投诉数据，自动完成根因分析→趋势对比→策略优化→ROI测算。
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: false
     harnessConfig:
@@ -41,7 +41,7 @@ agents:
       支持银行、证券、保险、基金、信托等子领域情报追踪。
       具备自我进化能力，可自动学习新技能和孵化新子 Agent。
       [Builder 多用户隔离模式]
-    modelName: qwen-plus
+    modelName: deepseek-v4-flash
     streaming: true
     enableThinking: false
     harnessConfig:
