@@ -1674,6 +1674,7 @@ agents:
       executionMode: CLAW
       isolationScope: USER
       filesystemMode: LOCAL
+      taskListEnabled: true
       compaction:
         triggerMessages: 10
         keepMessages: 5
@@ -1692,7 +1693,7 @@ agents:
     category: demo
     type: HARNESS
     name: 沙箱执行演示
-    description: 安全代码执行演示，使用 Local 沙箱后端
+    description: 安全代码执行演示，使用 Docker 沙箱后端隔离执行 Python 代码
     systemPrompt: |
       你是一个代码执行助手。你可以在安全的沙箱环境中执行 Python 代码。
       用户可以要求你执行计算、数据分析、文件操作等任务。
@@ -1702,8 +1703,13 @@ agents:
     harnessConfig:
       executionMode: BUILDER
       isolationScope: USER
-      filesystemMode: LOCAL
+      filesystemMode: DOCKER
       workspace: /tmp/agentscope-sandbox
+      taskListEnabled: true
+      sandbox:
+        image: python:3.11-slim
+        memorySizeBytes: 2000000000
+        cpuCount: 2
       compaction:
         triggerMessages: 30
         keepMessages: 10

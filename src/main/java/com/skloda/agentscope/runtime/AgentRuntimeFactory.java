@@ -26,13 +26,16 @@ public class AgentRuntimeFactory {
     private final CompositeAgentFactory compositeFactory;
     private final AgentConfigService configService;
     private final ApprovalService approvalService;
+    private final com.skloda.agentscope.harness.HarnessAgentFactory harnessAgentFactory;
 
     public AgentRuntimeFactory(CompositeAgentFactory compositeFactory,
                                 AgentConfigService configService,
-                                ApprovalService approvalService) {
+                                ApprovalService approvalService,
+                                com.skloda.agentscope.harness.HarnessAgentFactory harnessAgentFactory) {
         this.compositeFactory = compositeFactory;
         this.configService = configService;
         this.approvalService = approvalService;
+        this.harnessAgentFactory = harnessAgentFactory;
     }
 
     public StreamingAgentRuntime createRuntime(String agentId) {
@@ -158,7 +161,7 @@ public class AgentRuntimeFactory {
         try {
             log.debug("Creating HarnessRuntime for agent: {}", agentId);
             io.agentscope.harness.agent.HarnessAgent harnessAgent =
-                    com.skloda.agentscope.harness.HarnessAgentFactory.create(
+                    harnessAgentFactory.create(
                             configService.getAgentConfig(agentId),
                             compositeFactory.getApiKey()
                     );
@@ -221,7 +224,7 @@ public class AgentRuntimeFactory {
         try {
             log.debug("Creating HarnessRuntime with session for agent: {}", agentId);
             io.agentscope.harness.agent.HarnessAgent harnessAgent =
-                    com.skloda.agentscope.harness.HarnessAgentFactory.create(
+                    harnessAgentFactory.create(
                             configService.getAgentConfig(agentId),
                             compositeFactory.getApiKey()
                     );
