@@ -2,7 +2,7 @@ package com.skloda.agentscope.harness;
 
 import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.HarnessConfig;
-import io.agentscope.extensions.model.dashscope.DashScopeChatModel;
+import com.skloda.agentscope.model.ModelFactory;
 import io.agentscope.core.model.Model;
 import io.agentscope.harness.agent.HarnessAgent;
 import io.agentscope.harness.agent.filesystem.spec.LocalFilesystemSpec;
@@ -23,11 +23,14 @@ public class HarnessAgentFactory {
 
     private final FilesystemSpecFactory filesystemSpecFactory;
     private final CompactionConfigFactory compactionConfigFactory;
+    private final ModelFactory modelFactory;
 
     public HarnessAgentFactory(FilesystemSpecFactory filesystemSpecFactory,
-                               CompactionConfigFactory compactionConfigFactory) {
+                               CompactionConfigFactory compactionConfigFactory,
+                               ModelFactory modelFactory) {
         this.filesystemSpecFactory = filesystemSpecFactory;
         this.compactionConfigFactory = compactionConfigFactory;
+        this.modelFactory = modelFactory;
     }
 
     public HarnessAgent create(AgentConfig config, String apiKey, String executionModeOverride) throws Exception {
@@ -56,13 +59,10 @@ public class HarnessAgentFactory {
             WorkspaceInitializer.initializeSubagentWorkspace(sub.getName(), subWorkspace);
         }
 
-        // 3. Build model
+        // 3. Build model via ModelRegistry (unified entry point)
         String modelName = config.getModelName() != null ? config.getModelName() : "qwen-max";
-        Model model = DashScopeChatModel.builder()
-                .apiKey(apiKey)
-                .modelName(modelName)
-                .stream(true)
-                .build();
+        boolean streaming = config.isStreaming();
+        Model model = modelFactory.createModel(modelName, streaming, config.isEnableThinking());
 
         // 4. Build HarnessAgent
         HarnessAgent.Builder builder = HarnessAgent.builder()

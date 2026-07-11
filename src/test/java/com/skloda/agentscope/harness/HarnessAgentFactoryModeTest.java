@@ -3,6 +3,7 @@ package com.skloda.agentscope.harness;
 import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.AgentType;
 import com.skloda.agentscope.agent.HarnessConfig;
+import com.skloda.agentscope.model.ModelFactory;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -13,12 +14,15 @@ import static org.junit.jupiter.api.Assertions.*;
 class HarnessAgentFactoryModeTest {
 
     /**
-     * Creates a HarnessAgentFactory instance with the real FilesystemSpecFactory
-     * and CompactionConfigFactory (both are simple @Component POJOs with no external
+     * Creates a HarnessAgentFactory instance with real FilesystemSpecFactory,
+     * CompactionConfigFactory, and ModelFactory (all simple POJOs with no external
      * dependencies, safe to instantiate directly in unit tests).
      */
     private HarnessAgentFactory createFactory() {
-        return new HarnessAgentFactory(new FilesystemSpecFactory(), new CompactionConfigFactory());
+        return new HarnessAgentFactory(
+                new FilesystemSpecFactory(),
+                new CompactionConfigFactory(),
+                new ModelFactory(null));
     }
 
     @Test

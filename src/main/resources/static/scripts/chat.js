@@ -323,6 +323,27 @@ async function sendMessage() {
                             }
                             break;
 
+                        case 'tool_call_delta':
+                            // Incremental tool call arguments being streamed (pairs with tool_start/tool_end)
+                            var tcdRound = currentRound || (rounds.length > 0 ? rounds[rounds.length - 1] : null);
+                            if (tcdRound) {
+                                tcdRound._currentToolArgPreview =
+                                    ((tcdRound._currentToolArgPreview || '') + (payload.content || '')).substring(0, 120);
+                            }
+                            break;
+
+                        case 'tool_result_start':
+                            // Start of tool result streaming (pairs with tool_result_delta/tool_result_end)
+                            var trsRound = currentRound || (rounds.length > 0 ? rounds[rounds.length - 1] : null);
+                            if (trsRound) {
+                                trsRound._currentToolResultPreview = '';
+                                if (trsRound._currentToolRow) {
+                                    var trsMetrics = trsRound._currentToolRow.querySelector('.rtl-metrics');
+                                    if (trsMetrics) trsMetrics.textContent = 'result...';
+                                }
+                            }
+                            break;
+
                         case 'tool_result_delta':
                             var trdRound = currentRound || (rounds.length > 0 ? rounds[rounds.length - 1] : null);
                             if (trdRound) {
@@ -358,6 +379,17 @@ async function sendMessage() {
                                 console.warn('[tool_result_end] No targetRound available!', 'payload:', payload);
                             }
                             updateThinkingBox((resultOk ? '✓ ' : '✗ ') + treName, fileInfo);
+                            break;
+
+                        case 'data_block_delta':
+                            // Multimodal data block (image/audio/video) streaming delta — buffer per blockId
+                            // Do NOT append to agentBubble; this is auxiliary structured data, not main text
+                            if (currentRound) {
+                                if (!currentRound._dataBlockPreviews) currentRound._dataBlockPreviews = {};
+                                var blockKey = payload.blockId || 'default';
+                                currentRound._dataBlockPreviews[blockKey] =
+                                    ((currentRound._dataBlockPreviews[blockKey] || '') + (payload.content || '')).substring(0, 200);
+                            }
                             break;
 
                         // ===== STREAM CONTENT EVENTS =====
@@ -452,6 +484,13 @@ async function sendMessage() {
                                         escapeHtml(payload.toAgent || ''), 'ok');
                             }
                             break;
+                        case 'subagent_exposed':
+                            // Subagent tools/skills exposed to the user (Harness subagent visibility)
+                            if (currentRound) {
+                                var seLabel = payload.label || payload.subagentId || payload.agentId || '';
+                                addTimelineRow('phase', 'Subagent Exposed', escapeHtml(seLabel), 'ok');
+                            }
+                            break;
 
                         // ===== P6 ADVANCED PATTERN EVENTS =====
 
@@ -540,6 +579,37 @@ async function sendMessage() {
                             var approvalCard = createApprovalCard(payload);
                             chatMessages.appendChild(approvalCard);
                             scrollToBottom(chatMessages);
+                            break;
+
+                        case 'require_external_execution':
+                            // HITL pause for external tool execution (native RC3 flow).
+                            // Rendered as a passive marker — no interactive card or resume endpoint
+                            // in this demo (the live HITL path goes through pending_approval).
+                            completeThinkingBox();
+                            if (currentRound) {
+                                var rexNames = (payload.toolCalls || []).map(function(tc) { return tc.name; }).join(', ');
+                                currentRound._externalExecRow = addTimelineRow('phase',
+                                    'Require External Execution', escapeHtml(rexNames || ''), 'running');
+                            }
+                            break;
+
+                        case 'external_execution_result':
+                            // Completion counterpart to require_external_execution
+                            if (currentRound) {
+                                if (currentRound._externalExecRow) {
+                                    var eerRow = currentRound._externalExecRow;
+                                    var eerMetrics = eerRow.querySelector('.rtl-metrics');
+                                    var eerStatus = eerRow.querySelector('.rtl-status');
+                                    if (eerMetrics) eerMetrics.textContent = (payload.count || 0) + ' results';
+                                    if (eerStatus) eerStatus.textContent = '✓';
+                                    eerRow.classList.remove('status-running');
+                                    eerRow.classList.add('status-ok');
+                                    currentRound._externalExecRow = null;
+                                } else {
+                                    addTimelineRow('phase', 'External Execution Result',
+                                        (payload.count || 0) + ' results', 'ok');
+                                }
+                            }
                             break;
 
                         // ===== STRUCTURED OUTPUT EVENT =====
