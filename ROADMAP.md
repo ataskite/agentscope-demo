@@ -367,46 +367,100 @@ RC1 (2026-05-28) → RC2 (2026-06-09) → RC3 (2026-06-11) → RC4 (2026-06-18) 
 
 ---
 
-## 建议排期
+## Spec 分解与落地顺序
 
-### Sprint 1: 接线收尾（P1-A）
-- Docker sandbox + ToolResultEviction 接线 HarnessAgentFactory
-- 前端 6 个 SSE 事件渲染
-- enableTaskList 注释纠偏 + Harness 路径接 TaskList
-- 端到端手测 7 类 agent
-- CLAUDE.md / AGENTS.md 同步到 GA
+> 原则：一个 spec 应内聚到能一次设计完、一个 Sprint 实施完。上面的 P1/P2/P3 阶段是按「能力领域」分的，有些阶段里混了多个不相关的关注点。下面把它们拆成 **11 个可独立 brainstorm → spec → 实施的单元**，标注依赖关系和落地顺序。
 
-### Sprint 2: Harness 能力补齐（P1-B）
-- MemoryConfig 分层记忆
-- Plan Mode + Task List demo
-- Harness 路径接 permissionContext / skillRepository / maxRetries / fallbackModel
-- additionalContextFile / maxContextTokens / enableMetaTool
+### Spec 单元总览
 
-### Sprint 3: 模型与容错（P1-C）
-- ModelRegistry 统一入口
-- agents.yml `model: provider:modelName` 格式
-- 多 provider 示例 + 独立 compaction model
-- 结构化输出原生路径评估
+| Spec | 名称 | 来源阶段 | 依赖 | Brainstorm 价值 | 输出物 |
+|------|------|---------|------|----------------|--------|
+| **S1** | HarnessAgentFactory 接线收尾 | P1-A | 无 | ★☆☆ 纯接线 | `HarnessAgentFactory` 调用已有的 `FilesystemSpecFactory.createDocker()` + `CompactionConfigFactory.createEvictionConfig()`；enableTaskList 注释纠偏 |
+| **S2** | 前端 6 个 SSE 事件补齐 | P1-A | 无 | ★☆☆ 纯前端 | `chat.js` 加 6 个 case 分支：`data_block_delta`/`subagent_exposed`/`tool_call_delta`/`tool_result_start`/`require_external_execution`/`external_execution_result` |
+| **S3** | ModelRegistry + fallback 统一入口 | P1-C + P1-B 部分 | 无 | ★★☆ 有设计选择 | `model: dashscope:qwen-plus` 格式兼容旧 `modelName`；fallback 链配置；合并 Harness 和 ReAct 两条路径 |
+| **S4** | Plan Mode + Task List demo | P1-B | S1 | ★★★ 需设计 UX | 四阶段流转（plan_enter→write→exit + HITL）；前端渲染方案；和 Task List 协作 |
+| **S5** | Harness 分层记忆 | P1-B + P2-A | S1 | ★★★ 需选型 | `MemoryConfig` 配置（flush/consolidation/trigger/model/prompts）；MEMORY.md 注入策略；替代 v1 LongTermMemory |
+| **S6** | Harness 权限 + Skill 接入 | P1-B | 无 | ★★☆ 扩展现有 | 把 `PermissionContextFactory` + `SkillRepository` 扩展到 HarnessAgent 路径 |
+| **S7** | 上下文控制 | P1-B | 无 | ★☆☆ 配 config | `additionalContextFile` + `maxContextTokens` + `enableMetaTool` |
+| **S8** | RAG / 记忆替代方案 | P2-A | S5 | ★★☆ 过渡策略 | v1 deprecated API 的标注 + 大工具结果落盘 + 监测官方 v2 |
+| **S9** | 多 Agent 增强 + A2A | P2-B | S2 | ★★★ 需架构设计 | spawn registry 迁移评估 + 编程式 SubagentDeclaration + A2A 订单履约 demo + 前端 source 分区 |
+| **S10** | Skill 自学习 | P2-C | S6 | ★★★ 需设计流程 | `enableSkillManageTool` + `PromotionGate` + `Curator`；propose→approve→上线 流程 |
+| **S11** | 生产化样板 | P3 | S1-S10 多数 | ★★☆ 可拆子项 | DistributedBackend + OTel + Channel + MCP 加强 + AG-UI + Sandbox profile |
 
-### Sprint 4: 记忆替代方案（P2-A）
-- Harness 分层记忆替代 v1 LongTermMemory
-- 大工具结果落盘 + overflow 兜底
+### 依赖关系图
 
-### Sprint 5: 多 Agent 增强 + A2A（P2-B）
-- spawn registry 迁移评估
-- SubagentDeclaration 编程式声明
-- A2A 订单履约 demo
-- 前端 source 分区展示
+```
+S1 接线收尾 ──────┬──→ S4 Plan Mode + Task List
+                 ├──→ S5 Harness 分层记忆 ──→ S8 RAG/记忆替代
+                 └──→ (所有 Harness 能力的前置)
 
-### Sprint 6: Skill 自学习（P2-C）
-- FileSystemSkillRepository + 四层优先级
-- enableSkillManageTool + PromotionGate + Curator
-- Git/MySQL skill 市场
+S2 前端事件补齐 ──────────→ S9 多 Agent + A2A (前端 source 分区)
 
-### Sprint 7: 生产化样板（P3）
-- DistributedBackend（Redis/Postgres）
-- OTel / Channel / AG-UI / MCP 加强
-- 事件日志 + Studio 对接
+S3 ModelRegistry ─────────→ (被 S4/S5/S6 共享)
+
+S6 权限+Skill ────────────→ S10 Skill 自学习
+
+无依赖可并行: S1, S2, S3, S6, S7
+```
+
+### 落地顺序（分批执行）
+
+**第一批 — 并行启动（零依赖，可同时做）**
+
+| 顺序 | Spec | 为什么先做 | Brainstorm 重点 |
+|------|------|-----------|----------------|
+| ① | **S1 接线收尾** | 解锁 S4/S5/所有 Harness 能力；Factory 方法已建好，纯接线 | `agents.yml` 的 `filesystemMode` 怎么扩展支持 `DOCKER`？sandbox-demo 的 Docker 环境配置？ |
+| ② | **S2 前端事件补齐** | 纯前端，和 S1 完全并行 | 6 个事件各自的渲染形态：timeline 行？卡片？增量拼接？ |
+| ③ | **S3 ModelRegistry** | 后面 Harness 能力（S4/S5/S6）都依赖模型入口 | `model:` 格式 vs 旧 `modelName` 的兼容策略？fallback 链怎么配？ |
+| ④ | **S6 权限+Skill** | 解锁 S10；扩展现有 Factory，不依赖 S1 | Harness 路径的 permissionContext 默认规则？workspace skills vs classpath 优先级？ |
+| ⑤ | **S7 上下文控制** | 轻量，见缝插针 | 无复杂设计，配 config 即可 |
+
+> S1/S2 可同时做（后端 vs 前端不冲突）；S3/S6/S7 独立性强，看精力穿插。
+
+**第二批 — S1 完成后（Harness 能力主展示线）**
+
+| 顺序 | Spec | 前置 | Brainstorm 重点 |
+|------|------|------|----------------|
+| ⑥ | **S4 Plan Mode + Task List** | S1 | plan_enter→write→exit 四阶段在前端怎么呈现？HITL 确认按钮放哪？和 Task List 怎么协作？ |
+| ⑦ | **S5 Harness 分层记忆** | S1 | flushTrigger 选 ALWAYS 还是 THROTTLED？consolidation 用哪个轻量 model？MEMORY.md 注入策略？ |
+
+> S4/S6/S7 可并行（都是 S1 之后，彼此独立）；S5 也可以和 S4 并行。
+
+**第三批 — 中间层（依赖第一/二批）**
+
+| 顺序 | Spec | 前置 | Brainstorm 重点 |
+|------|------|------|----------------|
+| ⑧ | **S8 RAG/记忆替代** | S5 | v1 deprecated 标注策略？大工具结果落盘阈值？官方 v2 迁移触发条件？ |
+| ⑨ | **S9 多 Agent + A2A** | S2 | 手写 pipeline 哪些迁 spawn registry？A2A 的 agent 注册/发现机制？ |
+| ⑩ | **S10 Skill 自学习** | S6 | propose→approve→上线的审批流程？PromotionGate 用 LocalApprovalGate 还是 CanaryFilter？ |
+
+**第四批 — 生产化（依赖多数前面完成）**
+
+| 顺序 | Spec | 前置 | 说明 |
+|------|------|------|------|
+| ⑪ | **S11 生产化样板** | S1-S10 多数 | 可拆子项独立做：DistributedBackend / OTel / Channel / MCP 加强 / AG-UI / Sandbox profile，每个一个子-spec |
+
+### 单个 Spec 的 brainstorm → 落地流程
+
+每个 Spec 按以下流程推进：
+
+```
+brainstorming（/brainstorming skill）
+    ↓ 输出：设计选择、API 方案、配置格式
+spec 文档（docs/superpowers/specs/YYYY-MM-DD-<name>-design.md）
+    ↓ 输出：差距分析、方案选型、接口定义、验收标准
+plan 文档（docs/superpowers/plans/YYYY-MM-DD-<name>.md）
+    ↓ 输出：Task 分解、File Structure、Global Constraints
+实施（subagent-driven-development 或 executing-plans）
+    ↓ 输出：代码 + 测试 + commit
+```
+
+### 端到端手测与文档同步（穿插，不单独成 Spec）
+
+以下两项贯穿所有 Spec，在每批结束时做，不单独开 spec：
+
+- **端到端手测**：每批结束后跑对应 agent 的手测（第一批：sandbox/compaction/permission/middleware；第二批：complaint-reviewer/finance-intel-tracker + Plan Mode demo）。
+- **文档同步**：CLAUDE.md / AGENTS.md 在每批结束后增量更新（不一次性全改，避免越界）。
 
 ---
 
@@ -438,6 +492,7 @@ RC1 (2026-05-28) → RC2 (2026-06-09) → RC3 (2026-06-11) → RC4 (2026-06-18) 
 
 | 日期 | 变更 |
 |------|------|
+| 2026-07-12 | 新增「Spec 分解与落地顺序」：将 P1-P3 阶段拆为 11 个可独立 brainstorm→spec→实施的单元（S1-S11），标注依赖关系图、四批落地顺序、每个 spec 的 brainstorming 关注点 |
 | 2026-07-11 | 第三次重写：以官方 GA 文档全集为基准做逐节差距分析（Building Blocks / Harness / Integration / 前端四部分），标注 ✅/⚠️/❌/🔒 四级状态；Harness 20+ 项 builder 能力逐条对照；积压项按「GA 上能否做」分类归入 P1-A |
 | 2026-07-10 | GA 迁移收尾，版本基线行更新（commit `c0e4b8f`） |
 | 2026-07-10 | DashScope provider 模块化迁移（commit `abad612`） |
