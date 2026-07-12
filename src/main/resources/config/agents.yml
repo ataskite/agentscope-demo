@@ -613,6 +613,41 @@ agents:
       - prompt: “你还记得我是谁吗？”
         expectedBehavior: “通过记忆搜索回忆用户信息（需要重启后验证持久性）”
 
+  - agentId: skill-learning-demo
+    category: demo
+    type: HARNESS
+    name: Skill 自学习演示
+    description: 具备技能自我进化能力的助手。可以在对话中提出新技能，经审批后自动上线，过期技能自动归档
+    systemPrompt: |
+      你是一个能够自我进化的助手。
+      当你发现自己反复执行某个操作时，可以用 propose_skill 提出将其封装为新技能。
+      提出的技能经过安全扫描和审批后，会自动上线成为你的可用技能。
+      你也可以用 skill_manage 查看和管理已有技能。
+    modelName: deepseek-v4-flash
+    streaming: true
+    enableThinking: false
+    harnessConfig:
+      executionMode: BUILDER
+      filesystemMode: LOCAL
+      workspace: “${user.home}/.agentscope/skill-learning”
+      skillLearning:
+        manageToolEnabled: true
+        autoPromote: false
+        securityScan: true
+        curatorEnabled: true
+        curatorIntervalHours: 24
+        staleAfterDays: 30
+        archiveAfterDays: 90
+      compaction:
+        triggerMessages: 30
+        keepMessages: 10
+        flushBeforeCompact: true
+    samplePrompts:
+      - prompt: “帮我写一个 Python 函数计算斐波那契数列，然后把它保存成一个可复用的技能”
+        expectedBehavior: “执行任务后用 propose_skill 提出新技能”
+      - prompt: “你现在有哪些技能？帮我看看有没有过时的”
+        expectedBehavior: “用 skill_manage 列出技能，curator 自动标记过时项”
+
   - agentId: long-conversation
     category: single
     name: 长对话助手

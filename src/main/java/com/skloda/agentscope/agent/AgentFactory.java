@@ -141,7 +141,11 @@ public class AgentFactory {
         registerMcpTools(config, toolkit);
 
         // Register RAG knowledge if enabled
+        // NOTE: v1 RAG API (builder.knowledge/ragMode/retrieveConfig) is @Deprecated(forRemoval) in GA.
+        // The official v2 RAG rewrite is not yet released. This code path is maintained as-is
+        // until the v2 replacement is available. For new agents, prefer Harness MemoryConfig.
         if (config.isRagEnabled()) {
+            log.warn("  Agent {} uses deprecated v1 RAG API. Consider migrating to Harness MemoryConfig.", agentId);
             RAGMode ragMode = parseRagMode(config.getRagMode());
             builder.knowledge(knowledgeService.getKnowledge())
                     .ragMode(ragMode)

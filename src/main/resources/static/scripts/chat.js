@@ -307,6 +307,10 @@ async function sendMessage() {
                                 } else {
                                     rowLabel = 'Tool → ' + tName;
                                 }
+                                // S9: prefix subagent source to row label
+                                if (payload.source && payload.source !== 'main' && payload.source !== 'agent') {
+                                    rowLabel = '[' + payload.source + '] ' + rowLabel;
+                                }
                                 currentRound._currentToolRow = addTimelineRow(rowType, rowLabel, '...', 'running');
                                 currentRound._currentToolIsSkill = isSkill;
                                 currentRound._currentToolIsRag = isRag;
@@ -417,6 +421,14 @@ async function sendMessage() {
                             if (!agentBubble) {
                                 agentBubble = addAgentBubble();
                                 agentRawMarkdown = '';
+                                // S9: source badge for subagent output
+                                if (payload.source && payload.source !== 'main' && payload.source !== 'agent') {
+                                    var sourceBadge = document.createElement('div');
+                                    sourceBadge.className = 'subagent-source-badge';
+                                    sourceBadge.textContent = '🤖 ' + payload.source;
+                                    sourceBadge.style.cssText = 'font-size:0.75em;color:#888;margin-bottom:4px;font-style:italic;';
+                                    agentBubble.parentElement.insertBefore(sourceBadge, agentBubble);
+                                }
                             }
                             agentRawMarkdown += (payload.content || payload.text || '');
                             agentBubble.classList.add('md-render');

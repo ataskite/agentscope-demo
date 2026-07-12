@@ -212,6 +212,37 @@ public class HarnessAgentFactory {
             log.info("Agent '{}' enabled MetaTool (reset_tools)", config.getAgentId());
         }
 
+        // 14. Configure skill self-learning (S10): propose → review → promote lifecycle
+        HarnessConfig.SkillLearningConfig skillLearn = harnessConfig.getSkillLearning();
+        if (skillLearn != null && skillLearn.isManageToolEnabled()) {
+            builder.enableSkillManageTool(io.agentscope.harness.agent.tool.SkillManageConfig.builder()
+                    .autoPromote(skillLearn.isAutoPromote())
+                    .securityScan(skillLearn.isSecurityScan())
+                    .build());
+            log.info("Agent '{}' enabled SkillManageTool (autoPromote={}, securityScan={})",
+                    config.getAgentId(), skillLearn.isAutoPromote(), skillLearn.isSecurityScan());
+
+            if (skillLearn.isCuratorEnabled()) {
+                var curatorBuilder = io.agentscope.harness.agent.skill.curator.SkillCuratorConfig.builder()
+                        .enabled(true);
+                if (skillLearn.getCuratorIntervalHours() != null) {
+                    curatorBuilder.intervalHours(skillLearn.getCuratorIntervalHours());
+                }
+                if (skillLearn.getStaleAfterDays() != null) {
+                    curatorBuilder.staleAfterDays(skillLearn.getStaleAfterDays());
+                }
+                if (skillLearn.getArchiveAfterDays() != null) {
+                    curatorBuilder.archiveAfterDays(skillLearn.getArchiveAfterDays());
+                }
+                builder.enableSkillCurator(curatorBuilder.build());
+                log.info("Agent '{}' enabled SkillCurator (interval={}h, stale={}d, archive={}d)",
+                        config.getAgentId(),
+                        skillLearn.getCuratorIntervalHours(),
+                        skillLearn.getStaleAfterDays(),
+                        skillLearn.getArchiveAfterDays());
+            }
+        }
+
         HarnessAgent agent = builder.build();
         log.info("HarnessAgent '{}' built with workspace={}, mode={}, docker={}",
                 config.getAgentId(), workspace,

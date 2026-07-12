@@ -29,10 +29,14 @@ public class AgentConfig {
     private int autoContextLastKeep = 10;
     private double autoContextTokenRatio = 0.3;
 
-    // RAG settings
+    /** @deprecated v1 RAG API, pending v2 rewrite. Consider Harness MemoryConfig for new agents. */
+    @Deprecated(forRemoval = true)
     private boolean ragEnabled = false;
+    @Deprecated(forRemoval = true)
     private int ragRetrieveLimit = 3;
+    @Deprecated(forRemoval = true)
     private double ragScoreThreshold = 0.5;
+    @Deprecated(forRemoval = true)
     private String ragMode = "generic";
 
     // Modality settings

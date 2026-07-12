@@ -34,6 +34,9 @@ public class HarnessConfig {
     // S5: Layered Memory
     private MemoryConfig memory;
 
+    // S10: Skill self-learning
+    private SkillLearningConfig skillLearning;
+
     public boolean isBuilderMode() {
         return "BUILDER".equalsIgnoreCase(executionMode);
     }
@@ -100,5 +103,31 @@ public class HarnessConfig {
         private Integer dailyFileRetentionDays;
         /** Session tree retention; null = 180 (framework default) */
         private Integer sessionRetentionDays;
+    }
+
+    /**
+     * Skill self-learning configuration (S10).
+     * <p>
+     * Enables the three-stage skill lifecycle: propose → review → promote.
+     * When enabled, the agent can create new skills via propose_skill,
+     * a promotion gate reviews them, and a curator auto-archives stale skills.
+     */
+    @Setter
+    @Getter
+    public static class SkillLearningConfig {
+        /** Enable propose_skill / skill_manage tools */
+        private boolean manageToolEnabled = false;
+        /** Auto-promote approved skills without manual review */
+        private boolean autoPromote = false;
+        /** Enable security scan on proposed skills */
+        private boolean securityScan = true;
+        /** Enable curator (auto-archive stale skills) */
+        private boolean curatorEnabled = false;
+        /** Hours between curator runs; null = framework default */
+        private Integer curatorIntervalHours;
+        /** Days before a skill is considered stale; null = 30 */
+        private Integer staleAfterDays;
+        /** Days before a stale skill is archived; null = 90 */
+        private Integer archiveAfterDays;
     }
 }
