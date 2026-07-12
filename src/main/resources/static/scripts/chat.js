@@ -259,11 +259,18 @@ async function sendMessage() {
                             var isSkill = payload.isSkill === true;
                             var isMcp = payload.isMcp === true;
                             var isRag = payload.name === 'retrieve_knowledge';
+                            var isPlan = tName === 'plan_enter' || tName === 'plan_write' || tName === 'plan_exit';
+                            var isTodo = tName === 'todo_write';
                             var tSkillName = payload.displayName || '';
                             var tMcpName = payload.mcpName || '';
 
                             if (enableThinking) {
-                                if (isRag) {
+                                if (isPlan) {
+                                    var planLabels = { plan_enter: '📋 进入 PLAN 模式', plan_write: '📝 写入计划', plan_exit: '✅ 请求审批' };
+                                    updateThinkingBox(planLabels[tName] || ('📋 ' + tName), fileInfo);
+                                } else if (isTodo) {
+                                    updateThinkingBox('📝 更新任务清单', fileInfo);
+                                } else if (isRag) {
                                     var ragQuery = '';
                                     try {
                                         var params = JSON.parse(payload.params || '{}');
@@ -284,9 +291,14 @@ async function sendMessage() {
                             if (currentRound) {
                                 currentRound.toolCallCount++;
                                 currentRound._currentToolStart = Date.now();
-                                var rowType = isRag ? 'rag' : (isMcp ? 'mcp' : (isSkill ? 'skill' : 'tool'));
+                                var rowType = isPlan ? 'phase' : (isTodo ? 'phase' : (isRag ? 'rag' : (isMcp ? 'mcp' : (isSkill ? 'skill' : 'tool'))));
                                 var rowLabel;
-                                if (isRag) {
+                                if (isPlan) {
+                                    var planRowLabels = { plan_enter: 'Plan → 进入计划模式', plan_write: 'Plan → 写入计划', plan_exit: 'Plan → 请求审批' };
+                                    rowLabel = planRowLabels[tName] || ('Plan → ' + tName);
+                                } else if (isTodo) {
+                                    rowLabel = 'Todo → 更新任务清单';
+                                } else if (isRag) {
                                     rowLabel = 'RAG → retrieve_knowledge';
                                 } else if (isMcp) {
                                     rowLabel = 'MCP → ' + (tMcpName ? tMcpName + '/' : '') + tName;
@@ -294,6 +306,10 @@ async function sendMessage() {
                                     rowLabel = 'Skill → ' + (tSkillName || '');
                                 } else {
                                     rowLabel = 'Tool → ' + tName;
+                                }
+                                // S9: prefix subagent source to row label
+                                if (payload.source && payload.source !== 'main' && payload.source !== 'agent') {
+                                    rowLabel = '[' + payload.source + '] ' + rowLabel;
                                 }
                                 currentRound._currentToolRow = addTimelineRow(rowType, rowLabel, '...', 'running');
                                 currentRound._currentToolIsSkill = isSkill;
@@ -320,6 +336,27 @@ async function sendMessage() {
                                 }
                             } else {
                                 console.warn('[tool_end] No targetRound available!', 'payload:', payload);
+                            }
+                            break;
+
+                        case 'tool_call_delta':
+                            // Incremental tool call arguments being streamed (pairs with tool_start/tool_end)
+                            var tcdRound = currentRound || (rounds.length > 0 ? rounds[rounds.length - 1] : null);
+                            if (tcdRound) {
+                                tcdRound._currentToolArgPreview =
+                                    ((tcdRound._currentToolArgPreview || '') + (payload.content || '')).substring(0, 120);
+                            }
+                            break;
+
+                        case 'tool_result_start':
+                            // Start of tool result streaming (pairs with tool_result_delta/tool_result_end)
+                            var trsRound = currentRound || (rounds.length > 0 ? rounds[rounds.length - 1] : null);
+                            if (trsRound) {
+                                trsRound._currentToolResultPreview = '';
+                                if (trsRound._currentToolRow) {
+                                    var trsMetrics = trsRound._currentToolRow.querySelector('.rtl-metrics');
+                                    if (trsMetrics) trsMetrics.textContent = 'result...';
+                                }
                             }
                             break;
 
@@ -360,6 +397,17 @@ async function sendMessage() {
                             updateThinkingBox((resultOk ? '✓ ' : '✗ ') + treName, fileInfo);
                             break;
 
+                        case 'data_block_delta':
+                            // Multimodal data block (image/audio/video) streaming delta — buffer per blockId
+                            // Do NOT append to agentBubble; this is auxiliary structured data, not main text
+                            if (currentRound) {
+                                if (!currentRound._dataBlockPreviews) currentRound._dataBlockPreviews = {};
+                                var blockKey = payload.blockId || 'default';
+                                currentRound._dataBlockPreviews[blockKey] =
+                                    ((currentRound._dataBlockPreviews[blockKey] || '') + (payload.content || '')).substring(0, 200);
+                            }
+                            break;
+
                         // ===== STREAM CONTENT EVENTS =====
 
                         case 'text':
@@ -373,6 +421,14 @@ async function sendMessage() {
                             if (!agentBubble) {
                                 agentBubble = addAgentBubble();
                                 agentRawMarkdown = '';
+                                // S9: source badge for subagent output
+                                if (payload.source && payload.source !== 'main' && payload.source !== 'agent') {
+                                    var sourceBadge = document.createElement('div');
+                                    sourceBadge.className = 'subagent-source-badge';
+                                    sourceBadge.textContent = '🤖 ' + payload.source;
+                                    sourceBadge.style.cssText = 'font-size:0.75em;color:#888;margin-bottom:4px;font-style:italic;';
+                                    agentBubble.parentElement.insertBefore(sourceBadge, agentBubble);
+                                }
                             }
                             agentRawMarkdown += (payload.content || payload.text || '');
                             agentBubble.classList.add('md-render');
@@ -450,6 +506,13 @@ async function sendMessage() {
                                 addTimelineRow('phase', 'Handoff Complete',
                                     escapeHtml(payload.fromAgent || '') + ' → ' +
                                         escapeHtml(payload.toAgent || ''), 'ok');
+                            }
+                            break;
+                        case 'subagent_exposed':
+                            // Subagent tools/skills exposed to the user (Harness subagent visibility)
+                            if (currentRound) {
+                                var seLabel = payload.label || payload.subagentId || payload.agentId || '';
+                                addTimelineRow('phase', 'Subagent Exposed', escapeHtml(seLabel), 'ok');
                             }
                             break;
 
@@ -540,6 +603,57 @@ async function sendMessage() {
                             var approvalCard = createApprovalCard(payload);
                             chatMessages.appendChild(approvalCard);
                             scrollToBottom(chatMessages);
+                            break;
+
+                        case 'require_user_confirm':
+                            // HITL confirmation gate (e.g. plan_exit requests user to approve the plan).
+                            // Renders a timeline marker; the interactive approval goes through
+                            // pending_approval (which creates the approval card with buttons).
+                            if (currentRound) {
+                                var rucNames = (payload.toolCalls || []).map(function(tc) { return tc.name; }).join(', ');
+                                addTimelineRow('phase', 'Require User Confirm', escapeHtml(rucNames || ''), 'running');
+                            }
+                            break;
+
+                        case 'require_external_execution':
+                            // HITL pause for external tool execution (native RC3 flow).
+                            // Rendered as a passive marker — no interactive card or resume endpoint
+                            // in this demo (the live HITL path goes through pending_approval).
+                            completeThinkingBox();
+                            if (currentRound) {
+                                var rexNames = (payload.toolCalls || []).map(function(tc) { return tc.name; }).join(', ');
+                                currentRound._externalExecRow = addTimelineRow('phase',
+                                    'Require External Execution', escapeHtml(rexNames || ''), 'running');
+                            }
+                            break;
+
+                        case 'user_confirm_result':
+                            // Result of the HITL confirmation (e.g. plan approved/rejected)
+                            if (currentRound) {
+                                var ucrResults = (payload.confirmResults || []).map(function(cr) {
+                                    return cr.toolName + ': ' + (cr.confirmed ? '✓' : '✗');
+                                }).join(', ');
+                                addTimelineRow('phase', 'User Confirm Result', escapeHtml(ucrResults || ''), 'ok');
+                            }
+                            break;
+
+                        case 'external_execution_result':
+                            // Completion counterpart to require_external_execution
+                            if (currentRound) {
+                                if (currentRound._externalExecRow) {
+                                    var eerRow = currentRound._externalExecRow;
+                                    var eerMetrics = eerRow.querySelector('.rtl-metrics');
+                                    var eerStatus = eerRow.querySelector('.rtl-status');
+                                    if (eerMetrics) eerMetrics.textContent = (payload.count || 0) + ' results';
+                                    if (eerStatus) eerStatus.textContent = '✓';
+                                    eerRow.classList.remove('status-running');
+                                    eerRow.classList.add('status-ok');
+                                    currentRound._externalExecRow = null;
+                                } else {
+                                    addTimelineRow('phase', 'External Execution Result',
+                                        (payload.count || 0) + ' results', 'ok');
+                                }
+                            }
                             break;
 
                         // ===== STRUCTURED OUTPUT EVENT =====

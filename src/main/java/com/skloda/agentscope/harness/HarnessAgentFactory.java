@@ -2,22 +2,44 @@ package com.skloda.agentscope.harness;
 
 import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.HarnessConfig;
-import io.agentscope.extensions.model.dashscope.DashScopeChatModel;
+import com.skloda.agentscope.model.ModelFactory;
+import com.skloda.agentscope.permission.PermissionContextFactory;
 import io.agentscope.core.model.Model;
+import io.agentscope.core.permission.PermissionContextState;
+import io.agentscope.core.skill.repository.ClasspathSkillRepository;
 import io.agentscope.harness.agent.HarnessAgent;
 import io.agentscope.harness.agent.filesystem.spec.LocalFilesystemSpec;
 import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
+import io.agentscope.harness.agent.memory.compaction.ToolResultEvictionConfig;
+import io.agentscope.harness.agent.sandbox.impl.docker.DockerFilesystemSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+@Component
 public class HarnessAgentFactory {
 
     private static final Logger log = LoggerFactory.getLogger(HarnessAgentFactory.class);
 
-    public static HarnessAgent create(AgentConfig config, String apiKey, String executionModeOverride) throws Exception {
+    private final FilesystemSpecFactory filesystemSpecFactory;
+    private final CompactionConfigFactory compactionConfigFactory;
+    private final ModelFactory modelFactory;
+    private final PermissionContextFactory permissionContextFactory;
+
+    public HarnessAgentFactory(FilesystemSpecFactory filesystemSpecFactory,
+                               CompactionConfigFactory compactionConfigFactory,
+                               ModelFactory modelFactory,
+                               PermissionContextFactory permissionContextFactory) {
+        this.filesystemSpecFactory = filesystemSpecFactory;
+        this.compactionConfigFactory = compactionConfigFactory;
+        this.modelFactory = modelFactory;
+        this.permissionContextFactory = permissionContextFactory;
+    }
+
+    public HarnessAgent create(AgentConfig config, String apiKey, String executionModeOverride) throws Exception {
         HarnessConfig harnessConfig = config.getHarnessConfig();
         if (harnessConfig == null) {
             throw new IllegalArgumentException("Agent '" + config.getAgentId() + "' is type HARNESS but has no harnessConfig");
@@ -43,13 +65,10 @@ public class HarnessAgentFactory {
             WorkspaceInitializer.initializeSubagentWorkspace(sub.getName(), subWorkspace);
         }
 
-        // 3. Build model
+        // 3. Build model via ModelRegistry (unified entry point)
         String modelName = config.getModelName() != null ? config.getModelName() : "qwen-max";
-        Model model = DashScopeChatModel.builder()
-                .apiKey(apiKey)
-                .modelName(modelName)
-                .stream(true)
-                .build();
+        boolean streaming = config.isStreaming();
+        Model model = modelFactory.createModel(modelName, streaming, config.isEnableThinking());
 
         // 4. Build HarnessAgent
         HarnessAgent.Builder builder = HarnessAgent.builder()
@@ -59,12 +78,31 @@ public class HarnessAgentFactory {
                 .model(model)
                 .workspace(workspace);
 
-        if (isBuilder) {
-            builder.filesystem(new LocalFilesystemSpec());
+        // 5. Configure filesystem (Docker sandbox / Local)
+        if (harnessConfig.isDockerMode()) {
+            DockerFilesystemSpec dockerSpec = filesystemSpecFactory.createDocker();
+            // Apply sandbox config overrides if provided
+            HarnessConfig.SandboxConfig sandbox = harnessConfig.getSandbox();
+            if (sandbox != null) {
+                if (sandbox.getImage() != null && !sandbox.getImage().isBlank()) {
+                    dockerSpec.image(sandbox.getImage());
+                }
+                if (sandbox.getMemorySizeBytes() > 0) {
+                    dockerSpec.memorySizeBytes(sandbox.getMemorySizeBytes());
+                }
+                if (sandbox.getCpuCount() > 0) {
+                    dockerSpec.cpuCount(sandbox.getCpuCount());
+                }
+            }
+            builder.filesystem(dockerSpec);
+            String imageLog = (sandbox != null && sandbox.getImage() != null) ? sandbox.getImage() : "python:3.11-slim";
+            log.info("Agent '{}' using DOCKER sandbox (image={})", config.getAgentId(), imageLog);
+        } else if (isBuilder) {
+            builder.filesystem(filesystemSpecFactory.createLocal());
             log.info("Agent '{}' using BUILDER mode with LocalFilesystemSpec", config.getAgentId());
         }
 
-        // 5. Configure compaction
+        // 6. Configure compaction
         if (harnessConfig.getCompaction() != null) {
             HarnessConfig.CompactionConfig cc = harnessConfig.getCompaction();
             builder.compaction(CompactionConfig.builder()
@@ -74,17 +112,149 @@ public class HarnessAgentFactory {
                     .build());
         }
 
+        // 7. Configure tool result eviction (wires the previously unused CompactionConfigFactory)
+        ToolResultEvictionConfig evictionConfig = compactionConfigFactory.createEvictionConfig();
+        builder.toolResultEviction(evictionConfig);
+        log.info("Agent '{}' configured with ToolResultEvictionConfig (maxChars={})",
+                config.getAgentId(), evictionConfig.getMaxResultChars());
+
+        // 8. Configure Task List
+        if (harnessConfig.isTaskListEnabled()) {
+            builder.enableTaskList();
+            log.info("Agent '{}' enabled Task List (TodoTools + TaskReminderMiddleware)", config.getAgentId());
+        }
+
+        // 8b. Configure Plan Mode (S4) — designed to compose with Task List
+        HarnessConfig.PlanConfig planConfig = harnessConfig.getPlan();
+        if (planConfig != null && planConfig.isEnabled()) {
+            builder.enablePlanMode();
+            if (planConfig.getFileDirectory() != null && !planConfig.getFileDirectory().isBlank()) {
+                builder.planFileDirectory(planConfig.getFileDirectory());
+            }
+            if (planConfig.isAllowShell()) {
+                builder.allowShellInPlanMode();
+            }
+            log.info("Agent '{}' enabled Plan Mode (dir={}, allowShell={})",
+                    config.getAgentId(),
+                    planConfig.getFileDirectory(),
+                    planConfig.isAllowShell());
+        }
+
+        // 8c. Configure layered memory (S5) — GA replacement for v1 LongTermMemory
+        HarnessConfig.MemoryConfig memConfig = harnessConfig.getMemory();
+        if (memConfig != null) {
+            io.agentscope.harness.agent.memory.MemoryConfig.Builder memBuilder =
+                    io.agentscope.harness.agent.memory.MemoryConfig.builder();
+            if (memConfig.getModel() != null && !memConfig.getModel().isBlank()) {
+                memBuilder.model(memConfig.getModel());
+            }
+            if (memConfig.getConsolidationMaxTokens() != null) {
+                memBuilder.consolidationMaxTokens(memConfig.getConsolidationMaxTokens());
+            }
+            if (memConfig.getConsolidationMinGapSeconds() != null) {
+                memBuilder.consolidationMinGap(java.time.Duration.ofSeconds(memConfig.getConsolidationMinGapSeconds()));
+            }
+            if (memConfig.getDailyFileRetentionDays() != null) {
+                memBuilder.dailyFileRetentionDays(memConfig.getDailyFileRetentionDays());
+            }
+            if (memConfig.getSessionRetentionDays() != null) {
+                memBuilder.sessionRetentionDays(memConfig.getSessionRetentionDays());
+            }
+            if (memConfig.getFlushTrigger() != null) {
+                String trigger = memConfig.getFlushTrigger().toUpperCase();
+                switch (trigger) {
+                    case "NEVER" -> memBuilder.flushTrigger(io.agentscope.harness.agent.memory.MemoryConfig.FlushTrigger.never());
+                    case "THROTTLED" -> {
+                        long gapSec = memConfig.getConsolidationMinGapSeconds() != null
+                                ? memConfig.getConsolidationMinGapSeconds() : 1800L;
+                        memBuilder.flushTrigger(io.agentscope.harness.agent.memory.MemoryConfig.FlushTrigger.throttled(
+                                java.time.Duration.ofSeconds(gapSec)));
+                    }
+                    default -> memBuilder.flushTrigger(io.agentscope.harness.agent.memory.MemoryConfig.FlushTrigger.always());
+                }
+            }
+            builder.memory(memBuilder.build());
+            log.info("Agent '{}' enabled layered memory (flush={}, model={})",
+                    config.getAgentId(),
+                    memConfig.getFlushTrigger() != null ? memConfig.getFlushTrigger() : "ALWAYS",
+                    memConfig.getModel() != null ? memConfig.getModel() : "main");
+        }
+
+        // 9. Configure permission context (S6)
+        AgentConfig.PermissionConfig permConfig = harnessConfig.getPermissionConfig();
+        if (permConfig != null) {
+            String mode = permConfig.getDefaultMode() != null ? permConfig.getDefaultMode() : "bypass";
+            PermissionContextState permState = permissionContextFactory.build(mode, permConfig);
+            builder.permissionContext(permState);
+            log.info("Agent '{}' configured permission context (mode={})", config.getAgentId(), mode);
+        }
+
+        // 10. Configure skill repository (S6)
+        if (harnessConfig.getSkillPath() != null && !harnessConfig.getSkillPath().isBlank()) {
+            ClasspathSkillRepository skillRepo = new ClasspathSkillRepository(harnessConfig.getSkillPath());
+            builder.skillRepository(skillRepo);
+            log.info("Agent '{}' configured SkillRepository (path={})", config.getAgentId(), harnessConfig.getSkillPath());
+        }
+
+        // 11. Configure additional context files (S7)
+        if (harnessConfig.getAdditionalContextFiles() != null) {
+            for (String contextFile : harnessConfig.getAdditionalContextFiles()) {
+                builder.additionalContextFile(contextFile);
+            }
+        }
+
+        // 12. Configure max context tokens (S7)
+        builder.maxContextTokens(harnessConfig.getMaxContextTokens());
+
+        // 13. Configure meta tool (S7)
+        if (harnessConfig.isMetaToolEnabled()) {
+            builder.enableMetaTool(true);
+            log.info("Agent '{}' enabled MetaTool (reset_tools)", config.getAgentId());
+        }
+
+        // 14. Configure skill self-learning (S10): propose → review → promote lifecycle
+        HarnessConfig.SkillLearningConfig skillLearn = harnessConfig.getSkillLearning();
+        if (skillLearn != null && skillLearn.isManageToolEnabled()) {
+            builder.enableSkillManageTool(io.agentscope.harness.agent.tool.SkillManageConfig.builder()
+                    .autoPromote(skillLearn.isAutoPromote())
+                    .securityScan(skillLearn.isSecurityScan())
+                    .build());
+            log.info("Agent '{}' enabled SkillManageTool (autoPromote={}, securityScan={})",
+                    config.getAgentId(), skillLearn.isAutoPromote(), skillLearn.isSecurityScan());
+
+            if (skillLearn.isCuratorEnabled()) {
+                var curatorBuilder = io.agentscope.harness.agent.skill.curator.SkillCuratorConfig.builder()
+                        .enabled(true);
+                if (skillLearn.getCuratorIntervalHours() != null) {
+                    curatorBuilder.intervalHours(skillLearn.getCuratorIntervalHours());
+                }
+                if (skillLearn.getStaleAfterDays() != null) {
+                    curatorBuilder.staleAfterDays(skillLearn.getStaleAfterDays());
+                }
+                if (skillLearn.getArchiveAfterDays() != null) {
+                    curatorBuilder.archiveAfterDays(skillLearn.getArchiveAfterDays());
+                }
+                builder.enableSkillCurator(curatorBuilder.build());
+                log.info("Agent '{}' enabled SkillCurator (interval={}h, stale={}d, archive={}d)",
+                        config.getAgentId(),
+                        skillLearn.getCuratorIntervalHours(),
+                        skillLearn.getStaleAfterDays(),
+                        skillLearn.getArchiveAfterDays());
+            }
+        }
+
         HarnessAgent agent = builder.build();
-        log.info("HarnessAgent '{}' built with workspace={}, mode={}", config.getAgentId(), workspace,
-                isBuilder ? "BUILDER" : "CLAW");
+        log.info("HarnessAgent '{}' built with workspace={}, mode={}, docker={}",
+                config.getAgentId(), workspace,
+                isBuilder ? "BUILDER" : "CLAW", harnessConfig.isDockerMode());
         return agent;
     }
 
-    public static HarnessAgent create(AgentConfig config, String apiKey) throws Exception {
+    public HarnessAgent create(AgentConfig config, String apiKey) throws Exception {
         return create(config, apiKey, null);
     }
 
-    private static Path resolveWorkspace(String configuredPath, String agentId) {
+    private Path resolveWorkspace(String configuredPath, String agentId) {
         if (configuredPath != null && !configuredPath.isBlank()) {
             String expanded = configuredPath.replace("${user.home}", System.getProperty("user.home"));
             return Paths.get(expanded);

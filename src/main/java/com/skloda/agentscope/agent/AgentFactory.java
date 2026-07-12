@@ -2,6 +2,7 @@ package com.skloda.agentscope.agent;
 
 import com.skloda.agentscope.middleware.MiddlewareRegistry;
 import com.skloda.agentscope.mcp.McpClientService;
+import com.skloda.agentscope.model.ModelFactory;
 import com.skloda.agentscope.permission.PermissionContextFactory;
 import io.agentscope.core.permission.PermissionContextState;
 import com.skloda.agentscope.mcp.McpServerRef;
@@ -10,12 +11,11 @@ import com.skloda.agentscope.service.KnowledgeService;
 import com.skloda.agentscope.tool.ToolRegistry;
 import com.skloda.agentscope.middleware.ApprovalMiddleware;
 import io.agentscope.core.ReActAgent;
-import io.agentscope.extensions.model.dashscope.formatter.DashScopeChatFormatter;
+import io.agentscope.core.model.Model;
 import io.agentscope.core.middleware.MiddlewareBase;
 import io.agentscope.core.memory.LongTermMemory;
 import io.agentscope.core.memory.LongTermMemoryMode;
 import io.agentscope.core.memory.bailian.BailianLongTermMemory;
-import io.agentscope.extensions.model.dashscope.DashScopeChatModel;
 
 import io.agentscope.core.rag.RAGMode;
 import io.agentscope.core.rag.model.RetrieveConfig;
@@ -26,7 +26,6 @@ import io.agentscope.core.skill.repository.ClasspathSkillRepository;
 import io.agentscope.core.tool.Toolkit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.HashSet;
@@ -38,26 +37,26 @@ public class AgentFactory {
 
     private static final Logger log = LoggerFactory.getLogger(AgentFactory.class);
 
-    @Value("${agentscope.model.dashscope.api-key:}")
-    private String apiKey;
-
     private final AgentConfigService configService;
     private final ToolRegistry toolRegistry;
     private final KnowledgeService knowledgeService;
     private final McpClientService mcpClientService;
     private final MiddlewareRegistry middlewareRegistry;
     private final PermissionContextFactory permissionContextFactory;
+    private final ModelFactory modelFactory;
 
     public AgentFactory(AgentConfigService configService, ToolRegistry toolRegistry,
                         KnowledgeService knowledgeService, McpClientService mcpClientService,
                         MiddlewareRegistry middlewareRegistry,
-                        PermissionContextFactory permissionContextFactory) {
+                        PermissionContextFactory permissionContextFactory,
+                        ModelFactory modelFactory) {
         this.configService = configService;
         this.toolRegistry = toolRegistry;
         this.knowledgeService = knowledgeService;
         this.mcpClientService = mcpClientService;
         this.middlewareRegistry = middlewareRegistry;
         this.permissionContextFactory = permissionContextFactory;
+        this.modelFactory = modelFactory;
     }
 
     /**
@@ -118,13 +117,8 @@ public class AgentFactory {
         AgentConfig config = configService.getAgentConfig(agentId);
         log.info("Creating agent: {} ({})", config.getName(), agentId);
 
-        DashScopeChatModel model = DashScopeChatModel.builder()
-                .apiKey(apiKey)
-                .modelName(config.getModelName())
-                .stream(config.isStreaming())
-                .enableThinking(config.isEnableThinking())
-                .formatter(new DashScopeChatFormatter())
-                .build();
+        Model model = modelFactory.createModel(
+                config.getModelName(), config.isStreaming(), config.isEnableThinking());
 
         ReActAgent.Builder builder = ReActAgent.builder()
                 .name(config.getName())
@@ -147,7 +141,11 @@ public class AgentFactory {
         registerMcpTools(config, toolkit);
 
         // Register RAG knowledge if enabled
+        // NOTE: v1 RAG API (builder.knowledge/ragMode/retrieveConfig) is @Deprecated(forRemoval) in GA.
+        // The official v2 RAG rewrite is not yet released. This code path is maintained as-is
+        // until the v2 replacement is available. For new agents, prefer Harness MemoryConfig.
         if (config.isRagEnabled()) {
+            log.warn("  Agent {} uses deprecated v1 RAG API. Consider migrating to Harness MemoryConfig.", agentId);
             RAGMode ragMode = parseRagMode(config.getRagMode());
             builder.knowledge(knowledgeService.getKnowledge())
                     .ragMode(ragMode)
@@ -197,13 +195,8 @@ public class AgentFactory {
         AgentConfig config = configService.getAgentConfig(agentId);
         log.info("Creating agent: {} ({}) [permissionMode={}]", config.getName(), agentId, permissionMode);
 
-        DashScopeChatModel model = DashScopeChatModel.builder()
-                .apiKey(apiKey)
-                .modelName(config.getModelName())
-                .stream(config.isStreaming())
-                .enableThinking(config.isEnableThinking())
-                .formatter(new DashScopeChatFormatter())
-                .build();
+        Model model = modelFactory.createModel(
+                config.getModelName(), config.isStreaming(), config.isEnableThinking());
 
         ReActAgent.Builder builder = ReActAgent.builder()
                 .name(config.getName())
@@ -394,7 +387,7 @@ public class AgentFactory {
     LongTermMemory createLongTermMemory(AgentConfig.LongTermMemoryConfig config) {
         return switch (config.getType().toLowerCase()) {
             case "bailian" -> BailianLongTermMemory.builder()
-                    .apiKey(apiKey)
+                    .apiKey(modelFactory.getApiKey())
                     .userId(config.getUserId())
                     .build();
             default -> null;

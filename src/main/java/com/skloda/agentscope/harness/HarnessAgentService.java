@@ -22,12 +22,15 @@ public class HarnessAgentService {
     private static final Logger log = LoggerFactory.getLogger(HarnessAgentService.class);
 
     private final AgentConfigService configService;
+    private final HarnessAgentFactory harnessAgentFactory;
     private final String apiKey;
     private final ConcurrentHashMap<String, HarnessAgent> agentCache = new ConcurrentHashMap<>();
 
     public HarnessAgentService(AgentConfigService configService,
+                               HarnessAgentFactory harnessAgentFactory,
                                @Value("${agentscope.model.dashscope.api-key:}") String apiKey) {
         this.configService = configService;
+        this.harnessAgentFactory = harnessAgentFactory;
         this.apiKey = apiKey;
     }
 
@@ -65,7 +68,7 @@ public class HarnessAgentService {
             try {
                 AgentConfig config = configService.getAgentConfig(agentId);
                 String effectiveKey = resolveApiKey();
-                return HarnessAgentFactory.create(config, effectiveKey, executionMode);
+                return harnessAgentFactory.create(config, effectiveKey, executionMode);
             } catch (Exception e) {
                 throw new RuntimeException("Failed to create HarnessAgent: " + key, e);
             }

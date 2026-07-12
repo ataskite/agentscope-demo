@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Spring Boot 3.5.13 + Java 17 demo for AgentScope (v2.0.0-RC3), a Java agent framework with LLM-backed ReAct agents. Features multiple agent types: basic chat, tool-calling, document analysis, multi-modal support (vision/audio), RAG knowledge base, session management (AgentStateStore), web search, multi-agent collaboration (10 patterns: sequential, parallel, routing, handoffs, debate, loop, state graph, msg hub, subagents-sequential, subagents-parallel), and advanced capabilities via the AgentScope Harness (context compaction, sandbox execution).
+Spring Boot 3.5.14 + Java 17 demo for AgentScope (v2.0.0 GA), a Java agent framework with LLM-backed ReAct agents. Features multiple agent types: basic chat, tool-calling, document analysis, multi-modal support (vision/audio), RAG knowledge base, session management (AgentStateStore), web search, multi-agent collaboration (10 patterns: sequential, parallel, routing, handoffs, debate, loop, state graph, msg hub, subagents-sequential, subagents-parallel), and advanced capabilities via the AgentScope Harness (Docker sandbox, Plan Mode, Task List, layered memory, skill self-learning, context compaction, OTel tracing). Uses `ModelRegistry` unified model entry and `agent.streamEvents()` for typed event streaming (345 tests, 0 failures).
 
 ## Build & Run
 
@@ -227,7 +227,7 @@ Two `type: HARNESS` agents demonstrate 2.0 capabilities wired up through `Harnes
 - **compaction-demo**: Long conversations with automatic context compaction (CLAW execution mode, LOCAL filesystem) — triggers compaction after N messages while keeping the most recent K messages.
 - **sandbox-demo**: Safe code execution in a local sandbox (BUILDER execution mode, `/tmp/agentscope-sandbox` workspace) — runs user-supplied code through an isolated filesystem backend.
 
-> Note: AgUI and A2A protocol extensions are not yet available in 2.0.0-RC3 and are not wired into this demo.
+> Note: AgUI and A2A protocol extensions are not yet available (io.a2a SDK and extension jars not in Maven Central). A2A is the sole remaining ROADMAP todo.
 
 **Configuration format:**
 ```yaml
@@ -536,11 +536,12 @@ src/main/resources/
 
 ## Dependencies
 
-- `agentscope-spring-boot-starter` 2.0.0-RC3
-- `agentscope-core` 2.0.0-RC3
-- `agentscope-harness` 2.0.0-RC3 (context compaction + sandbox demos)
-- `agentscope-extensions-rag-simple` 2.0.0-RC3 (RAG extension; v2 alternative retained for now)
-- `agentscope-extensions-memory-bailian` 2.0.0-RC3 (Bailian memory extension; v2 alternative retained for now)
+- `agentscope-spring-boot-starter` 2.0.0
+- `agentscope-core` 2.0.0
+- `agentscope-harness` 2.0.0 (Docker sandbox, Plan Mode, Task List, layered memory, skill self-learning, compaction)
+- `agentscope-extensions-model-dashscope` 2.0.0 (DashScope provider, RC5 modularized from core)
+- `agentscope-extensions-rag-simple` 2.0.0 (v1 RAG API, @Deprecated — awaiting v2 rewrite)
+- `agentscope-extensions-memory-bailian` 2.0.0 (v1 LTM API, @Deprecated — Harness MemoryConfig is GA replacement)
 - Apache POI 5.5.1 (DOCX/XLSX parsing and generation)
 - Apache PDFBox 3.0.7 (PDF parsing)
 - Spring Boot 3.5.13

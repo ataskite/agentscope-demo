@@ -9,11 +9,11 @@ import com.skloda.agentscope.agent.StateConfig;
 import com.skloda.agentscope.agent.SubAgentConfig;
 import com.skloda.agentscope.agent.TriggerType;
 import com.skloda.agentscope.middleware.ApprovalMiddleware;
+import com.skloda.agentscope.model.ModelFactory;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.AgentBase;
 import io.agentscope.core.agent.StreamOptions;
-import io.agentscope.extensions.model.dashscope.formatter.DashScopeChatFormatter;
-import io.agentscope.extensions.model.dashscope.DashScopeChatModel;
+import io.agentscope.core.model.Model;
 import io.agentscope.core.state.AgentStateStore;
 import io.agentscope.core.state.InMemoryAgentStateStore;
 import io.agentscope.core.tool.Toolkit;
@@ -21,7 +21,6 @@ import io.agentscope.core.tool.subagent.SubAgentProvider;
 import io.agentscope.core.tool.subagent.SubAgentTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -48,13 +47,13 @@ public class CompositeAgentFactory {
 
     private final AgentFactory singleAgentFactory;
     private final AgentConfigService configService;
+    private final ModelFactory modelFactory;
 
-    @Value("${agentscope.model.dashscope.api-key:}")
-    private String apiKey;
-
-    public CompositeAgentFactory(AgentFactory singleAgentFactory, AgentConfigService configService) {
+    public CompositeAgentFactory(AgentFactory singleAgentFactory, AgentConfigService configService,
+                                 ModelFactory modelFactory) {
         this.singleAgentFactory = singleAgentFactory;
         this.configService = configService;
+        this.modelFactory = modelFactory;
     }
 
     public ReActAgent createSingleAgent(String agentId) {
@@ -124,13 +123,8 @@ public class CompositeAgentFactory {
 
         String routingPrompt = buildRoutingSystemPrompt(config);
 
-        DashScopeChatModel model = DashScopeChatModel.builder()
-                .apiKey(apiKey)
-                .modelName(config.getModelName())
-                .stream(config.isStreaming())
-                .enableThinking(config.isEnableThinking())
-                .formatter(new DashScopeChatFormatter())
-                .build();
+        Model model = modelFactory.createModel(
+                config.getModelName(), config.isStreaming(), config.isEnableThinking());
 
         Toolkit toolkit = new Toolkit();
         List<ReActAgent> subAgents = new ArrayList<>();
@@ -144,13 +138,9 @@ public class CompositeAgentFactory {
                     "专注于你作为" + subConfig.getAgentId() + "的专业领域。\n\n" +
                     "你的原始角色描述:\n" + originalPrompt;
 
-            DashScopeChatModel subModel = DashScopeChatModel.builder()
-                    .apiKey(apiKey)
-                    .modelName(subAgentConfig != null ? subAgentConfig.getModelName() : config.getModelName())
-                    .stream(config.isStreaming())
-                    .enableThinking(config.isEnableThinking())
-                    .formatter(new DashScopeChatFormatter())
-                    .build();
+            Model subModel = modelFactory.createModel(
+                    subAgentConfig != null ? subAgentConfig.getModelName() : config.getModelName(),
+                    config.isStreaming(), config.isEnableThinking());
 
             ReActAgent subAgent = ReActAgent.builder()
                     .name(subConfig.getAgentId())
@@ -246,13 +236,8 @@ public class CompositeAgentFactory {
 
         String handoffsPrompt = buildHandoffsSystemPrompt(config);
 
-        DashScopeChatModel model = DashScopeChatModel.builder()
-                .apiKey(apiKey)
-                .modelName(config.getModelName())
-                .stream(config.isStreaming())
-                .enableThinking(config.isEnableThinking())
-                .formatter(new DashScopeChatFormatter())
-                .build();
+        Model model = modelFactory.createModel(
+                config.getModelName(), config.isStreaming(), config.isEnableThinking());
 
         Toolkit toolkit = new Toolkit();
 
@@ -265,13 +250,9 @@ public class CompositeAgentFactory {
                     "专注于你作为" + subConfig.getAgentId() + "的专业领域。\n\n" +
                     "你的原始角色描述:\n" + originalPrompt;
 
-            DashScopeChatModel subModel = DashScopeChatModel.builder()
-                    .apiKey(apiKey)
-                    .modelName(subAgentConfig != null ? subAgentConfig.getModelName() : config.getModelName())
-                    .stream(config.isStreaming())
-                    .enableThinking(config.isEnableThinking())
-                    .formatter(new DashScopeChatFormatter())
-                    .build();
+            Model subModel = modelFactory.createModel(
+                    subAgentConfig != null ? subAgentConfig.getModelName() : config.getModelName(),
+                    config.isStreaming(), config.isEnableThinking());
 
             ReActAgent subAgent = ReActAgent.builder()
                     .name(subConfig.getAgentId())
@@ -531,6 +512,6 @@ public class CompositeAgentFactory {
     }
 
     public String getApiKey() {
-        return apiKey;
+        return modelFactory.getApiKey();
     }
 }
