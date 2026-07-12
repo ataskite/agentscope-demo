@@ -3,7 +3,10 @@ package com.skloda.agentscope.harness;
 import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.HarnessConfig;
 import com.skloda.agentscope.model.ModelFactory;
+import com.skloda.agentscope.permission.PermissionContextFactory;
 import io.agentscope.core.model.Model;
+import io.agentscope.core.permission.PermissionContextState;
+import io.agentscope.core.skill.repository.ClasspathSkillRepository;
 import io.agentscope.harness.agent.HarnessAgent;
 import io.agentscope.harness.agent.filesystem.spec.LocalFilesystemSpec;
 import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
@@ -24,13 +27,16 @@ public class HarnessAgentFactory {
     private final FilesystemSpecFactory filesystemSpecFactory;
     private final CompactionConfigFactory compactionConfigFactory;
     private final ModelFactory modelFactory;
+    private final PermissionContextFactory permissionContextFactory;
 
     public HarnessAgentFactory(FilesystemSpecFactory filesystemSpecFactory,
                                CompactionConfigFactory compactionConfigFactory,
-                               ModelFactory modelFactory) {
+                               ModelFactory modelFactory,
+                               PermissionContextFactory permissionContextFactory) {
         this.filesystemSpecFactory = filesystemSpecFactory;
         this.compactionConfigFactory = compactionConfigFactory;
         this.modelFactory = modelFactory;
+        this.permissionContextFactory = permissionContextFactory;
     }
 
     public HarnessAgent create(AgentConfig config, String apiKey, String executionModeOverride) throws Exception {
@@ -116,6 +122,38 @@ public class HarnessAgentFactory {
         if (harnessConfig.isTaskListEnabled()) {
             builder.enableTaskList();
             log.info("Agent '{}' enabled Task List (TodoTools + TaskReminderMiddleware)", config.getAgentId());
+        }
+
+        // 9. Configure permission context (S6)
+        AgentConfig.PermissionConfig permConfig = harnessConfig.getPermissionConfig();
+        if (permConfig != null) {
+            String mode = permConfig.getDefaultMode() != null ? permConfig.getDefaultMode() : "bypass";
+            PermissionContextState permState = permissionContextFactory.build(mode, permConfig);
+            builder.permissionContext(permState);
+            log.info("Agent '{}' configured permission context (mode={})", config.getAgentId(), mode);
+        }
+
+        // 10. Configure skill repository (S6)
+        if (harnessConfig.getSkillPath() != null && !harnessConfig.getSkillPath().isBlank()) {
+            ClasspathSkillRepository skillRepo = new ClasspathSkillRepository(harnessConfig.getSkillPath());
+            builder.skillRepository(skillRepo);
+            log.info("Agent '{}' configured SkillRepository (path={})", config.getAgentId(), harnessConfig.getSkillPath());
+        }
+
+        // 11. Configure additional context files (S7)
+        if (harnessConfig.getAdditionalContextFiles() != null) {
+            for (String contextFile : harnessConfig.getAdditionalContextFiles()) {
+                builder.additionalContextFile(contextFile);
+            }
+        }
+
+        // 12. Configure max context tokens (S7)
+        builder.maxContextTokens(harnessConfig.getMaxContextTokens());
+
+        // 13. Configure meta tool (S7)
+        if (harnessConfig.isMetaToolEnabled()) {
+            builder.enableMetaTool(true);
+            log.info("Agent '{}' enabled MetaTool (reset_tools)", config.getAgentId());
         }
 
         HarnessAgent agent = builder.build();

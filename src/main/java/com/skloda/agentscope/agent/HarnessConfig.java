@@ -19,6 +19,15 @@ public class HarnessConfig {
     private boolean taskListEnabled = false;
     private SandboxConfig sandbox;
 
+    // S6: Permission + Skill
+    private AgentConfig.PermissionConfig permissionConfig;
+    private String skillPath;
+
+    // S7: Context control
+    private List<String> additionalContextFiles = new ArrayList<>();
+    private int maxContextTokens = 8000;
+    private boolean metaToolEnabled = false;
+
     public boolean isBuilderMode() {
         return "BUILDER".equalsIgnoreCase(executionMode);
     }

@@ -12,6 +12,15 @@ agents:
       workspace: "${user.home}/.agentscope/complaint-reviewer"
       filesystemMode: LOCAL
       executionMode: CLAW
+      maxContextTokens: 8000
+      metaToolEnabled: true
+      permissionConfig:
+        defaultMode: accept_edits
+        denyTools:
+          - execute_shell_command
+        askTools:
+          - write_text_file
+          - edit_docx
       compaction:
         triggerMessages: 30
         keepMessages: 10

@@ -4,6 +4,7 @@ import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.AgentType;
 import com.skloda.agentscope.agent.HarnessConfig;
 import com.skloda.agentscope.model.ModelFactory;
+import com.skloda.agentscope.permission.PermissionContextFactory;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -22,7 +23,8 @@ class HarnessAgentFactoryModeTest {
         return new HarnessAgentFactory(
                 new FilesystemSpecFactory(),
                 new CompactionConfigFactory(),
-                new ModelFactory(null));
+                new ModelFactory(null),
+                new PermissionContextFactory());
     }
 
     @Test
