@@ -272,8 +272,8 @@ spring:
 
 | 技术 | 版本 | 用途 |
 |------|------|------|
-| Spring Boot | 3.5.13 | Web 框架 |
-| AgentScope | 1.0.11 | Agent 框架 |
+| Spring Boot | 3.5.14 | Web 框架 |
+| AgentScope | 2.0.0 GA | Agent 框架 |
 | Java | 17 | 运行环境 |
 | Apache POI | 5.5.1 | DOCX/XLSX 解析生成 |
 | Apache PDFBox | 3.0.7 | PDF 解析 |
