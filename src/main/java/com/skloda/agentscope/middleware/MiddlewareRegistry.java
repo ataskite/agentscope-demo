@@ -1,6 +1,7 @@
 package com.skloda.agentscope.middleware;
 
 import io.agentscope.core.middleware.MiddlewareBase;
+import io.agentscope.core.tracing.OtelTracingMiddleware;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -32,6 +33,9 @@ public class MiddlewareRegistry {
         // Enhanced middlewares
         register("detailed-audit", DetailedAuditMiddleware::new);
         register("metrics-collector", MetricsCollectorMiddleware::new);
+
+        // GA built-in: OpenTelemetry tracing (S11)
+        register("otel-tracing", OtelTracingMiddleware::new);
 
         log.info("Registered {} built-in middlewares: {}", registry.size(), getRegisteredNames());
     }

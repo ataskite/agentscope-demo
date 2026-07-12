@@ -1676,11 +1676,12 @@ agents:
     category: demo
     type: SINGLE
     name: 中间件演示助手
-    description: 展示 AgentScope 2.0 中间件系统：详细审计、指标收集、限流、上下文注入
+    description: 展示 AgentScope 2.0 中间件系统：详细审计、指标收集、限流、上下文注入、OpenTelemetry 链路追踪
     modelName: deepseek-v4-flash
     streaming: true
     enableThinking: true
     middlewares:
+      - otel-tracing
       - detailed-audit
       - metrics-collector
       - rate-limit
