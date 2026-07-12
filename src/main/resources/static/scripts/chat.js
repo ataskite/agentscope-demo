@@ -259,11 +259,18 @@ async function sendMessage() {
                             var isSkill = payload.isSkill === true;
                             var isMcp = payload.isMcp === true;
                             var isRag = payload.name === 'retrieve_knowledge';
+                            var isPlan = tName === 'plan_enter' || tName === 'plan_write' || tName === 'plan_exit';
+                            var isTodo = tName === 'todo_write';
                             var tSkillName = payload.displayName || '';
                             var tMcpName = payload.mcpName || '';
 
                             if (enableThinking) {
-                                if (isRag) {
+                                if (isPlan) {
+                                    var planLabels = { plan_enter: '📋 进入 PLAN 模式', plan_write: '📝 写入计划', plan_exit: '✅ 请求审批' };
+                                    updateThinkingBox(planLabels[tName] || ('📋 ' + tName), fileInfo);
+                                } else if (isTodo) {
+                                    updateThinkingBox('📝 更新任务清单', fileInfo);
+                                } else if (isRag) {
                                     var ragQuery = '';
                                     try {
                                         var params = JSON.parse(payload.params || '{}');
@@ -284,9 +291,14 @@ async function sendMessage() {
                             if (currentRound) {
                                 currentRound.toolCallCount++;
                                 currentRound._currentToolStart = Date.now();
-                                var rowType = isRag ? 'rag' : (isMcp ? 'mcp' : (isSkill ? 'skill' : 'tool'));
+                                var rowType = isPlan ? 'phase' : (isTodo ? 'phase' : (isRag ? 'rag' : (isMcp ? 'mcp' : (isSkill ? 'skill' : 'tool'))));
                                 var rowLabel;
-                                if (isRag) {
+                                if (isPlan) {
+                                    var planRowLabels = { plan_enter: 'Plan → 进入计划模式', plan_write: 'Plan → 写入计划', plan_exit: 'Plan → 请求审批' };
+                                    rowLabel = planRowLabels[tName] || ('Plan → ' + tName);
+                                } else if (isTodo) {
+                                    rowLabel = 'Todo → 更新任务清单';
+                                } else if (isRag) {
                                     rowLabel = 'RAG → retrieve_knowledge';
                                 } else if (isMcp) {
                                     rowLabel = 'MCP → ' + (tMcpName ? tMcpName + '/' : '') + tName;
@@ -581,6 +593,16 @@ async function sendMessage() {
                             scrollToBottom(chatMessages);
                             break;
 
+                        case 'require_user_confirm':
+                            // HITL confirmation gate (e.g. plan_exit requests user to approve the plan).
+                            // Renders a timeline marker; the interactive approval goes through
+                            // pending_approval (which creates the approval card with buttons).
+                            if (currentRound) {
+                                var rucNames = (payload.toolCalls || []).map(function(tc) { return tc.name; }).join(', ');
+                                addTimelineRow('phase', 'Require User Confirm', escapeHtml(rucNames || ''), 'running');
+                            }
+                            break;
+
                         case 'require_external_execution':
                             // HITL pause for external tool execution (native RC3 flow).
                             // Rendered as a passive marker — no interactive card or resume endpoint
@@ -590,6 +612,16 @@ async function sendMessage() {
                                 var rexNames = (payload.toolCalls || []).map(function(tc) { return tc.name; }).join(', ');
                                 currentRound._externalExecRow = addTimelineRow('phase',
                                     'Require External Execution', escapeHtml(rexNames || ''), 'running');
+                            }
+                            break;
+
+                        case 'user_confirm_result':
+                            // Result of the HITL confirmation (e.g. plan approved/rejected)
+                            if (currentRound) {
+                                var ucrResults = (payload.confirmResults || []).map(function(cr) {
+                                    return cr.toolName + ': ' + (cr.confirmed ? '✓' : '✗');
+                                }).join(', ');
+                                addTimelineRow('phase', 'User Confirm Result', escapeHtml(ucrResults || ''), 'ok');
                             }
                             break;
 

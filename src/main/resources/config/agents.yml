@@ -503,10 +503,13 @@ agents:
       - prompt: "帮我查一下阿里巴巴最近的相关新闻，并按重要性排序"
         expectedBehavior: "调用新闻搜索工具，整理最新信息"
 
+  # [DEPRECATED] project-planner uses legacy planEnabled + non-existent tools (create_plan/finish_subtask/finish_plan).
+  # Replaced by plan-build-demo (Harness agent with native GA Plan Mode + Task List).
+  # Kept for reference; will be removed in a future cleanup.
   - agentId: project-planner
     category: single
-    name: Project Planner
-    description: 项目规划和任务分解助手，支持创建和执行结构化计划
+    name: Project Planner (deprecated)
+    description: “[已废弃] 请使用 plan-build-demo。旧版项目规划助手，引用了 v1 已删除的工具。”
     systemPrompt: |
       你是一个项目规划助手，擅长将复杂任务分解为可执行的步骤。
       你可以帮助用户：
@@ -545,6 +548,70 @@ agents:
         expectedBehavior: “创建计划，展示任务分解和依赖关系”
       - prompt: “评估一下下周交付这个 Demo 的主要风险，并给出应对方案”
         expectedBehavior: “创建风险分析计划，逐步评估并给出方案”
+
+  - agentId: plan-build-demo
+    category: demo
+    type: HARNESS
+    name: Plan + Execute 演示
+    description: 先规划后执行。PLAN 模式只读调研并产出计划，用户审批后进入 BUILD 模式并用任务清单跟踪执行
+    systemPrompt: |
+      你是一个先规划后执行的助手。
+      面对复杂任务时，你会先进入 PLAN 模式做只读调研，用 plan_write 写出结构化计划，
+      然后 plan_exit 请求用户审批。审批通过后进入 BUILD 模式，
+      用 todo_write 建立任务清单并逐步执行。
+    modelName: deepseek-v4-flash
+    streaming: true
+    enableThinking: true
+    harnessConfig:
+      executionMode: BUILDER
+      filesystemMode: LOCAL
+      workspace: /tmp/agentscope-plan-demo
+      taskListEnabled: true
+      plan:
+        enabled: true
+        fileDirectory: plans
+        allowShell: false
+      compaction:
+        triggerMessages: 30
+        keepMessages: 10
+        flushBeforeCompact: true
+    samplePrompts:
+      - prompt: “分析当前工作区结构，规划一个给项目添加安装说明的计划”
+        expectedBehavior: “进入 PLAN 模式，调用 plan_write 写计划，plan_exit 请求审批”
+      - prompt: “帮我规划并执行：在工作区创建一个 hello.py 并写一个测试”
+        expectedBehavior: “规划→审批→BUILD 模式下 todo_write 跟踪逐步执行”
+
+  - agentId: memory-assistant
+    category: demo
+    type: HARNESS
+    name: 记忆助手
+    description: 具备分层长期记忆的助手。对话中自动提取事实写入每日记忆文件，定期合并到 MEMORY.md，重启后仍记得你
+    systemPrompt: |
+      你是一个具备长期记忆的个人助手。
+      你会在对话中自然地记住用户的偏好、事实和重要信息。
+      可以使用 memory_search 搜索过往记忆，memory_save 主动保存重要事实。
+      重启后，你仍能记得之前对话中的关键信息。
+    modelName: deepseek-v4-flash
+    streaming: true
+    enableThinking: false
+    harnessConfig:
+      executionMode: CLAW
+      filesystemMode: LOCAL
+      workspace: “${user.home}/.agentscope/memory-assistant”
+      memory:
+        flushTrigger: ALWAYS
+        consolidationMaxTokens: 4000
+        dailyFileRetentionDays: 90
+        sessionRetentionDays: 180
+      compaction:
+        triggerMessages: 30
+        keepMessages: 10
+        flushBeforeCompact: true
+    samplePrompts:
+      - prompt: “我叫小明，我是做Java后端开发的，最近在研究AI Agent”
+        expectedBehavior: “自动将用户信息写入每日记忆文件”
+      - prompt: “你还记得我是谁吗？”
+        expectedBehavior: “通过记忆搜索回忆用户信息（需要重启后验证持久性）”
 
   - agentId: long-conversation
     category: single

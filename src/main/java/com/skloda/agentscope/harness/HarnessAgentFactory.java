@@ -124,6 +124,62 @@ public class HarnessAgentFactory {
             log.info("Agent '{}' enabled Task List (TodoTools + TaskReminderMiddleware)", config.getAgentId());
         }
 
+        // 8b. Configure Plan Mode (S4) — designed to compose with Task List
+        HarnessConfig.PlanConfig planConfig = harnessConfig.getPlan();
+        if (planConfig != null && planConfig.isEnabled()) {
+            builder.enablePlanMode();
+            if (planConfig.getFileDirectory() != null && !planConfig.getFileDirectory().isBlank()) {
+                builder.planFileDirectory(planConfig.getFileDirectory());
+            }
+            if (planConfig.isAllowShell()) {
+                builder.allowShellInPlanMode();
+            }
+            log.info("Agent '{}' enabled Plan Mode (dir={}, allowShell={})",
+                    config.getAgentId(),
+                    planConfig.getFileDirectory(),
+                    planConfig.isAllowShell());
+        }
+
+        // 8c. Configure layered memory (S5) — GA replacement for v1 LongTermMemory
+        HarnessConfig.MemoryConfig memConfig = harnessConfig.getMemory();
+        if (memConfig != null) {
+            io.agentscope.harness.agent.memory.MemoryConfig.Builder memBuilder =
+                    io.agentscope.harness.agent.memory.MemoryConfig.builder();
+            if (memConfig.getModel() != null && !memConfig.getModel().isBlank()) {
+                memBuilder.model(memConfig.getModel());
+            }
+            if (memConfig.getConsolidationMaxTokens() != null) {
+                memBuilder.consolidationMaxTokens(memConfig.getConsolidationMaxTokens());
+            }
+            if (memConfig.getConsolidationMinGapSeconds() != null) {
+                memBuilder.consolidationMinGap(java.time.Duration.ofSeconds(memConfig.getConsolidationMinGapSeconds()));
+            }
+            if (memConfig.getDailyFileRetentionDays() != null) {
+                memBuilder.dailyFileRetentionDays(memConfig.getDailyFileRetentionDays());
+            }
+            if (memConfig.getSessionRetentionDays() != null) {
+                memBuilder.sessionRetentionDays(memConfig.getSessionRetentionDays());
+            }
+            if (memConfig.getFlushTrigger() != null) {
+                String trigger = memConfig.getFlushTrigger().toUpperCase();
+                switch (trigger) {
+                    case "NEVER" -> memBuilder.flushTrigger(io.agentscope.harness.agent.memory.MemoryConfig.FlushTrigger.never());
+                    case "THROTTLED" -> {
+                        long gapSec = memConfig.getConsolidationMinGapSeconds() != null
+                                ? memConfig.getConsolidationMinGapSeconds() : 1800L;
+                        memBuilder.flushTrigger(io.agentscope.harness.agent.memory.MemoryConfig.FlushTrigger.throttled(
+                                java.time.Duration.ofSeconds(gapSec)));
+                    }
+                    default -> memBuilder.flushTrigger(io.agentscope.harness.agent.memory.MemoryConfig.FlushTrigger.always());
+                }
+            }
+            builder.memory(memBuilder.build());
+            log.info("Agent '{}' enabled layered memory (flush={}, model={})",
+                    config.getAgentId(),
+                    memConfig.getFlushTrigger() != null ? memConfig.getFlushTrigger() : "ALWAYS",
+                    memConfig.getModel() != null ? memConfig.getModel() : "main");
+        }
+
         // 9. Configure permission context (S6)
         AgentConfig.PermissionConfig permConfig = harnessConfig.getPermissionConfig();
         if (permConfig != null) {

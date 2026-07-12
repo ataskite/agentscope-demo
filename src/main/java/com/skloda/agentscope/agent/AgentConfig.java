@@ -51,7 +51,8 @@ public class AgentConfig {
     // PlanNotebook settings
     private boolean planEnabled = false;
 
-    // Long-term memory settings
+    /** @deprecated Use {@link HarnessConfig.MemoryConfig} (Harness layered memory) instead. */
+    @Deprecated(forRemoval = true)
     private LongTermMemoryConfig longTermMemory;
 
     // === Multi-agent fields ===
@@ -99,6 +100,13 @@ public class AgentConfig {
         private String storagePath;
     }
 
+    /**
+     * @deprecated Use {@link HarnessConfig.MemoryConfig} instead.
+     * The v1 LongTermMemory API (Bailian) is deprecated in GA; the Harness
+     * layered memory (MEMORY.md + daily fact log + compaction) is the
+     * recommended replacement. See the memory-assistant demo agent.
+     */
+    @Deprecated(forRemoval = true)
     @Setter
     @Getter
     public static class LongTermMemoryConfig {

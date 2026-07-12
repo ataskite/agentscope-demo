@@ -28,6 +28,12 @@ public class HarnessConfig {
     private int maxContextTokens = 8000;
     private boolean metaToolEnabled = false;
 
+    // S4: Plan Mode
+    private PlanConfig plan;
+
+    // S5: Layered Memory
+    private MemoryConfig memory;
+
     public boolean isBuilderMode() {
         return "BUILDER".equalsIgnoreCase(executionMode);
     }
@@ -57,5 +63,42 @@ public class HarnessConfig {
         private String image = "python:3.11-slim";
         private long memorySizeBytes = 2_000_000_000L;
         private long cpuCount = 2L;
+    }
+
+    @Setter
+    @Getter
+    public static class PlanConfig {
+        private boolean enabled = false;
+        private String fileDirectory = "plans";
+        private boolean allowShell = false;
+    }
+
+    /**
+     * Harness layered memory configuration (S5).
+     * <p>
+     * Drives HarnessAgent.Builder.memory(MemoryConfig). When configured, the agent
+     * gains three capabilities:
+     * <ul>
+     *   <li>Per-turn flush — extracts facts to memory/daily/&lt;date&gt;.md</li>
+     *   <li>Throttled consolidation — merges daily entries into MEMORY.md</li>
+     *   <li>Memory tools — memory_search, memory_get, memory_save</li>
+     * </ul>
+     * This is the GA replacement for the deprecated v1 LongTermMemory API.
+     */
+    @Setter
+    @Getter
+    public static class MemoryConfig {
+        /** Model name for flush/consolidation LLM calls; null = use agent's main model */
+        private String model;
+        /** "ALWAYS" | "NEVER" | "THROTTLED"; null = ALWAYS (framework default) */
+        private String flushTrigger;
+        /** Min gap between consolidation runs (seconds); only for THROTTLED; null = 1800 (30 min) */
+        private Long consolidationMinGapSeconds;
+        /** Max tokens for consolidated memory; null = 4000 (framework default) */
+        private Integer consolidationMaxTokens;
+        /** Daily flush file retention; null = 90 (framework default) */
+        private Integer dailyFileRetentionDays;
+        /** Session tree retention; null = 180 (framework default) */
+        private Integer sessionRetentionDays;
     }
 }
