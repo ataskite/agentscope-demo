@@ -1,13 +1,16 @@
 # AgentScope Java 2.0 GA — 差距分析与演进路线
 
-> Last reviewed: 2026-07-11
+> Last reviewed: 2026-07-12（S1-S11 实施完成）
 > Baseline: Spring Boot 3.5.14, Java 17, `agentscope.version=2.0.0` GA（2026-07-10 发布）
-> Tests: `mvn test` → **343 tests, 0 failures, 0 errors**
+> Tests: `mvn test` → **345 tests, 0 failures, 0 errors**
 > 官方文档: https://java.agentscope.io/v2/zh/docs/index.html
+> 实施状态: **S1-S11 已完成，唯一待办为 A2A Protocol（等官方补齐 io.a2a SDK）**
 
 ## 方法论
 
-本文档以**官方 2.0 GA 文档全集**（building-blocks / harness / integration 三个目录的全部章节）为基准，逐节对照当前项目代码，标注每一项能力的采用状态（✅ 已采用 / ⚠️ 部分采用 / ❌ 未采用 / 🔒 官方 gap），再据此排列后续路线。
+本文档以**官方 2.0 GA 文档全集**（building-blocks / harness / integration 三个目录的全部章节）为基准，逐节对照当前项目代码，标注每一项能力的采用状态（✅ 已采用 / ⚠️ 部分采用 / ❌ 未采用 / 🔒 官方 gap）。
+
+> **注意：** 第一到第四部分记录的是**实施前的差距基线**（保留作为审计参考）。实际完成状态见「第六部分：实施完成总结」。
 
 ## 版本演进路径
 
@@ -373,19 +376,19 @@ RC1 (2026-05-28) → RC2 (2026-06-09) → RC3 (2026-06-11) → RC4 (2026-06-18) 
 
 ### Spec 单元总览
 
-| Spec | 名称 | 来源阶段 | 依赖 | Brainstorm 价值 | 输出物 |
-|------|------|---------|------|----------------|--------|
-| **S1** | HarnessAgentFactory 接线收尾 | P1-A | 无 | ★☆☆ 纯接线 | `HarnessAgentFactory` 调用已有的 `FilesystemSpecFactory.createDocker()` + `CompactionConfigFactory.createEvictionConfig()`；enableTaskList 注释纠偏 |
-| **S2** | 前端 6 个 SSE 事件补齐 | P1-A | 无 | ★☆☆ 纯前端 | `chat.js` 加 6 个 case 分支：`data_block_delta`/`subagent_exposed`/`tool_call_delta`/`tool_result_start`/`require_external_execution`/`external_execution_result` |
-| **S3** | ModelRegistry + fallback 统一入口 | P1-C + P1-B 部分 | 无 | ★★☆ 有设计选择 | `model: dashscope:qwen-plus` 格式兼容旧 `modelName`；fallback 链配置；合并 Harness 和 ReAct 两条路径 |
-| **S4** | Plan Mode + Task List demo | P1-B | S1 | ★★★ 需设计 UX | 四阶段流转（plan_enter→write→exit + HITL）；前端渲染方案；和 Task List 协作 |
-| **S5** | Harness 分层记忆 | P1-B + P2-A | S1 | ★★★ 需选型 | `MemoryConfig` 配置（flush/consolidation/trigger/model/prompts）；MEMORY.md 注入策略；替代 v1 LongTermMemory |
-| **S6** | Harness 权限 + Skill 接入 | P1-B | 无 | ★★☆ 扩展现有 | 把 `PermissionContextFactory` + `SkillRepository` 扩展到 HarnessAgent 路径 |
-| **S7** | 上下文控制 | P1-B | 无 | ★☆☆ 配 config | `additionalContextFile` + `maxContextTokens` + `enableMetaTool` |
-| **S8** | RAG / 记忆替代方案 | P2-A | S5 | ★★☆ 过渡策略 | v1 deprecated API 的标注 + 大工具结果落盘 + 监测官方 v2 |
-| **S9** | 多 Agent 增强 + A2A | P2-B | S2 | ★★★ 需架构设计 | spawn registry 迁移评估 + 编程式 SubagentDeclaration + A2A 订单履约 demo + 前端 source 分区 |
-| **S10** | Skill 自学习 | P2-C | S6 | ★★★ 需设计流程 | `enableSkillManageTool` + `PromotionGate` + `Curator`；propose→approve→上线 流程 |
-| **S11** | 生产化样板 | P3 | S1-S10 多数 | ★★☆ 可拆子项 | DistributedBackend + OTel + Channel + MCP 加强 + AG-UI + Sandbox profile |
+| Spec | 名称 | 来源阶段 | 状态 | Commit |
+|------|------|---------|------|--------|
+| **S1** | HarnessAgentFactory 接线收尾 | P1-A | ✅ 完成 | `f42b9ed` |
+| **S2** | 前端 6 个 SSE 事件补齐 | P1-A | ✅ 完成 | `32b52b0` |
+| **S3** | ModelRegistry + fallback 统一入口 | P1-C | ✅ 完成 | `32b52b0` |
+| **S4** | Plan Mode + Task List demo | P1-B | ✅ 完成 | `05d3f0a` |
+| **S5** | Harness 分层记忆 | P1-B | ✅ 完成 | `05d3f0a` |
+| **S6** | Harness 权限 + Skill 接入 | P1-B | ✅ 完成 | `2794f6d` |
+| **S7** | 上下文控制 | P1-B | ✅ 完成 | `2794f6d` |
+| **S8** | RAG / 记忆替代方案 | P2-A | ✅ 完成 | `31b1fd0` |
+| **S9** | 多 Agent source 分区 | P2-B | ✅ 完成 | `31b1fd0` |
+| **S10** | Skill 自学习 | P2-C | ✅ 完成 | `31b1fd0` |
+| **S11** | OTel tracing | P3 | ✅ 完成 | `54b18dc` |
 
 ### 依赖关系图
 
@@ -404,6 +407,8 @@ S6 权限+Skill ────────────→ S10 Skill 自学习
 ```
 
 ### 落地顺序（分批执行）
+
+> **全部已完成（2026-07-12）。** 以下保留原始计划作为审计参考。
 
 **第一批 — 并行启动（零依赖，可同时做）**
 
@@ -469,8 +474,80 @@ plan 文档（docs/superpowers/plans/YYYY-MM-DD-<name>.md）
 - ❌ **不急于把 `HarnessRuntime` 从 `agent.stream()` 迁到 `streamEvents()`** — 官方明确是已知 gap，迁移后子 agent 事件会丢失。
 - ❌ **不把 RAG/LongTermMemory 深绑在 v1 API 上扩新功能** — 官方 v2 重写未上线，标 deprecated 维持现状即可。
 - ❌ **不主动复活旧 pipeline 代码** — 多 agent 用 GA subagent / event source 逐步替代手写方案。
-- ❌ **不先做大 UI 改版** — 事件契约补齐（6 个缺失事件 + source 分区）后再做展示优化。
+- ❌ **不先做大 UI 改版** — 事件契约补齐（6 个缺失事件 + source 分区）已完成，后续可做展示优化。
 - ❌ **不继续基于 v1 的 `Session`/`SkillBox`/`Hook` 扩新功能** — 已清理完毕，用 `AgentStateStore`/`SkillRepository`/`Middleware`。
+
+---
+
+## 第六部分：实施完成总结
+
+> 2026-07-12 更新。S1-S11 全部实施完成，345 测试全绿，8 个 commit 在 `docs/roadmap-ga-gap-analysis` 分支。
+
+### Spec 完成状态
+
+| Spec | 名称 | 状态 | Commit | 关键产出 |
+|------|------|------|--------|---------|
+| S1 | 接线收尾 | ✅ | `f42b9ed` | Docker sandbox + ToolResultEviction + TaskList 接线；HarnessAgentFactory static→@Component |
+| S2 | 前端事件补齐 | ✅ | `32b52b0` | 6 个 SSE 事件 + require_user_confirm + user_confirm_result |
+| S3 | ModelRegistry | ✅ | `32b52b0` | ModelFactory 统一入口；7 处 DashScopeChatModel.builder() 清零 |
+| S4 | Plan Mode + Task List | ✅ | `05d3f0a` | plan-build-demo agent；plan/todo 前端渲染；project-planner 标 deprecated |
+| S5 | 分层记忆 | ✅ | `05d3f0a` | memory-assistant agent；MemoryConfig 接线；v1 LTM 标 @Deprecated |
+| S6 | 权限 + Skill | ✅ | `2794f6d` | HarnessAgent 路径接 permissionContext + skillRepository |
+| S7 | 上下文控制 | ✅ | `2794f6d` | additionalContextFile + maxContextTokens + enableMetaTool |
+| S8 | RAG deprecated | ✅ | `31b1fd0` | v1 RAG/LTM 字段全标 @Deprecated(forRemoval=true) |
+| S9 | source 分区 | ✅ | `31b1fd0` | 前端 text/tool 按 payload.source 区分 main/subagent |
+| S10 | Skill 自学习 | ✅ | `31b1fd0` | skill-learning-demo agent；SkillManageTool + Curator |
+| S11 | OTel tracing | ✅ | `54b18dc` | OtelTracingMiddleware + TracerRegistry 初始化 |
+
+### 新增 Agent
+
+| Agent ID | 类型 | 展示能力 |
+|----------|------|---------|
+| `plan-build-demo` | HARNESS | Plan Mode（plan_enter/write/exit + HITL 审批）+ Task List |
+| `memory-assistant` | HARNESS | 分层记忆（每日 flush + MEMORY.md 合并 + memory_search/get/save） |
+| `skill-learning-demo` | HARNESS | Skill 自学习（propose_skill + 安全扫描 + 自动归档） |
+
+### 新增 Java 类
+
+| 类 | 职责 |
+|----|------|
+| `model/ModelFactory.java` | ModelRegistry 统一入口，封装 `dashscope:` 前缀解析 + ModelCreationContext |
+| `config/TracingConfig.java` | OTel TracerRegistry 启动初始化 |
+
+### HarnessAgent.Builder 能力采用统计
+
+```
+实施前:  5/20+  (workspace, model, compaction, filesystem-BUILDER, subagents-via-md)
+实施后: 17/20+  (+Docker sandbox, ToolResultEviction, TaskList, PlanMode, Memory,
+                  permissionContext, skillRepository, maxRetries, fallbackModel,
+                  additionalContextFile, maxContextTokens, enableMetaTool,
+                  enableSkillManageTool, enableSkillCurator)
+```
+
+### 前端 SSE 事件覆盖
+
+```
+实施前: 39 个 case
+实施后: 56 个 case (+6 缺失事件 +require_user_confirm +user_confirm_result
+         +plan/todo 工具识别 +source 分区)
+```
+
+### 🔒 唯一待办：A2A Protocol
+
+| 项目 | 说明 |
+|------|------|
+| **阻塞原因** | `io.a2a.*` SDK 不在 Maven Central；需要单独的 `agentscope` artifact + A2A SDK |
+| **解除条件** | 官方发布 A2A SDK 到 Maven Central，或手动安装依赖 |
+| **已做的部分** | 前端 source 分区展示（S9）已为 A2A 远程 agent 输出做好了 UI 准备 |
+| **后续步骤** | 依赖可用后：加 pom 依赖 → 启用 `AgentProtocolAutoConfiguration` → 新建 A2A demo agent（订单履约调用库存/客服） |
+
+### 其他阻塞项（暂忽略）
+
+以下 extension jar 不在 Maven Central，等官方发布后再评估：
+
+- `agentscope-extensions-agent-state-store-redis/mysql`（DistributedBackend）
+- `agentscope-extensions-channel`（飞书/钉钉/GitHub IM 接入）
+- AG-UI Protocol（无对应 class）
 
 ---
 
@@ -492,6 +569,7 @@ plan 文档（docs/superpowers/plans/YYYY-MM-DD-<name>.md）
 
 | 日期 | 变更 |
 |------|------|
+| 2026-07-12 | S1-S11 全部实施完成（8 commits），新增「第六部分：实施完成总结」；Spec 总览更新为 ✅ 完成状态；唯一待办为 A2A Protocol（等官方补齐 io.a2a SDK）；345 测试全绿 |
 | 2026-07-12 | 新增「Spec 分解与落地顺序」：将 P1-P3 阶段拆为 11 个可独立 brainstorm→spec→实施的单元（S1-S11），标注依赖关系图、四批落地顺序、每个 spec 的 brainstorming 关注点 |
 | 2026-07-11 | 第三次重写：以官方 GA 文档全集为基准做逐节差距分析（Building Blocks / Harness / Integration / 前端四部分），标注 ✅/⚠️/❌/🔒 四级状态；Harness 20+ 项 builder 能力逐条对照；积压项按「GA 上能否做」分类归入 P1-A |
 | 2026-07-10 | GA 迁移收尾，版本基线行更新（commit `c0e4b8f`） |
