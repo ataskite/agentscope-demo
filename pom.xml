@@ -101,6 +101,35 @@
             <version>${agentscope.version}</version>
         </dependency>
 
+        <!-- AgentScope Distributed AgentStateStore (S13: Redis/MySQL/Postgres, profile-gated) -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-redis</artifactId>
+            <version>${agentscope.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-mysql</artifactId>
+            <version>${agentscope.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-postgresql</artifactId>
+            <version>${agentscope.version}</version>
+        </dependency>
+
+        <!-- JDBC DataSource support for distributed state store profiles (mysql/postgres) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+        <!-- MySQL JDBC driver (activated via mysql profile) -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- Reactor Test -->
         <dependency>
             <groupId>io.projectreactor</groupId>

@@ -26,6 +26,7 @@ import io.agentscope.core.skill.repository.ClasspathSkillRepository;
 import io.agentscope.core.tool.Toolkit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.HashSet;
@@ -44,6 +45,15 @@ public class AgentFactory {
     private final MiddlewareRegistry middlewareRegistry;
     private final PermissionContextFactory permissionContextFactory;
     private final ModelFactory modelFactory;
+
+    /**
+     * S13: Optional distributed AgentStateStore bean. Present only when a
+     * {@code redis}/{@code mysql}/{@code postgresql} Spring profile is active
+     * (see {@link com.skloda.agentscope.config.DistributedStateStoreConfig}).
+     * Null by default -> falls back to InMemory/JsonFile (no behavior change).
+     */
+    @Autowired(required = false)
+    private AgentStateStore distributedStateStore;
 
     public AgentFactory(AgentConfigService configService, ToolRegistry toolRegistry,
                         KnowledgeService knowledgeService, McpClientService mcpClientService,
@@ -67,6 +77,10 @@ public class AgentFactory {
     }
 
     public AgentStateStore createStateStore(String type, String storagePath) {
+        // S13: prefer distributed store bean when a redis/mysql/postgresql profile is active
+        if (distributedStateStore != null) {
+            return distributedStateStore;
+        }
         if ("json".equalsIgnoreCase(type)) {
             java.nio.file.Path dir = (storagePath != null && !storagePath.isBlank())
                     ? java.nio.file.Path.of(storagePath)

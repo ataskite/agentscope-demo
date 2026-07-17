@@ -1945,3 +1945,26 @@ agents:
         expectedBehavior: "调用 attribution_context_build 获取 context，推理出 GAP1 承诺未兑现"
       - prompt: "no-gap-5710-ticket-created 这单有没有问题"
         expectedBehavior: "调用 attribution_context_build 获取 context，推理出 NO_GAP"
+
+  # S13: Distributed state store demo - session survives app restart when
+  # --spring.profiles.active=redis (or mysql/postgresql) is active.
+  - agentId: session-persistence
+    category: single
+    name: 会话持久化演示 (分布式状态存储)
+    description: 演示 S13 分布式 AgentStateStore。激活 redis/mysql/postgresql profile 后，对话历史持久化到外部存储，应用重启后同 sessionId 可恢复历史。
+    systemPrompt: |
+      你是一个用于演示会话持久化的助手。你会记住用户在本次会话中告诉你的信息（如姓名、偏好），
+      并在后续对话中引用。请提醒用户：此 agent 需配合 --spring.profiles.active=redis 启动才能看到重启后记忆恢复效果。
+    modelName: deepseek-v4-flash
+    streaming: true
+    enableThinking: false
+    skills: []
+    userTools: []
+    systemTools: []
+    sessionConfig:
+      defaultType: memory
+    samplePrompts:
+      - prompt: "我叫张三，我喜欢喝美式咖啡。请记住。"
+        expectedBehavior: "确认记住用户信息"
+      - prompt: "我刚才告诉你我叫什么？我喜欢喝什么？"
+        expectedBehavior: "正确回忆张三和美式咖啡（重启应用后同 sessionId 仍能回答即为持久化生效）"

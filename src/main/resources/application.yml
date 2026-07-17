@@ -10,6 +10,13 @@ spring:
     multipart:
       max-file-size: 50MB
       max-request-size: 50MB
+  # Exclude DataSource auto-config by default (no DB needed for default startup).
+  # The mysql/postgresql profiles provide their own DataSource bean via
+  # DistributedStateStoreConfig (S13), so auto-config is not used there either.
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
 
 # AgentScope Configuration
 agentscope:

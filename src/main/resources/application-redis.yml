@@ -1,0 +1,16 @@
+# S13: Redis distributed AgentStateStore profile
+# Activate: --spring.profiles.active=redis
+# Requires a running Redis at the configured URL.
+agentscope:
+  distributed:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+      key-prefix: agentscope
+  # When redis profile is active, AgentFactory.createStateStore returns the
+  # RedisAgentStateStore bean regardless of the per-agent sessionType.
+  session:
+    type: redis
+
+logging:
+  level:
+    io.agentscope.extensions.redis: INFO

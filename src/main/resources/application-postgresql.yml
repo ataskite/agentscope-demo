@@ -1,0 +1,17 @@
+# S13: PostgreSQL distributed AgentStateStore profile
+# Activate: --spring.profiles.active=postgresql
+# Requires a running PostgreSQL at the configured URL and the agentscope_state DB.
+spring:
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/agentscope_state}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+agentscope:
+  session:
+    type: postgresql
+
+logging:
+  level:
+    io.agentscope.extensions.postgresql: INFO

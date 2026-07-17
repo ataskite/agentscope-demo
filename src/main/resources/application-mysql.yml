@@ -1,0 +1,17 @@
+# S13: MySQL distributed AgentStateStore profile
+# Activate: --spring.profiles.active=mysql
+# Requires a running MySQL at the configured URL and the agentscope_state DB.
+spring:
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/agentscope_state?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC}
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+agentscope:
+  session:
+    type: mysql
+
+logging:
+  level:
+    io.agentscope.extensions.mysql: INFO
