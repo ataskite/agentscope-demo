@@ -131,6 +131,18 @@
             <version>${agentscope.version}</version>
         </dependency>
 
+        <!-- AgentScope AG-UI Protocol (S15: /ag-ui endpoint, profile-gated) -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-agui</artifactId>
+            <version>${agentscope.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-agui-spring-boot-starter</artifactId>
+            <version>${agentscope.version}</version>
+        </dependency>
+
         <!-- AgentScope Distributed AgentStateStore (S13: Redis/MySQL/Postgres, profile-gated) -->
         <dependency>
             <groupId>io.agentscope</groupId>

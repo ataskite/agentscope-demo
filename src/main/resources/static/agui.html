@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>AgentScope AG-UI Demo</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; }
+        h1 { font-size: 1.5em; }
+        .info { background: #f0f7ff; border-left: 4px solid #2196f3; padding: 12px 16px; margin: 16px 0; font-size: 0.9em; }
+        textarea { width: 100%; height: 80px; box-sizing: border-box; padding: 8px; font-family: inherit; }
+        button { padding: 8px 24px; background: #2196f3; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; }
+        button:disabled { background: #aaa; }
+        #events { background: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 4px; height: 400px; overflow-y: auto; font-family: 'SF Mono', monospace; font-size: 0.85em; white-space: pre-wrap; }
+        .event-run-started { color: #4fc3f7; }
+        .event-text { color: #81c784; }
+        .event-tool { color: #ffb74d; }
+        .event-run-finished { color: #ce93d8; }
+        .event-error { color: #ef5350; }
+        .status { font-size: 0.85em; color: #666; margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <h1>AgentScope AG-UI Protocol Demo (S15)</h1>
+    <div class="info">
+        This page exercises the <code>POST /ag-ui</code> endpoint (AG-UI protocol),
+        which is separate from the main <code>/chat/send</code> SSE endpoint.<br>
+        Requires <code>--spring.profiles.active=agui</code> to be active.
+        Events are rendered as raw AG-UI event types (28 AguiEventType values).
+    </div>
+    <div>
+        <label for="message">Message:</label>
+        <textarea id="message" placeholder="Type a message to the agent...">你好，请介绍一下你自己。</textarea>
+    </div>
+    <div style="margin: 12px 0;">
+        <button id="sendBtn" onclick="sendMessage()">Send via AG-UI</button>
+        <span class="status" id="status"></span>
+    </div>
+    <div id="events"></div>
+
+<script>
+    const eventsDiv = document.getElementById('events');
+    const statusSpan = document.getElementById('status');
+    const sendBtn = document.getElementById('sendBtn');
+
+    function appendEvent(text, cssClass) {
+        const line = document.createElement('div');
+        if (cssClass) line.className = cssClass;
+        line.textContent = text;
+        eventsDiv.appendChild(line);
+        eventsDiv.scrollTop = eventsDiv.scrollHeight;
+    }
+
+    function classifyEvent(eventType) {
+        if (eventType.startsWith('RUN_')) return 'event-run-started';
+        if (eventType.startsWith('TEXT_')) return 'event-text';
+        if (eventType.startsWith('TOOL_')) return 'event-tool';
+        if (eventType === 'RUN_FINISHED') return 'event-run-finished';
+        return '';
+    }
+
+    async function sendMessage() {
+        const message = document.getElementById('message').value.trim();
+        if (!message) return;
+        sendBtn.disabled = true;
+        statusSpan.textContent = 'Sending...';
+        eventsDiv.innerHTML = '';
+
+        // Build RunAgentInput (AG-UI protocol)
+        const runAgentInput = {
+            threadId: 'agui-demo-' + Date.now(),
+            runId: 'run-' + Date.now(),
+            messages: [
+                { role: 'user', content: message, parts: [{ type: 'text', text: message }] }
+            ],
+            tools: [],
+            context: [],
+            state: {},
+            forwardedProps: {}
+        };
+
+        try {
+            const response = await fetch('/ag-ui', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
+                body: JSON.stringify(runAgentInput)
+            });
+
+            if (!response.ok) {
+                appendEvent('HTTP ' + response.status + ': ' + await response.text(), 'event-error');
+                return;
+            }
+
+            statusSpan.textContent = 'Streaming AG-UI events...';
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+                for (const line of lines) {
+                    if (line.startsWith('data:')) {
+                        const data = line.slice(5).trim();
+                        if (!data) continue;
+                        try {
+                            const evt = JSON.parse(data);
+                            const type = evt.type || evt.event || 'UNKNOWN';
+                            let detail = '';
+                            if (type.startsWith('TEXT_MESSAGE_') && evt.delta) detail = ' delta="' + evt.delta + '"';
+                            else if (type.startsWith('TOOL_CALL_START')) detail = ' tool=' + (evt.toolName || evt.toolCallId || '');
+                            appendEvent('[' + type + ']' + detail, classifyEvent(type));
+                        } catch (e) {
+                            appendEvent('[raw] ' + data);
+                        }
+                    }
+                }
+            }
+            statusSpan.textContent = 'Done.';
+        } catch (e) {
+            appendEvent('Error: ' + e.message, 'event-error');
+            statusSpan.textContent = 'Failed.';
+        } finally {
+            sendBtn.disabled = false;
+        }
+    }
+</script>
+</body>
+</html>

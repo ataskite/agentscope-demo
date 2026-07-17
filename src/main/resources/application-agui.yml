@@ -1,0 +1,20 @@
+# S15: AG-UI Protocol profile
+# Activate: --spring.profiles.active=agui
+# Requires DASHSCOPE_API_KEY (the AG-UI agent uses a DashScope model).
+#
+# This profile registers chat-basic into the AguiAgentRegistry so it is callable
+# via the AG-UI protocol at POST /ag-ui. The existing /chat/send endpoint is unchanged.
+agentscope:
+  agui:
+    path-prefix: /ag-ui
+    default-agent-id: chat-basic
+    enable-reasoning: true
+    emit-state-events: true
+    emit-tool-call-args: true
+    run-timeout: 5m
+    server-side-memory: true
+
+logging:
+  level:
+    io.agentscope.core.agui: INFO
+    io.agentscope.spring.boot.agui: INFO
