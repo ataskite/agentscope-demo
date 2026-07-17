@@ -389,6 +389,10 @@ RC1 (2026-05-28) → RC2 (2026-06-09) → RC3 (2026-06-11) → RC4 (2026-06-18) 
 | **S9** | 多 Agent source 分区 | P2-B | ✅ 完成 | `31b1fd0` |
 | **S10** | Skill 自学习 | P2-C | ✅ 完成 | `31b1fd0` |
 | **S11** | OTel tracing | P3 | ✅ 完成 | `54b18dc` |
+| **S12** | A2A Protocol | P3 | ✅ 完成 | `a9f9432` |
+| **S13** | 分布式状态存储 (Redis/MySQL/Postgres) | P3 | ✅ 完成 | (S13 commit) |
+| **S14** | Channel/飞书 IM 接入 | P3 | ✅ 完成 | `bfce3ed` |
+| **S15** | AG-UI Protocol | P3 | ✅ 完成 | `7211ab7` |
 
 ### 依赖关系图
 
@@ -481,7 +485,7 @@ plan 文档（docs/superpowers/plans/YYYY-MM-DD-<name>.md）
 
 ## 第六部分：实施完成总结
 
-> 2026-07-12 更新。S1-S11 全部实施完成，345 测试全绿，8 个 commit 在 `docs/roadmap-ga-gap-analysis` 分支。
+> 2026-07-17 更新。S1-S15 全部实施完成，345 测试全绿。S1-S11 在 `docs/roadmap-ga-gap-analysis` 分支；S12-S15 在 `feat/s12-s15-blocked-jars` 分支（先前阻塞的 jar 已确认全部在 Maven Central 2.0.0 发布）。
 
 ### Spec 完成状态
 
@@ -498,6 +502,10 @@ plan 文档（docs/superpowers/plans/YYYY-MM-DD-<name>.md）
 | S9 | source 分区 | ✅ | `31b1fd0` | 前端 text/tool 按 payload.source 区分 main/subagent |
 | S10 | Skill 自学习 | ✅ | `31b1fd0` | skill-learning-demo agent；SkillManageTool + Curator |
 | S11 | OTel tracing | ✅ | `54b18dc` | OtelTracingMiddleware + TracerRegistry 初始化 |
+| S12 | A2A Protocol | ✅ | `a9f9432` | a2a-server/client + starter；A2aServerConfig + A2aClientDemoRunner；`/.well-known/agent-card.json` + `/a2a/jsonrpc` |
+| S13 | 分布式状态存储 | ✅ | `f42b9ed`(S13) | redis/mysql/postgresql 扩展；DistributedStateStoreConfig (@Profile)；session-persistence demo agent |
+| S14 | Channel/飞书 | ✅ | `bfce3ed` | channel-common + channel-feishu；FeishuChannelController (webhook + reply)；application-feishu.yml |
+| S15 | AG-UI Protocol | ✅ | `7211ab7` | agui + starter；AguiConfig (@AguiAgentId)；`/ag-ui` 端点 + agui.html 前端页面 |
 
 ### 新增 Agent
 
@@ -532,22 +540,18 @@ plan 文档（docs/superpowers/plans/YYYY-MM-DD-<name>.md）
          +plan/todo 工具识别 +source 分区)
 ```
 
-### 🔒 唯一待办：A2A Protocol
+### ✅ 先前阻塞项已全部解除（S12-S15）
 
-| 项目 | 说明 |
-|------|------|
-| **阻塞原因** | `io.a2a.*` SDK 不在 Maven Central；需要单独的 `agentscope` artifact + A2A SDK |
-| **解除条件** | 官方发布 A2A SDK 到 Maven Central，或手动安装依赖 |
-| **已做的部分** | 前端 source 分区展示（S9）已为 A2A 远程 agent 输出做好了 UI 准备 |
-| **后续步骤** | 依赖可用后：加 pom 依赖 → 启用 `AgentProtocolAutoConfiguration` → 新建 A2A demo agent（订单履约调用库存/客服） |
+> 2026-07-17 更新：核实 Maven Central 后，下列 extension jar 均已在 2.0.0 GA（2026-07-10）发布。先前 ROADMAP 标注的"阻塞/未发布"信息已过时。实际 artifact 名与当初假设有差异（见下表）。
 
-### 其他阻塞项（暂忽略）
+| 先前假设的阻塞项 | 实际 artifact (2.0.0 已发布) | 实施 Spec |
+|----------------|---------------------------|----------|
+| A2A Protocol（`io.a2a.*` SDK 不在 Maven Central） | `agentscope-extensions-a2a-server/client` + `agentscope-a2a-spring-boot-starter`（传递依赖 `io.github.a2asdk:*` 即 `io.a2a.*` 包） | S12 ✅ |
+| DistributedBackend Redis/MySQL | `agentscope-extensions-redis` / `-mysql` / `-postgresql`（**非**假设的 `-agent-state-store-*`） | S13 ✅ |
+| Channel/IM | `agentscope-extensions-channel` + 子渠道 `channel-feishu`/`-dingtalk`/`-github`/`-gitlab`/`-wecom` | S14 ✅ |
+| AG-UI Protocol（无对应 class） | `agentscope-extensions-agui` + `agentscope-agui-spring-boot-starter` | S15 ✅ |
 
-以下 extension jar 不在 Maven Central，等官方发布后再评估：
-
-- `agentscope-extensions-agent-state-store-redis/mysql`（DistributedBackend）
-- `agentscope-extensions-channel`（飞书/钉钉/GitHub IM 接入）
-- AG-UI Protocol（无对应 class）
+> 注：A2A SDK 曾从 `io.a2a.*` / `io.github.a2asdk` 重命名为 `org.a2aproject.sdk.*`（1.0.0.Alpha4 起，最新 1.1.0.Final）。但 AgentScope 2.0.0 的 A2A 扩展仍基于旧 `io.a2a.*` 包构建，因此传递依赖使用 `io.github.a2asdk:*`，无需显式引入 `org.a2aproject.sdk`。
 
 ---
 
@@ -569,6 +573,7 @@ plan 文档（docs/superpowers/plans/YYYY-MM-DD-<name>.md）
 
 | 日期 | 变更 |
 |------|------|
+| 2026-07-17 | S12-S15 全部实施完成（4 commits，`feat/s12-s15-blocked-jars` 分支）。核实 Maven Central：先前阻塞的 A2A/分布式状态存储/Channel/AG-UI extension jar 均已在 2.0.0 GA 发布。实际 artifact 名与假设有差异（`-redis`/`-mysql` 非 `-agent-state-store-*`；A2A 用旧 `io.a2a.*` 包）。清除「唯一待办 A2A」「其他阻塞项」过时标注；Spec 总览 S12-S15 标 ✅；345 测试全绿 |
 | 2026-07-12 | S1-S11 全部实施完成（8 commits），新增「第六部分：实施完成总结」；Spec 总览更新为 ✅ 完成状态；唯一待办为 A2A Protocol（等官方补齐 io.a2a SDK）；345 测试全绿 |
 | 2026-07-12 | 新增「Spec 分解与落地顺序」：将 P1-P3 阶段拆为 11 个可独立 brainstorm→spec→实施的单元（S1-S11），标注依赖关系图、四批落地顺序、每个 spec 的 brainstorming 关注点 |
 | 2026-07-11 | 第三次重写：以官方 GA 文档全集为基准做逐节差距分析（Building Blocks / Harness / Integration / 前端四部分），标注 ✅/⚠️/❌/🔒 四级状态；Harness 20+ 项 builder 能力逐条对照；积压项按「GA 上能否做」分类归入 P1-A |

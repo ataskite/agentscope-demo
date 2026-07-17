@@ -227,7 +227,7 @@ Two `type: HARNESS` agents demonstrate 2.0 capabilities wired up through `Harnes
 - **compaction-demo**: Long conversations with automatic context compaction (CLAW execution mode, LOCAL filesystem) — triggers compaction after N messages while keeping the most recent K messages.
 - **sandbox-demo**: Safe code execution in a local sandbox (BUILDER execution mode, `/tmp/agentscope-sandbox` workspace) — runs user-supplied code through an isolated filesystem backend.
 
-> Note: AgUI and A2A protocol extensions are not yet available (io.a2a SDK and extension jars not in Maven Central). A2A is the sole remaining ROADMAP todo.
+> Note: AgUI (S15), A2A (S12), distributed state store (S13), and Channel/feishu (S14) extensions are all now integrated — the extension jars were confirmed on Maven Central at 2.0.0 GA (2026-07-10). Each is profile-gated (`--spring.profiles.active=a2a|redis|mysql|postgresql|feishu|agui`). See ROADMAP.md §第六部分 for details.
 
 **Configuration format:**
 ```yaml

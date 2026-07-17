@@ -116,9 +116,15 @@ src/main/java/com/skloda/agentscope/
 │   ├── CompositeAgentFactory.java    # Multi-agent patterns (routing, handoffs, pipelines)
 │   └── graph/                        # State graph (order fulfillment)
 ├── config/
-│   └── TracingConfig.java            # OTel TracerRegistry initialization
+│   ├── TracingConfig.java            # OTel TracerRegistry initialization
+│   ├── DistributedStateStoreConfig.java  # S13: Redis/MySQL/Postgres AgentStateStore (@Profile)
+│   ├── A2aServerConfig.java          # S12: A2A server agent builder (@Profile a2a)
+│   ├── A2aClientDemoRunner.java      # S12: A2A client self-loop demo (@Profile a2a)
+│   ├── FeishuChannelConfig.java      # S14: Feishu channel beans (@Profile feishu)
+│   └── AguiConfig.java              # S15: AG-UI agent registration (@Profile agui)
 ├── controller/
-│   └── ChatController.java           # Reactive SSE chat + file upload
+│   ├── ChatController.java           # Reactive SSE chat + file upload
+│   └── FeishuChannelController.java  # S14: Feishu IM webhook (@Profile feishu)
 ├── harness/
 │   ├── HarnessAgentFactory.java      # @Component, builds HarnessAgent (17+ builder capabilities)
 │   ├── HarnessAgentService.java      # Harness agent routing + cache
@@ -166,6 +172,10 @@ src/main/java/com/skloda/agentscope/
 | POST | `/chat/send` | Send message, returns `Flux<ServerSentEvent<String>>` |
 | POST | `/chat/upload` | Upload file (multipart) |
 | GET | `/chat/download?fileId=` | Download file |
+| POST | `/channel/feishu/webhook` | Feishu IM webhook (profile: `feishu`, S14) |
+| POST | `/ag-ui` | AG-UI protocol SSE endpoint (profile: `agui`, S15) |
+| GET | `/.well-known/agent-card.json` | A2A AgentCard discovery (profile: `a2a`, S12) |
+| POST | `/a2a/jsonrpc` | A2A JSON-RPC task endpoint (profile: `a2a`, S12) |
 
 ## Dependencies
 
@@ -175,6 +185,10 @@ src/main/java/com/skloda/agentscope/
 - `agentscope-extensions-model-dashscope` 2.0.0 (DashScope provider, RC5 modularized)
 - `agentscope-extensions-rag-simple` 2.0.0
 - `agentscope-extensions-memory-bailian` 2.0.0
+- `agentscope-extensions-redis` / `-mysql` / `-postgresql` 2.0.0 (S13 distributed state store, profile-gated)
+- `agentscope-extensions-a2a-server` / `-a2a-client` / `agentscope-a2a-spring-boot-starter` 2.0.0 (S12 A2A protocol, profile-gated)
+- `agentscope-extensions-channel-common` / `-channel-feishu` 2.0.0 (S14 IM channel, profile-gated)
+- `agentscope-extensions-agui` / `agentscope-agui-spring-boot-starter` 2.0.0 (S15 AG-UI protocol, profile-gated)
 - Apache POI 5.5.1, Apache PDFBox 3.0.7
 - Spring Boot 3.5.14
 - Project Reactor
