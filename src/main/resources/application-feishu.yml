@@ -1,0 +1,25 @@
+# S14: Feishu (Lark) Channel profile
+# Activate: --spring.profiles.active=feishu
+#
+# Prerequisites:
+# 1. Create a Feishu custom app at https://open.feishu.cn/app
+# 2. Add event subscription: URL verification + im.message.receive_v1
+# 3. Set callback URL to: https://<your-public-host>/channel/feishu/webhook
+#    (use ngrok for local dev: ngrok http 8081)
+# 4. Grant permissions: im:message, im:message:send_as_bot
+# 5. Fill in the credentials below (or via env vars)
+agentscope:
+  channel:
+    feishu:
+      app-id: ${FEISHU_APP_ID:}
+      app-secret: ${FEISHU_APP_SECRET:}
+      verification-token: ${FEISHU_VERIFICATION_TOKEN:}
+      encrypt-key: ${FEISHU_ENCRYPT_KEY:}        # leave empty to disable encryption (dev)
+      callback-path: /channel/feishu/webhook
+      api-base: https://open.feishu.cn/open-apis
+      default-agent-id: chat-basic               # agent to route Feishu messages to
+
+logging:
+  level:
+    io.agentscope.extensions.channel.feishu: INFO
+    com.skloda.agentscope.controller.FeishuChannelController: INFO

@@ -119,6 +119,18 @@
             <version>${agentscope.version}</version>
         </dependency>
 
+        <!-- AgentScope Channel/IM (S14: feishu webhook, profile-gated) -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-channel-common</artifactId>
+            <version>${agentscope.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-channel-feishu</artifactId>
+            <version>${agentscope.version}</version>
+        </dependency>
+
         <!-- AgentScope Distributed AgentStateStore (S13: Redis/MySQL/Postgres, profile-gated) -->
         <dependency>
             <groupId>io.agentscope</groupId>
