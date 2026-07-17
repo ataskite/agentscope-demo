@@ -101,6 +101,24 @@
             <version>${agentscope.version}</version>
         </dependency>
 
+        <!-- AgentScope A2A Protocol (S12: expose/call agents via A2A, profile-gated) -->
+        <!-- a2a-server/client pull io.github.a2asdk:* (io.a2a.* packages) transitively -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-a2a-server</artifactId>
+            <version>${agentscope.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-a2a-client</artifactId>
+            <version>${agentscope.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-a2a-spring-boot-starter</artifactId>
+            <version>${agentscope.version}</version>
+        </dependency>
+
         <!-- AgentScope Distributed AgentStateStore (S13: Redis/MySQL/Postgres, profile-gated) -->
         <dependency>
             <groupId>io.agentscope</groupId>

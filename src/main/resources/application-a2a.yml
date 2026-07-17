@@ -1,0 +1,27 @@
+# S12: A2A Protocol profile
+# Activate: --spring.profiles.active=a2a
+# Requires DASHSCOPE_API_KEY (the exposed A2A agent uses a DashScope model).
+#
+# This profile:
+# 1. Enables the A2A server auto-config (exposes chat-basic as an A2A service)
+# 2. Registers the A2A client demo (A2aClientDemoRunner) which calls the server in a self-loop
+#
+# Endpoints when active:
+#   GET  /.well-known/agent-card.json   - A2A AgentCard discovery
+#   POST /a2a/jsonrpc                   - JSON-RPC task send/get/cancel
+agentscope:
+  a2a:
+    server:
+      enabled: true
+      card:
+        name: agentscope-demo-a2a
+        description: AgentScope demo agent exposed via A2A protocol (chat-basic)
+        version: 1.0.0
+      transports:
+        jsonrpc:
+          enabled: true
+
+logging:
+  level:
+    io.agentscope.core.a2a: INFO
+    io.agentscope.spring.boot.a2a: INFO
