@@ -50,5 +50,8 @@ build/
 ### Claude Code ###
 .claude/
 
+### ZCode ###
+.zcode/
+
 ### Mac OS ###
 .DS_Store
