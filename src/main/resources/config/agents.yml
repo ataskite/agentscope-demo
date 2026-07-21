@@ -1055,6 +1055,87 @@ agents:
       - prompt: "我想先了解产品功能，再看价格，最后决定是否购买"
         expectedBehavior: "多轮对话中按需在不同专员间切换"
 
+# === Multi-Agent: Supervisor + Shared Blackboard ===
+#
+# This agent is a Supervisor / Router that uses an explicit Shared Blackboard
+# (stored under key "shared_blackboard" in the AgentStateStore) to preserve
+# cross-expert business facts across turns. The user always addresses THIS agent;
+# routing to support-agent / sales-agent / complaint-agent happens dynamically
+# per turn based on the routingConfig strategy.
+#
+# Key properties of this configuration:
+#   - sharedBlackboard.enabled: true  → activates the new runtime path
+#   - routingConfig.strategy: rule    → keyword-based deterministic routing
+#   - activeExpert / currentIntent are NEVER set here — they are runtime values
+#     kept in the Blackboard keyed by (userId, sessionId)
+#   - The supervisor agentId is the fixed user entry; the frontend never switches
+#     agentId per turn
+
+  - agentId: customer-service-supervisor
+    category: collaboration
+    type: ROUTING
+    name: 智能客服 Supervisor
+    description: |
+      固定入口的 Supervisor / Router。根据用户当前消息、会话摘要和 Shared Blackboard
+      动态选择支持/销售/投诉专家。跨专家切换时业务事实（金额、订单号、失败原因等）
+      在 Blackboard 中连续保留，用户无需重复提供。
+    modelName: deepseek-v4-flash
+    streaming: true
+    enableThinking: true
+    systemPrompt: |
+      你是一个客服 Supervisor。你的职责是理解用户意图，并通过显式路由规则选择
+      最合适的专家处理。路由逻辑由后端 RoutingDecisionService 确定，你不直接选择。
+
+      ## 专家目录（白名单）
+      - support-agent：一般咨询、使用指导、常见问题
+      - sales-agent：产品价格、购买方案、销售咨询
+      - complaint-agent：投诉受理、问题升级、赔偿处理
+
+      你的输出会作为会话摘要的一部分被专家参考，请简洁明了。
+    sharedBlackboard:
+      enabled: true
+      storageKey: shared_blackboard
+      minConfidence: 0.5
+    routingConfig:
+      strategy: rule
+      defaultKeep: true
+      recentTurns: 3
+    subAgents:
+      - agentId: support-agent
+        description: 一般客服咨询
+      - agentId: sales-agent
+        description: 销售顾问
+      - agentId: complaint-agent
+        description: 投诉处理
+    handoffTriggers:
+      - type: EXPLICIT
+        keywords: ["转销售", "转人工销售", "找销售"]
+        target: sales-agent
+      - type: EXPLICIT
+        keywords: ["转投诉", "转人工投诉"]
+        target: complaint-agent
+      - type: EXPLICIT
+        keywords: ["转客服", "转人工客服", "转支持"]
+        target: support-agent
+      - type: INTENT
+        keywords: ["购买", "价格", "报价", "套餐", "多少钱", "费用"]
+        target: sales-agent
+      - type: INTENT
+        keywords: ["投诉", "不满", "退款", "升级", "赔偿", "态度差"]
+        target: complaint-agent
+      - type: INTENT
+        keywords: ["怎么用", "怎么使用", "帮助", "指导", "操作步骤", "功能"]
+        target: support-agent
+    samplePrompts:
+      - prompt: "我想了解一下你们的产品价格"
+        expectedBehavior: "INTENT 匹配 → 路由到 sales-agent；Blackboard 写入 currentIntent"
+      - prompt: "好的，那给我一个具体的报价方案"
+        expectedBehavior: "无新关键词命中但 activeExpert=sales-agent，默认 KEEP 继续由销售回答"
+      - prompt: "我对这次购买体验非常不满，要投诉"
+        expectedBehavior: "INTENT 匹配投诉关键词 → SWITCH 到 complaint-agent；保留之前讨论的价格信息"
+      - prompt: "转人工客服"
+        expectedBehavior: "EXPLICIT 触发 → SWITCH 到 support-agent"
+
 # === Multi-Agent: Supervisor ===
 
   - agentId: super-supervisor

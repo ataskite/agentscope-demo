@@ -127,6 +127,7 @@ public class AgentRuntimeFactory {
     }
 
     public AgentRuntime createRoutingRuntime(String agentId) {
+        // Legacy ROUTING path — used when sharedBlackboard is not enabled.
         ObservabilityHook hook = new ObservabilityHook();
         ReActAgent agent = compositeFactory.createRoutingAgent(
                 configService.getAgentConfig(agentId), (AgentStateStore) null);
@@ -134,6 +135,8 @@ public class AgentRuntimeFactory {
     }
 
     public AgentRuntime createHandoffsRuntime(String agentId) {
+        // HANDOFFS stays on its original code path. sharedBlackboard is not applied to
+        // HANDOFFS in this version (objective constraint #9: 收紧改动范围).
         ObservabilityHook hook = new ObservabilityHook();
         ReActAgent agent = compositeFactory.createHandoffsAgent(
                 configService.getAgentConfig(agentId), (AgentStateStore) null);

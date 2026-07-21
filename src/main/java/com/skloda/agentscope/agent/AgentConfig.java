@@ -70,6 +70,14 @@ public class AgentConfig {
     private List<StateConfig> states = new ArrayList<>();
     private MsgHubConfig msgHubConfig;
 
+    // === Supervisor / Router + Shared Blackboard fields ===
+    // When sharedBlackboard is non-null and enabled, a ROUTING agent is upgraded to a
+    // Supervisor that uses an explicit Shared Blackboard (stored under key
+    // "shared_blackboard" in the AgentStateStore, never mixed with "agent_state").
+    // When null or disabled, the agent keeps the legacy ROUTING/HANDOFFS behavior.
+    private SharedBlackboardConfig sharedBlackboard;
+    private RoutingConfig routingConfig;
+
     // === Harness fields ===
     private HarnessConfig harnessConfig;
 
@@ -119,4 +127,60 @@ public class AgentConfig {
         private String userId = "default_user";
     }
 
+    /**
+     * Static configuration for the Supervisor Shared Blackboard.
+     * Runtime state (activeExpert, currentIntent, customerFacts, ...) is NEVER stored
+     * here — only tunable knobs. The actual runtime data lives in {@code SessionBlackboard}
+     * keyed by {@code (userId, sessionId)} under AgentStateStore key "shared_blackboard".
+     */
+    @Setter
+    @Getter
+    public static class SharedBlackboardConfig {
+        /** Master switch. Default false preserves legacy ROUTING/HANDOFFS behavior. */
+        private boolean enabled = false;
+
+        /**
+         * AgentStateStore key used to persist the blackboard. MUST be distinct from
+         * "agent_state" (the conversation state). Default "shared_blackboard".
+         */
+        private String storageKey = "shared_blackboard";
+
+        /**
+         * Minimum confidence (0..1) below which the Supervisor emits CLARIFY instead of
+         * routing. Defaults to 0.5. Only consulted by LLM-based routing strategy.
+         */
+        private double minConfidence = 0.5;
+    }
+
+    /**
+     * Static routing-strategy parameters. The runtime router reads these knobs; it does
+     * NOT read or write activeExpert / currentIntent from here — those are runtime values
+     * kept in {@link SharedBlackboardConfig}'s blackboard.
+     */
+    @Setter
+    @Getter
+    public static class RoutingConfig {
+        /**
+         * Strategy name. Supported: "rule" (default, keyword/intent table from
+         * {@link HandoffTrigger}), "llm" (Supervisor LLM decides and emits structured
+         * JSON). New strategies can be added without touching YAML schema.
+         */
+        private String strategy = "rule";
+
+        /**
+         * When the router is uncertain (no keyword hit and no LLM quorum), default to
+         * KEEP the current activeExpert instead of CLARIFY if the blackboard has one.
+         * Set false to always CLARIFY on uncertainty.
+         */
+        private boolean defaultKeep = true;
+
+        /**
+         * Optional model override for the LLM router. If null, the supervisor agent's
+         * own {@code modelName} is used.
+         */
+        private String modelName;
+
+        /** Number of recent Supervisor turns passed to the LLM router as context. */
+        private int recentTurns = 3;
+    }
 }

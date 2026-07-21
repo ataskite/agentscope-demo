@@ -2,6 +2,8 @@ package com.skloda.agentscope.service;
 
 import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.agent.AgentType;
+import com.skloda.agentscope.blackboard.SupervisorRuntime;
+import com.skloda.agentscope.blackboard.SupervisorRuntimeFactory;
 import com.skloda.agentscope.harness.HarnessAgentService;
 import com.skloda.agentscope.model.ChatRequest;
 import com.skloda.agentscope.model.ChatMessage;
@@ -34,31 +36,40 @@ public class AgentService {
     private final WorkflowRunService workflowRunService;
     private final ChatHistoryRepository chatHistoryRepository;
     private final HarnessAgentService harnessAgentService;
+    /**
+     * Optional. Injected only when the blackboard package is on the classpath (always true
+     * in this project, but {@code required=false} keeps the service constructable in tests
+     * that don't wire the full Spring context).
+     */
+    private final SupervisorRuntimeFactory supervisorRuntimeFactory;
 
     @Autowired
     public AgentService(AgentRuntimeFactory runtimeFactory,
                         SessionManagerService sessionManagerService,
                         WorkflowRunService workflowRunService,
                         ChatHistoryRepository chatHistoryRepository,
-                        HarnessAgentService harnessAgentService) {
+                        HarnessAgentService harnessAgentService,
+                        @Autowired(required = false)
+                                SupervisorRuntimeFactory supervisorRuntimeFactory) {
         this.runtimeFactory = runtimeFactory;
         this.sessionManagerService = sessionManagerService;
         this.workflowRunService = workflowRunService;
         this.chatHistoryRepository = chatHistoryRepository;
         this.harnessAgentService = harnessAgentService;
+        this.supervisorRuntimeFactory = supervisorRuntimeFactory;
     }
 
     public AgentService(AgentRuntimeFactory runtimeFactory,
                         SessionManagerService sessionManagerService,
                         WorkflowRunService workflowRunService,
                         ChatHistoryRepository chatHistoryRepository) {
-        this(runtimeFactory, sessionManagerService, workflowRunService, chatHistoryRepository, null);
+        this(runtimeFactory, sessionManagerService, workflowRunService, chatHistoryRepository, null, null);
     }
 
     public AgentService(AgentRuntimeFactory runtimeFactory,
                         SessionManagerService sessionManagerService,
                         WorkflowRunService workflowRunService) {
-        this(runtimeFactory, sessionManagerService, workflowRunService, new InMemoryChatHistoryRepository(), null);
+        this(runtimeFactory, sessionManagerService, workflowRunService, new InMemoryChatHistoryRepository(), null, null);
     }
 
     public AgentService(AgentRuntimeFactory runtimeFactory,
@@ -136,6 +147,18 @@ public class AgentService {
             }
         }
 
+        // Supervisor / Router + Shared Blackboard path — only when explicitly enabled in YAML
+        // AND the agent type is ROUTING. HANDOFFS agents intentionally stay on the legacy
+        // path in this version (objective constraint #9: 收紧改动范围).
+        if (supervisorRuntimeFactory != null) {
+            AgentConfig cfg = runtimeFactory.getConfigService().findAgentConfig(agentId).orElse(null);
+            if (cfg != null
+                    && cfg.getType() == AgentType.ROUTING
+                    && SupervisorRuntimeFactory.isSupervisor(cfg)) {
+                return createSupervisorStreamFlux(agentId, userMsg, sessionId, userId);
+            }
+        }
+
         String runId = workflowRunService.startRun(agentId, sessionId,
                 buildInputPreview(message, filePath, fileName, images, audio));
 
@@ -151,6 +174,49 @@ public class AgentService {
 
         return recordWorkflowRun(runId, recordChatTranscript(agentId,
                 buildTranscriptUserText(message, fileName, images, audio), stream));
+    }
+
+    /**
+     * Build a Supervisor stream that carries the real {@code userId} / {@code sessionId}
+     * end-to-end into AgentScope's {@link io.agentscope.core.agent.RuntimeContext}. The
+     * Supervisor's Conversation AgentState is resolved via {@link SessionManagerService}
+     * (so it persists across requests for the same session), while the Shared Blackboard
+     * is resolved by {@link com.skloda.agentscope.blackboard.BlackboardService} under the
+     * configured key.
+     */
+    private Flux<Map<String, Object>> createSupervisorStreamFlux(String agentId, Msg userMsg,
+                                                                 String sessionId, String userId) {
+        String effectiveSessionId = (sessionId == null || sessionId.isBlank())
+                ? sessionManagerService.createNewSession(agentId).getSessionId()
+                : sessionManagerService.getOrCreateSession(sessionId, agentId).getSessionId();
+
+        // Supervisor's Conversation store — session-scoped, same lifecycle as legacy agents.
+        SessionManagerService.SessionContext ctx =
+                sessionManagerService.getOrCreateSession(effectiveSessionId, agentId);
+
+        SupervisorRuntime runtime = supervisorRuntimeFactory.create(
+                agentId, ctx.getStateStore(), userId, effectiveSessionId);
+
+        Flux<Map<String, Object>> stream = runtime.stream(userMsg)
+                .doFinally(signal -> {
+                    sessionManagerService.saveSession(effectiveSessionId);
+                    log.debug("Supervisor session {} saved after stream ({})", effectiveSessionId, signal);
+                });
+
+        String runId = workflowRunService.startRun(agentId, effectiveSessionId,
+                extractMessagePreview(userMsg));
+        return recordWorkflowRun(runId, stream);
+    }
+
+    private static String extractMessagePreview(Msg msg) {
+        if (msg == null || msg.getContent() == null) return "";
+        StringBuilder sb = new StringBuilder();
+        for (var block : msg.getContent()) {
+            if (block instanceof io.agentscope.core.message.TextBlock tb && tb.getText() != null) {
+                sb.append(tb.getText());
+            }
+        }
+        return sb.toString();
     }
 
     private Flux<Map<String, Object>> createSessionStreamFlux(String sessionId, String agentId,
