@@ -3,9 +3,12 @@ package com.skloda.agentscope.blackboard;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.skloda.agentscope.agent.AgentConfig;
 import com.skloda.agentscope.hook.ObservabilityHook;
+import com.skloda.agentscope.runtime.AgentEventMapper;
 import com.skloda.agentscope.runtime.StreamingAgentRuntime;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.RuntimeContext;
+import io.agentscope.core.event.AgentEvent;
+import io.agentscope.core.event.AgentResultEvent;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
@@ -59,6 +62,31 @@ public class SupervisorRuntime implements StreamingAgentRuntime {
     private static final Logger log = LoggerFactory.getLogger(SupervisorRuntime.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    /**
+     * Reused event mapper (same instance as {@code AgentRuntime}). Pure-function, thread-safe.
+     * Used to translate the expert's {@link AgentEvent}s into the SSE-compatible Maps the
+     * frontend already knows how to render (llm_start/llm_end/tool_start/tool_end/...).
+     */
+    private static final AgentEventMapper EVENT_MAPPER = new AgentEventMapper();
+
+    /**
+     * SSE event types that must NOT be forwarded from the expert's event stream to the
+     * Supervisor's sink, because they would corrupt the frontend's round lifecycle or
+     * render the expert's raw JSON contract into the user-facing chat bubble:
+     * <ul>
+     *   <li>{@code text} - the expert emits a JSON contract as text deltas; the Supervisor
+     *       parses it and re-emits only the {@code answer} field via {@link #emitTextDeltas}.
+     *       Forwarding raw text deltas would show raw JSON to the user and double-render.</li>
+     *   <li>{@code agent_start} / {@code agent_end} - the frontend's {@code agent_end}
+     *       handler marks the round trace complete and clears {@code currentRound}; forwarding
+     *       the expert's agent_end would prematurely terminate the Supervisor's round.</li>
+     *   <li>{@code agent_result_text} - carries the expert's final Msg text (the JSON contract);
+     *       same double-render / raw-JSON concern as {@code text}.</li>
+     * </ul>
+     */
+    private static final java.util.Set<String> DROPPED_EXPERT_EVENT_TYPES = java.util.Set.of(
+            "text", "agent_start", "agent_end", "agent_result_text");
+
     private final AgentConfig supervisorConfig;
     private final ReActAgent supervisorAgent;
     private final ObservabilityHook hook;
@@ -107,12 +135,14 @@ public class SupervisorRuntime implements StreamingAgentRuntime {
     public Flux<Map<String, Object>> stream(Msg userMsg) {
         // We subscribe on boundedElastic because expert dispatch is blocking (agent.call).
         return Flux.<Map<String, Object>>create(sink -> {
+            long tStreamStart = System.currentTimeMillis();
+            log.debug("[SupervisorTiming] stream() subscribed, emitting supervisor_start for session={}", sessionId);
             sink.next(Map.of("type", "supervisor_start",
                     "agentId", supervisorConfig.getAgentId(),
                     "sessionId", sessionId,
                     "userId", userId == null ? "" : userId));
             try {
-                routeAndDispatch(userMsg, sink);
+                routeAndDispatch(userMsg, sink, tStreamStart);
             } catch (Exception e) {
                 log.error("Supervisor routing failed for session {}", sessionId, e);
                 sink.next(Map.of("type", "error",
@@ -125,7 +155,7 @@ public class SupervisorRuntime implements StreamingAgentRuntime {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-    private void routeAndDispatch(Msg userMsg, FluxSink<Map<String, Object>> sink) {
+    private void routeAndDispatch(Msg userMsg, FluxSink<Map<String, Object>> sink, long tStreamStart) {
         String userText = extractText(userMsg);
         sessionLock.lock();
         try {
@@ -139,8 +169,12 @@ public class SupervisorRuntime implements StreamingAgentRuntime {
             saveSupervisorState();
 
             // 3. Compute routing decision.
+            long tRouteStart = System.currentTimeMillis();
             RoutingDecisionService.RoutingDecision decision =
                     routingService.decide(supervisorConfig, userText, bb);
+            log.debug("[SupervisorTiming] routing decision took {}ms (action={}, expert={})",
+                    System.currentTimeMillis() - tRouteStart,
+                    decision.getAction(), decision.getSelectedExpert());
 
             // 4. Emit routing event (objective §Required behavior #5).
             Map<String, Object> routingEvent = new LinkedHashMap<>();
@@ -171,15 +205,15 @@ public class SupervisorRuntime implements StreamingAgentRuntime {
                     saveSupervisorState();
                     emitTextDeltas(sink, clarifyText);
                 }
-                case KEEP, SWITCH -> dispatchExpert(decision, previousExpert, userText, bb, sink);
+                case KEEP, SWITCH -> dispatchExpert(decision, previousExpert, userText, bb, sink, tStreamStart);
                 case MULTI -> {
                     // Not implemented in v1; fall back to single dispatch on selected expert.
                     log.warn("MULTI routing requested but not implemented; falling back to single");
-                    dispatchExpert(decision, previousExpert, userText, bb, sink);
+                    dispatchExpert(decision, previousExpert, userText, bb, sink, tStreamStart);
                 }
                 default -> {
                     log.warn("Unknown routing action {}; treating as CLARIFY", decision.getAction());
-                    dispatchExpert(decision, previousExpert, userText, bb, sink);
+                    dispatchExpert(decision, previousExpert, userText, bb, sink, tStreamStart);
                 }
             }
         } finally {
@@ -191,7 +225,8 @@ public class SupervisorRuntime implements StreamingAgentRuntime {
                                 String previousExpert,
                                 String userText,
                                 SessionBlackboard bbPre,
-                                FluxSink<Map<String, Object>> sink) {
+                                FluxSink<Map<String, Object>> sink,
+                                long tStreamStart) {
         String expertId = decision.getSelectedExpert();
         if (expertId == null || expertId.isBlank()) {
             // Defensive: should not happen for KEEP/SWITCH, but handle gracefully.
@@ -215,7 +250,10 @@ public class SupervisorRuntime implements StreamingAgentRuntime {
                 "sessionId", sessionId));
 
         // Provide a fresh expert instance (new InMemoryAgentStateStore each call).
+        long tExpertBuild = System.currentTimeMillis();
         ReActAgent expert = expertProvider.provide(expertId, userId, sessionId);
+        log.debug("[SupervisorTiming] expert '{}' built in {}ms",
+                expertId, System.currentTimeMillis() - tExpertBuild);
 
         // Compose the prompt the expert sees: deterministic context injection.
         Msg expertPrompt = buildExpertPrompt(req);
@@ -230,10 +268,19 @@ public class SupervisorRuntime implements StreamingAgentRuntime {
                 .build();
 
         long t0 = System.currentTimeMillis();
-        // Use the GA API that accepts RuntimeContext (constraint #2).
-        Msg expertReply = expert.call(List.of(expertPrompt), expertCtx)
-                .block();
+        // Use streamEvents() (not call().block()) so the expert's internal lifecycle events
+        // (llm_start/llm_end/tool_start/tool_end) are forwarded to the frontend. This is what
+        // populates the debug panel's Tokens / LLM / Tools metrics - call().block() returned
+        // only the final Msg and dropped all events, leaving the metrics at 0.
+        //
+        // We subscribe synchronously (blockLast) to preserve the routing+patch+state-write
+        // serialization enforced by sessionLock. The expert's text/agent_start/agent_end events
+        // are filtered (see DROPPED_EXPERT_EVENT_TYPES) to avoid double-rendering the raw JSON
+        // contract and prematurely terminating the Supervisor's round.
+        Msg expertReply = streamExpertAndForward(expert, List.of(expertPrompt), expertCtx, expertId, sink);
         long durationMs = System.currentTimeMillis() - t0;
+        log.debug("[SupervisorTiming] expert '{}' stream completed in {}ms (total since stream start: {}ms)",
+                expertId, durationMs, System.currentTimeMillis() - tStreamStart);
 
         // Parse expert reply into structured ExpertResult.
         ExpertResult result = parseExpertResult(expertId, expertReply);
@@ -245,23 +292,26 @@ public class SupervisorRuntime implements StreamingAgentRuntime {
                 "sessionId", sessionId));
 
         // Apply patch as the sole writer (constraint: Supervisor is only writer).
-        BlackboardPatch patch = result.getBlackboardPatch();
-        SessionBlackboard bbPost;
-        if (patch != null && !patch.isEmpty()) {
-            // Ensure activeExpert / currentIntent are coherent with the decision.
-            BlackboardPatch effectivePatch = coercePatchMetadata(patch, expertId, decision, userText);
-            bbPost = blackboardService.applyPatch(userId, sessionId, effectivePatch);
-            sink.next(Map.of("type", "blackboard_patched",
-                    "expertId", expertId,
-                    "newVersion", bbPost.getVersion(),
-                    "previousVersion", bbPre.getVersion(),
-                    "sessionId", sessionId));
-        } else {
-            // Still bump the blackboard to record activeExpert/currentIntent even on empty patch.
-            BlackboardPatch metaOnly = coercePatchMetadata(new BlackboardPatch(),
-                    expertId, decision, userText);
-            bbPost = blackboardService.applyPatch(userId, sessionId, metaOnly);
-        }
+        // We always emit a blackboard_patched event (even when the expert returned no patch)
+        // because the Supervisor still bumps activeExpert/currentIntent, and the trace must
+        // show that the blackboard advanced to a new version.
+        BlackboardPatch rawPatch = result.getBlackboardPatch() != null
+                ? result.getBlackboardPatch() : new BlackboardPatch();
+        BlackboardPatch effectivePatch = coercePatchMetadata(rawPatch, expertId, decision, userText);
+        long preVersion = bbPre.getVersion();
+        java.util.Map<String, Object> preFacts = bbPre.getCustomerFacts();
+        java.util.Map<String, Object> preSlots = bbPre.getCollectedSlots();
+        java.util.Map<String, Object> preState = bbPre.getBusinessState();
+        String preActiveExpert = bbPre.getActiveExpert();
+        String preIntent = bbPre.getCurrentIntent();
+
+        SessionBlackboard bbPost = blackboardService.applyPatch(userId, sessionId, effectivePatch);
+
+        // Emit blackboard_patched with the diff (key=value) so the trace can render it.
+        sink.next(buildBlackboardPatchedEvent(
+                expertId, preVersion, bbPost,
+                preFacts, preSlots, preState, preActiveExpert, preIntent,
+                effectivePatch));
 
         // Surface the expert's answer to the user as text deltas.
         String answer = result.getAnswer();
@@ -280,6 +330,75 @@ public class SupervisorRuntime implements StreamingAgentRuntime {
                     "expertId", expertId,
                     "questions", result.getUnresolvedQuestions(),
                     "sessionId", sessionId));
+        }
+    }
+
+    /**
+     * Build a {@code blackboard_patched} SSE event with a per-field diff. Each entry in
+     * {@code changes} is {@code {key, oldValue, newValue, op}} where {@code op} is one of
+     * {@code add}/{@code remove}/{@code change}. The frontend renders this as a
+     * {@code + key = value} / {@code - key} / {@code ~ key: old → new} list.
+     */
+    private Map<String, Object> buildBlackboardPatchedEvent(
+            String expertId,
+            long preVersion,
+            SessionBlackboard bbPost,
+            java.util.Map<String, Object> preFacts,
+            java.util.Map<String, Object> preSlots,
+            java.util.Map<String, Object> preState,
+            String preActiveExpert,
+            String preIntent,
+            BlackboardPatch appliedPatch) {
+        java.util.List<Map<String, Object>> changes = new java.util.ArrayList<>();
+        collectFieldChanges(changes, "activeExpert", preActiveExpert, bbPost.getActiveExpert());
+        collectFieldChanges(changes, "currentIntent", preIntent, bbPost.getCurrentIntent());
+        collectMapChanges(changes, "customerFacts", preFacts, bbPost.getCustomerFacts());
+        collectMapChanges(changes, "collectedSlots", preSlots, bbPost.getCollectedSlots());
+        collectMapChanges(changes, "businessState", preState, bbPost.getBusinessState());
+
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("type", "blackboard_patched");
+        event.put("expertId", expertId);
+        event.put("previousVersion", preVersion);
+        event.put("newVersion", bbPost.getVersion());
+        event.put("sessionId", sessionId);
+        event.put("changes", changes);
+        return event;
+    }
+
+    private static void collectFieldChanges(java.util.List<Map<String, Object>> out,
+                                            String fieldName, Object before, Object after) {
+        if (java.util.Objects.equals(before, after)) {
+            return;
+        }
+        Map<String, Object> entry = new LinkedHashMap<>();
+        entry.put("field", fieldName);
+        entry.put("op", before == null ? "add" : "change");
+        entry.put("oldValue", before == null ? "" : before);
+        entry.put("newValue", after == null ? "" : after);
+        out.add(entry);
+    }
+
+    private static void collectMapChanges(java.util.List<Map<String, Object>> out,
+                                          String mapName,
+                                          java.util.Map<String, Object> before,
+                                          java.util.Map<String, Object> after) {
+        java.util.Set<String> allKeys = new java.util.LinkedHashSet<>();
+        if (before != null) allKeys.addAll(before.keySet());
+        if (after != null) allKeys.addAll(after.keySet());
+        for (String key : allKeys) {
+            Object oldV = before != null ? before.get(key) : null;
+            Object newV = after != null ? after.get(key) : null;
+            if (java.util.Objects.equals(oldV, newV)) {
+                continue;
+            }
+            String op = (oldV == null) ? "add" : (newV == null) ? "remove" : "change";
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("field", mapName + "." + key);
+            entry.put("op", op);
+            entry.put("oldValue", oldV == null ? "" : oldV);
+            entry.put("newValue", newV == null ? "" : newV);
+            out.add(entry);
         }
     }
 
@@ -382,6 +501,55 @@ public class SupervisorRuntime implements StreamingAgentRuntime {
             }
         }
         return new ExpertResult(expertId, text, 0.6, new BlackboardPatch(), List.of());
+    }
+
+    /**
+     * Stream the expert's execution, forwarding its lifecycle events to the SSE sink so the
+     * frontend debug panel can accumulate Tokens / LLM / Tools metrics. Returns the expert's
+     * final reply {@link Msg} (extracted from the {@link AgentResultEvent}) for downstream
+     * parsing by {@link #parseExpertResult}.
+     *
+     * <p>Events are mapped via the shared {@link AgentEventMapper} and tagged with
+     * {@code source=expertId} so the frontend can attribute them to the expert in the timeline.
+     * The {@link #DROPPED_EXPERT_EVENT_TYPES dropped types} (text / agent_start / agent_end /
+     * agent_result_text) are filtered to avoid double-rendering the raw JSON contract and
+     * prematurely terminating the Supervisor's round.
+     *
+     * <p>Blocks until the expert stream completes (synchronous dispatch under sessionLock).
+     */
+    private Msg streamExpertAndForward(ReActAgent expert,
+                                       List<Msg> prompts,
+                                       RuntimeContext expertCtx,
+                                       String expertId,
+                                       FluxSink<Map<String, Object>> sink) {
+        // Single-slot holder for the final reply Msg (set when AGENT_RESULT fires).
+        // Using a 1-element array so the lambda can write to it.
+        final Msg[] replyHolder = new Msg[1];
+
+        expert.streamEvents(prompts, expertCtx)
+                .doOnNext(event -> {
+                    // Capture the final reply Msg from the AGENT_RESULT event before mapping,
+                    // because the mapper strips it down to just a {type, content} text payload.
+                    if (event instanceof AgentResultEvent are) {
+                        replyHolder[0] = are.getResult();
+                    }
+                    Map<String, Object> mapped = EVENT_MAPPER.apply(event);
+                    if (mapped == null || mapped.isEmpty()) {
+                        return;
+                    }
+                    String type = (String) mapped.get("type");
+                    if (type == null || DROPPED_EXPERT_EVENT_TYPES.contains(type)) {
+                        return;
+                    }
+                    // The mapper may return an immutable Map (e.g. Map.of() for thinking/text),
+                    // so copy into a mutable LinkedHashMap before adding the source tag.
+                    Map<String, Object> withSource = new LinkedHashMap<>(mapped);
+                    withSource.put("source", expertId);
+                    sink.next(withSource);
+                })
+                .blockLast();
+
+        return replyHolder[0];
     }
 
     @SuppressWarnings("unchecked")

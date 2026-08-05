@@ -1,10 +1,10 @@
 # AgentScope Java 2.0 GA — 差距分析与演进路线
 
-> Last reviewed: 2026-07-12（S1-S11 实施完成）
+> Last reviewed: 2026-08-05（S1-S16 全部实施完成）
 > Baseline: Spring Boot 3.5.14, Java 17, `agentscope.version=2.0.0` GA（2026-07-10 发布）
-> Tests: `mvn test` → **345 tests, 0 failures, 0 errors**
+> Tests: `mvn test` → **387 tests, 0 failures, 0 errors**
 > 官方文档: https://java.agentscope.io/v2/zh/docs/index.html
-> 实施状态: **S1-S11 已完成，唯一待办为 A2A Protocol（等官方补齐 io.a2a SDK）**
+> 实施状态: **S1-S16 全部完成（ROADMAP 范围内无待办）**
 
 ## 方法论
 
@@ -393,6 +393,7 @@ RC1 (2026-05-28) → RC2 (2026-06-09) → RC3 (2026-06-11) → RC4 (2026-06-18) 
 | **S13** | 分布式状态存储 (Redis/MySQL/Postgres) | P3 | ✅ 完成 | (S13 commit) |
 | **S14** | Channel/飞书 IM 接入 | P3 | ✅ 完成 | `bfce3ed` |
 | **S15** | AG-UI Protocol | P3 | ✅ 完成 | `7211ab7` |
+| **S16** | Supervisor / Router + Shared Blackboard 动态多 Agent | (演进) | ✅ 完成 | `18c52c5` + follow-up |
 
 ### 依赖关系图
 
@@ -485,7 +486,8 @@ plan 文档（docs/superpowers/plans/YYYY-MM-DD-<name>.md）
 
 ## 第六部分：实施完成总结
 
-> 2026-07-17 更新。S1-S15 全部实施完成，345 测试全绿。S1-S11 在 `docs/roadmap-ga-gap-analysis` 分支；S12-S15 在 `feat/s12-s15-blocked-jars` 分支（先前阻塞的 jar 已确认全部在 Maven Central 2.0.0 发布）。
+> 2026-07-17 更新。S1-S15 全部实施完成。S1-S11 在 `docs/roadmap-ga-gap-analysis` 分支；S12-S15 在 `feat/s12-s15-blocked-jars` 分支（先前阻塞的 jar 已确认全部在 Maven Central 2.0.0 发布）。
+> 2026-08-05 更新。新增 S16（Supervisor / Router + Shared Blackboard 动态多 Agent 架构），387 测试全绿。
 
 ### Spec 完成状态
 
@@ -506,6 +508,7 @@ plan 文档（docs/superpowers/plans/YYYY-MM-DD-<name>.md）
 | S13 | 分布式状态存储 | ✅ | `f42b9ed`(S13) | redis/mysql/postgresql 扩展；DistributedStateStoreConfig (@Profile)；session-persistence demo agent |
 | S14 | Channel/飞书 | ✅ | `bfce3ed` | channel-common + channel-feishu；FeishuChannelController (webhook + reply)；application-feishu.yml |
 | S15 | AG-UI Protocol | ✅ | `7211ab7` | agui + starter；AguiConfig (@AguiAgentId)；`/ag-ui` 端点 + agui.html 前端页面 |
+| S16 | Supervisor / Shared Blackboard | ✅ | `18c52c5` + follow-up | 固定 Supervisor 入口（customer-service-supervisor）+ KEEP/SWITCH/CLARIFY 路由 + 三层状态边界（Conversation AgentState / Shared Blackboard / Expert Private State）；11 个 blackboard 类 + 42 个测试；follow-up 补全事件流（expert streamEvents→SSE）、blackboard_patched diff、前端调试面板（supervisor/routing/expert/blackboard 时间线 + 可折叠 metrics）、修复 AgentRuntime sink 完成循环依赖导致的流悬挂（"只能聊一次"） |
 
 ### 新增 Agent
 
@@ -573,6 +576,7 @@ plan 文档（docs/superpowers/plans/YYYY-MM-DD-<name>.md）
 
 | 日期 | 变更 |
 |------|------|
+| 2026-08-05 | 新增 S16（Supervisor / Router + Shared Blackboard 动态多 Agent 架构）。同步头部声明（"S1-S11 已完成"→"S1-S16 全部完成"，测试数 345→387）；清除"唯一待办 A2A"过时标注（已在 S12 完成）。 |
 | 2026-07-17 | S12-S15 全部实施完成（4 commits，`feat/s12-s15-blocked-jars` 分支）。核实 Maven Central：先前阻塞的 A2A/分布式状态存储/Channel/AG-UI extension jar 均已在 2.0.0 GA 发布。实际 artifact 名与假设有差异（`-redis`/`-mysql` 非 `-agent-state-store-*`；A2A 用旧 `io.a2a.*` 包）。清除「唯一待办 A2A」「其他阻塞项」过时标注；Spec 总览 S12-S15 标 ✅；345 测试全绿 |
 | 2026-07-12 | S1-S11 全部实施完成（8 commits），新增「第六部分：实施完成总结」；Spec 总览更新为 ✅ 完成状态；唯一待办为 A2A Protocol（等官方补齐 io.a2a SDK）；345 测试全绿 |
 | 2026-07-12 | 新增「Spec 分解与落地顺序」：将 P1-P3 阶段拆为 11 个可独立 brainstorm→spec→实施的单元（S1-S11），标注依赖关系图、四批落地顺序、每个 spec 的 brainstorming 关注点 |

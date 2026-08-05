@@ -210,6 +210,44 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+    margin-bottom: var(--space-xs);
+}
+
+/* Metrics summary - always visible, click to expand details */
+.rm-summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 6px;
+    font-size: 10px;
+    color: var(--text-muted);
+    background: var(--bg-input);
+    border: 1px solid var(--border-dim);
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
+}
+
+.rm-summary:hover {
+    border-color: var(--neon-cyan);
+    color: var(--text-secondary);
+}
+
+.rm-summary-icon {
+    font-size: 8px;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 4px rgba(0, 240, 255, 0.5);
+}
+
+.rm-summary-text {
+    flex: 1;
+    font-family: var(--font-mono, 'JetBrains Mono', 'Menlo', monospace);
+}
+
+/* Metrics details - collapsed by default */
+.rm-details.collapsed {
+    display: none;
 }
 
 .rm-row {
@@ -528,4 +566,168 @@
 .rtl-row.type-mcp .rtl-metrics {
     color: var(--neon-green);
     font-size: 10px;
+}
+
+/* ===== SUPERVISOR / SHARED BLACKBOARD TYPES ===== */
+
+/* Supervisor entry row — neon-cyan accent */
+.rtl-row.type-supervisor {
+    background: rgba(0, 240, 255, 0.04);
+    border-radius: 4px;
+    margin: 2px 0;
+    padding: var(--space-xs) 0;
+}
+.rtl-row.type-supervisor .rtl-icon {
+    color: var(--neon-cyan);
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.7), 0 0 15px rgba(0, 240, 255, 0.3);
+    font-size: 12px;
+}
+.rtl-row.type-supervisor .rtl-label {
+    color: var(--neon-cyan);
+    font-weight: 600;
+}
+
+/* Routing decision — neon-purple (same hue as legacy routing_decision card) */
+.rtl-row.type-routing {
+    background: rgba(200, 0, 255, 0.05);
+    border-radius: 4px;
+    margin: 2px 0;
+    padding: var(--space-xs) 0;
+}
+.rtl-row.type-routing .rtl-icon {
+    color: var(--neon-purple);
+    text-shadow: 0 0 8px rgba(200, 0, 255, 0.7), 0 0 15px rgba(200, 0, 255, 0.3);
+    font-size: 12px;
+}
+.rtl-row.type-routing .rtl-label {
+    color: var(--neon-purple);
+    font-weight: 600;
+}
+.rtl-row.type-routing .rtl-metrics {
+    color: var(--text-muted);
+    font-size: 10px;
+}
+
+/* Expert dispatch — neon-yellow (same hue as handoff card) */
+.rtl-row.type-expert {
+    background: rgba(255, 200, 0, 0.05);
+    border-radius: 4px;
+    margin: 2px 0;
+    padding: var(--space-xs) 0;
+}
+.rtl-row.type-expert .rtl-icon {
+    color: var(--neon-yellow);
+    text-shadow: 0 0 8px rgba(255, 200, 0, 0.7), 0 0 15px rgba(255, 200, 0, 0.3);
+    font-size: 12px;
+}
+.rtl-row.type-expert .rtl-label {
+    color: var(--neon-yellow);
+    font-weight: 500;
+}
+.rtl-row.type-expert .rtl-metrics {
+    color: var(--text-muted);
+    font-size: 10px;
+}
+
+/* Blackboard diff — neon-green */
+.rtl-row.type-blackboard {
+    background: rgba(0, 255, 136, 0.05);
+    border-radius: 4px;
+    margin: 2px 0;
+    padding: var(--space-xs) 0;
+}
+.rtl-row.type-blackboard .rtl-icon {
+    color: var(--neon-green);
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.7), 0 0 15px rgba(0, 255, 136, 0.3);
+    font-size: 12px;
+}
+.rtl-row.type-blackboard .rtl-label {
+    color: var(--neon-green);
+    font-weight: 600;
+}
+.rtl-row.type-blackboard .rtl-metrics {
+    color: var(--text-muted);
+    font-size: 10px;
+}
+
+/* Secondary reason / sub-row under a timeline row */
+.rtl-reason {
+    grid-column: 1 / -1;
+    width: 100%;
+    font-size: 10px;
+    color: var(--text-muted);
+    padding: var(--space-xs) 0 var(--space-xs) var(--space-lg);
+    font-style: italic;
+    line-height: 1.4;
+    word-break: break-word;
+    opacity: 0.85;
+}
+
+/* Per-field diff list under a blackboard row */
+.rtl-diff-list {
+    grid-column: 1 / -1;
+    width: 100%;
+    padding: var(--space-xs) 0 var(--space-xs) var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.rtl-diff-item {
+    font-family: var(--font-mono, 'JetBrains Mono', 'Menlo', monospace);
+    font-size: 10px;
+    line-height: 1.4;
+    word-break: break-all;
+}
+.rtl-diff-prefix {
+    display: inline-block;
+    width: 12px;
+    font-weight: 700;
+}
+.rtl-diff-field {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+.rtl-diff-item.op-add .rtl-diff-prefix {
+    color: var(--neon-green);
+}
+.rtl-diff-item.op-add .rtl-diff-new {
+    color: var(--neon-green);
+}
+.rtl-diff-item.op-remove .rtl-diff-prefix {
+    color: var(--neon-pink, #ff5577);
+}
+.rtl-diff-item.op-remove .rtl-diff-old {
+    color: var(--text-muted);
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+.rtl-diff-item.op-change .rtl-diff-prefix {
+    color: var(--neon-yellow);
+}
+.rtl-diff-item.op-change .rtl-diff-old {
+    color: var(--text-muted);
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+.rtl-diff-item.op-change .rtl-diff-new {
+    color: var(--neon-cyan);
+}
+
+/* ===== COLLAPSIBLE TIMELINE ROWS =====
+ * Applied to routing / blackboard rows that carry a reason or diff sub-block.
+ * The sub-block (.rtl-reason / .rtl-diff-list) is collapsed by default; clicking the
+ * row toggles it. The .collapsible class just adds a hover affordance + pointer cursor.
+ */
+.rtl-row.collapsible {
+    border-radius: 4px;
+    transition: background 0.15s ease;
+}
+
+.rtl-row.collapsible:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.rtl-reason.collapsed,
+.rtl-diff-list.collapsed {
+    display: none;
 }

@@ -13,10 +13,14 @@ spring:
   # Exclude DataSource auto-config by default (no DB needed for default startup).
   # The mysql/postgresql profiles provide their own DataSource bean via
   # DistributedStateStoreConfig (S13), so auto-config is not used there either.
+  # A2A server auto-config is excluded too by default: it requires an AgentRunner bean
+  # that is only provided under the "a2a" profile (see A2aServerConfig). Excluding here
+  # keeps the default startup clean; the a2a profile re-enables it on demand.
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
       - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+      - io.agentscope.spring.boot.a2a.AgentscopeA2aAutoConfiguration
 
 # AgentScope Configuration
 agentscope:

@@ -44,7 +44,13 @@ export function startRound(userMessage, roundNumber, currentAgent, agents) {
         '</div>' +
         '<div class="round-body" id="round-body-' + round.number + '">' +
             '<div class="round-metrics" id="round-metrics-' + round.number + '">' +
-                (modelName ? '<div class="rm-row"><span class="rm-label">Model</span><span class="rm-value">' + escapeHtml(modelName) + '</span></div>' : '') +
+                '<div class="rm-summary" id="rm-summary-' + round.number + '" onclick="toggleRoundMetrics(' + round.number + ')">' +
+                    '<span class="rm-summary-icon">&#x25B6;</span> ' +
+                    '<span class="rm-summary-text">Metrics</span>' +
+                '</div>' +
+                '<div class="rm-details collapsed" id="rm-details-' + round.number + '">' +
+                    (modelName ? '<div class="rm-row"><span class="rm-label">Model</span><span class="rm-value">' + escapeHtml(modelName) + '</span></div>' : '') +
+                '</div>' +
             '</div>' +
             '<div class="round-timeline" id="round-timeline-' + round.number + '"></div>' +
         '</div>';
@@ -113,9 +119,25 @@ export function updateRoundMetricsForRound(r) {
     var metricsEl = document.getElementById('round-metrics-' + r.number);
     if (!metricsEl) return;
 
-    var wallMs = (r.endTime || Date.now()) - r.startTime;
     var speed = r.llmTime > 0 ? Math.round(r.outputTokens / r.llmTime) : 0;
     var modelName = window.currentAgent && window.agents[window.currentAgent] ? window.agents[window.currentAgent].config.modelName : '';
+    var totalTokens = (r.inputTokens || 0) + (r.outputTokens || 0);
+
+    // One-line summary (always visible). Shows the key numbers compactly.
+    var summaryText = totalTokens.toLocaleString() + ' tokens' +
+        '  \u00b7  ' + r.llmTime.toFixed(1) + 's LLM' +
+        '  \u00b7  ' + r.toolCallCount + ' tools';
+    var summaryEl = document.getElementById('rm-summary-' + r.number);
+    if (summaryEl) {
+        var iconEl = summaryEl.querySelector('.rm-summary-icon');
+        var isExpanded = !metricsEl.querySelector('.rm-details').classList.contains('collapsed');
+        summaryEl.querySelector('.rm-summary-text').textContent = summaryText;
+        if (iconEl) iconEl.innerHTML = isExpanded ? '&#x25BC;' : '&#x25B6;';
+    }
+
+    // Detailed rows (collapsed by default).
+    var detailsEl = document.getElementById('rm-details-' + r.number);
+    if (!detailsEl) return;
 
     var html = '';
     if (modelName) {
@@ -128,7 +150,7 @@ export function updateRoundMetricsForRound(r) {
         html += '<div class="rm-row"><span class="rm-label">Speed</span><span class="rm-value">' + speed + ' tokens/s</span></div>';
     }
 
-    metricsEl.innerHTML = html;
+    detailsEl.innerHTML = html;
 }
 
 export function completeRoundTrace(round, status) {
@@ -189,6 +211,10 @@ function getTimelineIcon(type) {
         case 'rag': return '🔍';
         case 'mcp': return '🔌';
         case 'tool': return '⚡';
+        case 'supervisor': return '🎯';  // Supervisor / Router entry
+        case 'routing': return '🧭';                                       // KEEP / SWITCH / CLARIFY
+        case 'expert': return '🤖';                                        // expert dispatch
+        case 'blackboard': return '📋';                                    // blackboard diff
         case 'error': return '⚠';
         default: return '·';
     }
@@ -203,6 +229,10 @@ function getTimelineConnector(type) {
         case 'rag': return '├';
         case 'mcp': return '├';
         case 'tool': return '│';
+        case 'supervisor': return '┳';     // top of a supervisor dispatch tree
+        case 'routing': return '┃';        // vertical bar — routing is the spine
+        case 'expert': return '┣';         // branch off to an expert
+        case 'blackboard': return '┃';     // back to the spine
         default: return '│';
     }
 }
@@ -220,6 +250,16 @@ function getStatusText(status) {
 window.toggleRoundDetails = function(roundNum) {
     var body = document.getElementById('round-body-' + roundNum);
     if (body) body.classList.toggle('collapsed');
+};
+
+// Global function for metrics collapse/expand
+window.toggleRoundMetrics = function(roundNum) {
+    var details = document.getElementById('rm-details-' + roundNum);
+    var summary = document.getElementById('rm-summary-' + roundNum);
+    if (!details || !summary) return;
+    var isExpanded = !details.classList.toggle('collapsed');
+    var iconEl = summary.querySelector('.rm-summary-icon');
+    if (iconEl) iconEl.innerHTML = isExpanded ? '&#x25BC;' : '&#x25B6;';
 };
 
 export function clearDebug() {
@@ -488,4 +528,185 @@ export function handleTaskEnd(data) {
 function truncate(str, maxLen) {
     if (!str) return '';
     return str.length > maxLen ? str.substring(0, maxLen) + '...' : str;
+}
+
+/* ===== SUPERVISOR / SHARED BLACKBOARD EVENT HANDLERS =====
+ *
+ * These handle the 5 new event types emitted by SupervisorRuntime:
+ *   - supervisor_start     : user entering a Supervisor conversation
+ *   - routing_event        : KEEP / SWITCH / CLARIFY decision + reason + version
+ *   - expert_dispatch_start: expert about to be invoked
+ *   - expert_dispatch_end  : expert returned, with confidence + duration
+ *   - blackboard_patched   : blackboard advanced to a new version, with field diff
+ *   - unresolved_questions : expert surfaced open questions
+ *
+ * Design choice: reuse the existing timeline-row rendering pipeline. No new card type —
+ * each event renders as one or two rows in the round timeline, visually consistent with
+ * routing_decision / handoff_start / pipeline_step_* above. Each row carries the most
+ * informative label+metrics inline; long diffs go into the metrics slot as a folded block.
+ */
+
+/**
+ * @param {object} data {agentId, sessionId, userId}
+ *
+ * No timeline row is added for supervisor_start. The routing row that follows already
+ * signals the start of a Supervisor dispatch; a separate supervisor_start row would just
+ * add visual noise without information (the session/user metadata is available in the
+ * round header and the routing row's metrics).
+ */
+export function handleSupervisorStart(data) {
+    // Intentionally a no-op: keep the timeline focused on routing + expert + blackboard.
+}
+
+/**
+ * @param {object} data {action, previousExpert, selectedExpert, reason, sessionId,
+ *                       userId, blackboardVersion, confidence, timestamp}
+ */
+export function handleRoutingEvent(data) {
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) return;
+
+    var action = data.action || 'KEEP';
+    var prev = data.previousExpert || '';
+    var sel = data.selectedExpert || '';
+    var arrow = '';
+    if (action === 'SWITCH') {
+        arrow = prev ? (escapeHtml(prev) + ' \u2192 ' + escapeHtml(sel)) : escapeHtml(sel);
+    } else if (action === 'KEEP') {
+        arrow = escapeHtml(sel);
+    } else { // CLARIFY / MULTI
+        arrow = action;
+    }
+    // Compact metrics: just the action + blackboard version. Confidence moved to the expert row.
+    var metrics = action + '  v=' + (data.blackboardVersion != null ? data.blackboardVersion : '?');
+    var row = addTimelineRowForRound(targetRound, 'routing',
+        arrow, metrics, 'ok');
+    if (row && data.reason) {
+        // Reason is collapsed by default; click the row to expand (see CSS .rtl-reason.collapsed).
+        var detail = document.createElement('div');
+        detail.className = 'rtl-reason collapsed';
+        detail.textContent = '\u21b3 ' + data.reason;
+        row.appendChild(detail);
+        row.classList.add('collapsible');
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', function(e) {
+            // Toggle the collapsed state of the reason sub-row only.
+            detail.classList.toggle('collapsed');
+            e.stopPropagation();
+        });
+    }
+}
+
+/**
+ * @param {object} data {expertId, previousExpert, sessionId}
+ *
+ * Creates a single running timeline row; the matching handleExpertDispatchEnd updates the
+ * SAME row in place (conf + duration + status). The row reference is stashed on the round
+ * object as {@code _currentExpertRow}.
+ */
+export function handleExpertDispatchStart(data) {
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) return;
+    var label = escapeHtml(data.expertId || '');
+    if (data.previousExpert && data.previousExpert !== data.expertId) {
+        label += '  (was ' + escapeHtml(data.previousExpert) + ')';
+    }
+    var row = addTimelineRowForRound(targetRound, 'expert', label, '...', 'running');
+    targetRound._currentExpertRow = row;
+}
+
+/**
+ * @param {object} data {expertId, confidence, durationMs, sessionId}
+ *
+ * Updates the row created by handleExpertDispatchStart in place. If no matching start row
+ * exists (e.g. events arrived out of order), falls back to adding a new row.
+ */
+export function handleExpertDispatchEnd(data) {
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) return;
+    var conf = data.confidence != null ? Number(data.confidence).toFixed(2) : '?';
+    var metrics = 'conf=' + conf + '  ' + formatDuration(data.durationMs || 0);
+    var row = targetRound._currentExpertRow;
+    if (row) {
+        var metricsEl = row.querySelector('.rtl-metrics');
+        var statusEl = row.querySelector('.rtl-status');
+        if (metricsEl) metricsEl.textContent = metrics;
+        if (statusEl) statusEl.textContent = '\u2713';
+        row.classList.remove('status-running');
+        row.classList.add('status-ok');
+        targetRound._currentExpertRow = null;
+    } else {
+        addTimelineRowForRound(targetRound, 'expert',
+            escapeHtml(data.expertId || ''), metrics, 'ok');
+    }
+}
+
+/**
+ * @param {object} data {expertId, previousVersion, newVersion, changes, sessionId}
+ *   changes: [{field, op, oldValue, newValue}, ...]  op â {add, remove, change}
+ *
+ * The row label is compact ("vN -> vM"). The per-field diff list is collapsed by default;
+ * click the row to expand it.
+ */
+export function handleBlackboardPatched(data) {
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) return;
+
+    var changes = data.changes || [];
+    // Compact label: just the version transition. The change count goes into the metrics slot.
+    var label = 'v' + (data.previousVersion != null ? data.previousVersion : '?') +
+        ' \u2192 v' + (data.newVersion != null ? data.newVersion : '?');
+    var metrics = changes.length + ' change' + (changes.length === 1 ? '' : 's');
+    var row = addTimelineRowForRound(targetRound, 'blackboard', label, metrics, 'ok');
+
+    // Render each change as a + key = value / - key / ~ key: old -> new sub-row.
+    // The diff list is collapsed by default; click the row to expand.
+    if (row && changes.length > 0) {
+        var list = document.createElement('div');
+        list.className = 'rtl-diff-list collapsed';
+        for (var i = 0; i < changes.length; i++) {
+            var c = changes[i];
+            var item = document.createElement('div');
+            item.className = 'rtl-diff-item op-' + c.op;
+            var prefix = c.op === 'add' ? '+' : c.op === 'remove' ? '-' : '~';
+            var valSpan;
+            if (c.op === 'change') {
+                valSpan = '<span class="rtl-diff-old">' + escapeHtml(String(c.oldValue)) +
+                    '</span> \u2192 <span class="rtl-diff-new">' + escapeHtml(String(c.newValue)) + '</span>';
+            } else if (c.op === 'remove') {
+                valSpan = '<span class="rtl-diff-old">' + escapeHtml(String(c.oldValue)) + '</span>';
+            } else {
+                valSpan = '<span class="rtl-diff-new">' + escapeHtml(String(c.newValue)) + '</span>';
+            }
+            item.innerHTML = '<span class="rtl-diff-prefix">' + prefix + '</span> ' +
+                '<span class="rtl-diff-field">' + escapeHtml(c.field || '') + '</span> = ' +
+                valSpan;
+            list.appendChild(item);
+        }
+        row.appendChild(list);
+        row.classList.add('collapsible');
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', function(e) {
+            list.classList.toggle('collapsed');
+            e.stopPropagation();
+        });
+    }
+}
+
+/**
+ * @param {object} data {expertId, questions: [string], sessionId}
+ */
+export function handleUnresolvedQuestions(data) {
+    var targetRound = window.currentRound || (window.rounds.length > 0 ? window.rounds[window.rounds.length - 1] : null);
+    if (!targetRound) return;
+    var qs = data.questions || [];
+    var preview = qs.length > 0 ? truncate(qs[0], 50) : '';
+    var row = addTimelineRowForRound(targetRound, 'supervisor',
+        'Unresolved (' + escapeHtml(data.expertId || '') + ')', preview, 'ok');
+    if (row && qs.length > 1) {
+        var more = document.createElement('div');
+        more.className = 'rtl-reason';
+        more.textContent = '↳ +' + (qs.length - 1) + ' more: ' + qs.slice(1).join(' / ');
+        row.appendChild(more);
+    }
 }

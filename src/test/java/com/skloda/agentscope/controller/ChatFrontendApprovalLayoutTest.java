@@ -22,9 +22,9 @@ class ChatFrontendApprovalLayoutTest {
         String chatHtml = Files.readString(Path.of("src/main/resources/templates/chat.html"));
 
         // Asset versions are bumped together whenever the trace/2.0-event UI changes.
-        assertTrue(chatHtml.contains("/scripts/chat.js?v=2.11"),
+        assertTrue(chatHtml.contains("/scripts/chat.js?v=2.12"),
                 "chat.html should bump the script version so browsers stop using the stale trace UI");
-        assertTrue(chatHtml.contains("/styles/chat.css?v=2.8"),
+        assertTrue(chatHtml.contains("/styles/chat.css?v=2.9"),
                 "chat.html should bump the stylesheet version so browsers stop using stale approval card styles");
         assertTrue(chatHtml.contains("rel=\"icon\" href=\"data:,\""),
                 "chat.html should avoid a noisy /favicon.ico 404 in the browser console");

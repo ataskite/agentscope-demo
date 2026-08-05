@@ -53,5 +53,9 @@ build/
 ### ZCode ###
 .zcode/
 
+### Code review tool artifacts ###
+.cc-code-reviewer/
+code-review-report-*.md
+
 ### Mac OS ###
 .DS_Store

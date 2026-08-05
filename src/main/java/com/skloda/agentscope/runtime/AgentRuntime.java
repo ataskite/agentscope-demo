@@ -109,7 +109,23 @@ public class AgentRuntime implements StreamingAgentRuntime {
                     });
         }
 
-        return Flux.merge(sinkEvents, agentEvents)
+        // Complete the EventSink when the agent event stream terminates so that
+        // Flux.merge(sinkEvents, agentEvents) can complete and the trailing 'done'
+        // (or 'pending_approval') event from concatWith is emitted.
+        //
+        // Previously the sink was only completed in the outer flux's doOnComplete /
+        // doOnError — a circular dependency, since the outer flux's completion
+        // depends on the merge completing, which in turn depends on the sink
+        // completing (Sinks.Many never auto-completes). This left the stream
+        // hanging after the agent finished, so the frontend never received the
+        // 'done' SSE event, isStreaming stayed true, and the input box remained
+        // permanently disabled ("只能聊一次"). Moving the sink completion to
+        // agentEvents.doFinally breaks the cycle: agent done -> sink done ->
+        // merge done -> 'done' emitted.
+        Flux<Map<String, Object>> agentEventsWithSinkCompletion = agentEvents
+                .doFinally(signal -> hook.getEventSink().complete());
+
+        return Flux.merge(sinkEvents, agentEventsWithSinkCompletion)
                 .concatWith(Mono.fromCallable(() -> {
                     // On completion, check if approval was triggered
                     if (approvalMiddleware != null && approvalMiddleware.isApprovalTriggered()) {
@@ -118,13 +134,9 @@ public class AgentRuntime implements StreamingAgentRuntime {
                     return Map.of("type", "done");
                 }))
                 .doOnCancel(this::close)
-                .doOnComplete(() -> {
-                    hook.getEventSink().complete();
-                    this.close();
-                })
+                .doOnComplete(this::close)
                 .doOnError(e -> {
                     log.error("Stream error for agent: {}", agent.getName(), e);
-                    hook.getEventSink().complete();
                     this.close();
                 });
     }

@@ -331,3 +331,24 @@ export function showTypingIndicator() {
     chatMessages.appendChild(typingEl);
     scrollToBottom(chatMessages);
 }
+
+/**
+ * Update the typing indicator to show a status label (e.g. expert name) next to the dots.
+ * If the indicator was already removed, this is a no-op. Keeps the user informed during
+ * long expert dispatches without clearing the "thinking" feedback.
+ */
+export function updateTypingIndicator(label) {
+    var el = document.getElementById('typingIndicator');
+    if (!el) return;
+    // Avoid duplicate label nodes on repeated calls.
+    var existing = el.querySelector('.typing-label');
+    if (existing) {
+        existing.textContent = label;
+    } else {
+        var labelEl = document.createElement('span');
+        labelEl.className = 'typing-label';
+        labelEl.textContent = label;
+        el.appendChild(labelEl);
+    }
+    scrollToBottom(chatMessages);
+}

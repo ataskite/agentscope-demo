@@ -1,8 +1,8 @@
 import './state.js?v=2.4';
 import { createSSEParser, uploadFile, fetchAgents, fetchSessions, createSession as createSessionApi, deleteSession as deleteSessionApi, fetchKnowledgeDocs, uploadKnowledgeDoc, removeKnowledgeDoc as removeKnowledgeDocApi, fetchSkillInfo, fetchToolInfo } from './api.js?v=2.5';
 import { renderMarkdown, escapeHtml, getTimestamp, formatDuration, scrollToBottom, createFileList } from './modules/utils.js?v=2.4';
-import { chatMessages, messageInput, sendBtn, chatEmpty, chatHeaderName, chatHeaderDesc, debugPanel, debugRounds, debugToggle, appendMessage, createThinkingBox, updateThinkingBox, collapseThinkingBox, completeThinkingBox, addAgentBubble, addAgentBubbleAfter, removeTypingIndicator, setStreamingState, showTypingIndicator, createAgentMessageWrapper } from './modules/ui.js?v=2.4';
-import { startRound, endRound, completeRoundTrace, addTimelineRow, addTimelineRowForRound, clearDebug, toggleDebug, handlePipelineStart, handlePipelineStepStart, handlePipelineStepEnd, handleRoutingDecision, handleHandoffStart, updateRoundMetrics, updateRoundMetricsForRound, handleLoopStart, handleLoopEnd, handleLoopIterationResult, handleGraphTransition, handleRoundtableStart, handleRoundMessage, handleTaskDelegate, handleTaskEnd } from './modules/debug.js?v=2.8';
+import { chatMessages, messageInput, sendBtn, chatEmpty, chatHeaderName, chatHeaderDesc, debugPanel, debugRounds, debugToggle, appendMessage, createThinkingBox, updateThinkingBox, collapseThinkingBox, completeThinkingBox, addAgentBubble, addAgentBubbleAfter, removeTypingIndicator, updateTypingIndicator, setStreamingState, showTypingIndicator, createAgentMessageWrapper } from './modules/ui.js?v=2.5';
+import { startRound, endRound, completeRoundTrace, addTimelineRow, addTimelineRowForRound, clearDebug, toggleDebug, handlePipelineStart, handlePipelineStepStart, handlePipelineStepEnd, handleRoutingDecision, handleHandoffStart, updateRoundMetrics, updateRoundMetricsForRound, handleLoopStart, handleLoopEnd, handleLoopIterationResult, handleGraphTransition, handleRoundtableStart, handleRoundMessage, handleTaskDelegate, handleTaskEnd, handleSupervisorStart, handleRoutingEvent, handleExpertDispatchStart, handleExpertDispatchEnd, handleBlackboardPatched, handleUnresolvedQuestions } from './modules/debug.js?v=2.9';
 import { loadAgents, selectAgent, showAgentConfig, showSkillInfo, showToolInfo } from './modules/agents.js?v=2.6';
 import { loadSessions, createNewSession, selectSession, deleteSession, clearSession as clearSessionFn } from './modules/session.js?v=2.6';
 import { loadKnowledgeDocs, uploadToKnowledge, removeKnowledgeDoc } from './modules/knowledge.js?v=2.4';
@@ -59,6 +59,8 @@ async function sendMessage() {
     startRound(message, roundNumber, currentAgent, agents);
 
     showTypingIndicator();
+    // Track that the typing indicator is showing so the first content event can clear it.
+    window._typingIndicatorActive = true;
 
     currentThinkingBox = null;
     currentAgentMessageWrapper = null;
@@ -116,7 +118,12 @@ async function sendMessage() {
             return;
         }
 
-        removeTypingIndicator();
+        // NOTE: do NOT removeTypingIndicator() here. reader.read() resolves on the first
+        // HTTP byte (headers), but no SSE event has been processed yet. Removing the typing
+        // dots here creates a visual vacuum - the dots disappear and nothing replaces them
+        // until the first content event (agent_start/thinking/text/...) arrives seconds later
+        // (agent build + first LLM round-trip). Instead, the typing indicator stays visible
+        // and is removed by the first content-bearing event handler below.
         messageCount++;
 
         var reader = response.body.getReader();
@@ -140,6 +147,32 @@ async function sendMessage() {
                     // Log all payload types for debugging
                     if (payload.type === 'tool_start' || payload.type === 'tool_end') {
                         console.log('[SSE] Received', payload.type, 'payload:', payload);
+                    }
+
+                    // Remove the typing indicator on the first event that renders visible content
+                    // into the CHAT AREA (not the debug panel). This is the key to eliminating the
+                    // "vacuum period": the three bouncing dots stay until the user can actually
+                    // see something — a thinking box (thinking/reasoning_text/tool_start for
+                    // thinking-enabled agents) or the answer text itself.
+                    //
+                    // Debug-panel-only events (supervisor_start, routing_event, expert_dispatch_*,
+                    // llm_start, blackboard_patched, pipeline_*, handoff_*, etc.) do NOT clear the
+                    // dots — they only add timeline rows in the side panel. For the supervisor path
+                    // in particular, these fire before/during the expert's multi-second LLM call,
+                    // and clearing the dots on them would leave the chat area blank until the
+                    // expert's final answer arrives.
+                    if (window._typingIndicatorActive) {
+                        var isChatContentEvent = payload.type === 'thinking' ||
+                            payload.type === 'reasoning_text' ||
+                            payload.type === 'text' ||
+                            payload.type === 'tool_start' ||
+                            // Safety nets: clear on terminal/error states even if no content arrived.
+                            payload.type === 'done' || payload.type === 'error' ||
+                            payload.type === 'pending_approval';
+                        if (isChatContentEvent) {
+                            removeTypingIndicator();
+                            window._typingIndicatorActive = false;
+                        }
                     }
 
                     switch (payload.type) {
@@ -516,6 +549,37 @@ async function sendMessage() {
                             }
                             break;
 
+                        // ===== SUPERVISOR / SHARED BLACKBOARD EVENTS =====
+                        // Emitted by SupervisorRuntime when the agent has sharedBlackboard.enabled.
+                        // Each event renders one or two rows in the round timeline.
+
+                        case 'supervisor_start':
+                            handleSupervisorStart(payload);
+                            break;
+                        case 'routing_event':
+                            handleRoutingEvent(payload);
+                            break;
+                        case 'expert_dispatch_start':
+                            // Update the typing indicator to show which expert is working,
+                            // so the user sees "正在咨询 <expert>..." instead of generic dots.
+                            // The indicator persists until the expert's first thinking/text output.
+                            if (window._typingIndicatorActive && payload.expertId) {
+                                var expertName = (window.agents[payload.expertId] && window.agents[payload.expertId].config && window.agents[payload.expertId].config.name)
+                                    ? window.agents[payload.expertId].config.name : payload.expertId;
+                                updateTypingIndicator('正在咨询 ' + expertName + '…');
+                            }
+                            handleExpertDispatchStart(payload);
+                            break;
+                        case 'expert_dispatch_end':
+                            handleExpertDispatchEnd(payload);
+                            break;
+                        case 'blackboard_patched':
+                            handleBlackboardPatched(payload);
+                            break;
+                        case 'unresolved_questions':
+                            handleUnresolvedQuestions(payload);
+                            break;
+
                         // ===== P6 ADVANCED PATTERN EVENTS =====
 
                         case 'loop_start':
@@ -695,6 +759,7 @@ async function sendMessage() {
         }
         completeThinkingBox();
         removeTypingIndicator();
+        window._typingIndicatorActive = false;
         appendMessage('error', '[NETWORK ERROR] ' + err.message);
         endRound('error');
         setStreamingState(false);

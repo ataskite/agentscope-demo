@@ -194,8 +194,11 @@ public class AgentService {
         SessionManagerService.SessionContext ctx =
                 sessionManagerService.getOrCreateSession(effectiveSessionId, agentId);
 
+        long tBuild = System.currentTimeMillis();
         SupervisorRuntime runtime = supervisorRuntimeFactory.create(
                 agentId, ctx.getStateStore(), userId, effectiveSessionId);
+        log.debug("[SupervisorTiming] supervisor runtime built in {}ms (agentId={})",
+                System.currentTimeMillis() - tBuild, agentId);
 
         Flux<Map<String, Object>> stream = runtime.stream(userMsg)
                 .doFinally(signal -> {
