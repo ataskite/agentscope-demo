@@ -78,7 +78,7 @@ Register directly via `toolkit.registerTool(new SimpleTools())` or bind via Skil
 - enableSkillManageTool + enableSkillCurator (skill self-learning)
 - maxContextTokens, additionalContextFile
 
-**HarnessRuntime** uses `agent.stream()` (not `streamEvents()`) due to official GA gap: `streamEvents()` does not forward sub-agent events.
+**HarnessRuntime** uses `agent.streamEvents()` (the 2.0 native `Flux<AgentEvent>` stream) and reuses the shared `AgentEventMapper`, so harness agents emit the same typed event stream as single agents. (Previously used the deprecated `agent.stream()` to work around a GA gap where `streamEvents()` dropped sub-agent events; fixed in agentscope 2.0.2 PR #2613.)
 
 ### Frontend (Modular JS + SSE)
 
@@ -116,7 +116,6 @@ src/main/java/com/skloda/agentscope/
 │   ├── CompositeAgentFactory.java    # Multi-agent patterns (routing, handoffs, pipelines)
 │   └── graph/                        # State graph (order fulfillment)
 ├── config/
-│   ├── TracingConfig.java            # OTel TracerRegistry initialization
 │   ├── DistributedStateStoreConfig.java  # S13: Redis/MySQL/Postgres AgentStateStore (@Profile)
 │   ├── A2aServerConfig.java          # S12: A2A server agent builder (@Profile a2a)
 │   ├── A2aClientDemoRunner.java      # S12: A2A client self-loop demo (@Profile a2a)
@@ -128,7 +127,7 @@ src/main/java/com/skloda/agentscope/
 ├── harness/
 │   ├── HarnessAgentFactory.java      # @Component, builds HarnessAgent (17+ builder capabilities)
 │   ├── HarnessAgentService.java      # Harness agent routing + cache
-│   ├── HarnessRuntime.java           # Harness stream runtime (uses agent.stream())
+│   ├── HarnessRuntime.java           # Harness stream runtime (agent.streamEvents + AgentEventMapper)
 │   ├── FilesystemSpecFactory.java    # Local/Docker filesystem spec factory
 │   ├── CompactionConfigFactory.java  # Compaction + ToolResultEviction config factory
 │   └── WorkspaceInitializer.java     # Workspace template initialization

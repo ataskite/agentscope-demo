@@ -4,6 +4,15 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * Tests for {@link AgentConfig} plan/memory config.
+ * <p>
+ * {@link AgentConfig.LongTermMemoryConfig} is project-{@code @Deprecated(forRemoval=true)} because it
+ * wraps the v1 LongTermMemory API, which agentscope 2.0.x has deprecated without a ReActAgent
+ * replacement yet (layered memory exists only on HarnessAgent). Suppressed until the upstream
+ * memory redesign ships.
+ */
+@SuppressWarnings("removal")
 class AgentConfigPlanAndMemoryTest {
 
     @Test

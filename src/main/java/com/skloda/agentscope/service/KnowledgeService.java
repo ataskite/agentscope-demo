@@ -39,8 +39,15 @@ import java.util.stream.Stream;
 /**
  * Manages the RAG knowledge base lifecycle.
  * Uses SimpleKnowledge with InMemoryStore for demo purposes.
+ *
+ * <p><b>Deprecation note:</b> {@code io.agentscope.core.rag.model.Document} is marked
+ * {@code @Deprecated(forRemoval=true)} in agentscope 2.0.x, but no successor type exists yet —
+ * {@code Knowledge.retrieve()} still returns {@code Mono<List<Document>>} and the whole RAG API
+ * depends on it. The {@code @SuppressWarnings("removal")} below silences the warning until the
+ * official RAG v2 rewrite ships a replacement type.
  */
 @Service
+@SuppressWarnings("removal")
 public class KnowledgeService {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeService.class);

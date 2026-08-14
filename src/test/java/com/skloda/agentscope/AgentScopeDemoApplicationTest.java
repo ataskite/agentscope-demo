@@ -3,8 +3,8 @@ package com.skloda.agentscope;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.ApplicationContext;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import com.skloda.agentscope.service.KnowledgeService;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -15,7 +15,7 @@ class AgentScopeDemoApplicationTest {
     @Autowired
     private ApplicationContext applicationContext;
 
-    @MockBean
+    @MockitoBean
     private KnowledgeService knowledgeService;
 
     @Test

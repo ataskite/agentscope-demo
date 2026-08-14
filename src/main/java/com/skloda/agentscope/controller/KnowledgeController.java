@@ -19,9 +19,14 @@ import java.util.UUID;
 
 /**
  * REST controller for knowledge base management.
+ *
+ * <p><b>Deprecation note:</b> uses {@code io.agentscope.core.rag.model.Document} (marked
+ * {@code @Deprecated(forRemoval=true)} in agentscope 2.0.x) because {@code Knowledge.retrieve()}
+ * still returns it. No successor type exists yet; suppressed until the RAG v2 rewrite ships.
  */
 @RestController
 @RequestMapping("/api/knowledge")
+@SuppressWarnings("removal")
 public class KnowledgeController {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeController.class);

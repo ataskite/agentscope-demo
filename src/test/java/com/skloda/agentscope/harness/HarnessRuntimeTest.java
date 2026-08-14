@@ -1,38 +1,17 @@
 package com.skloda.agentscope.harness;
 
-import io.agentscope.core.agent.Event;
-import io.agentscope.core.agent.EventType;
-import io.agentscope.core.message.Msg;
-import io.agentscope.core.message.TextBlock;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * Tests for {@link HarnessRuntime} wiring and {@link com.skloda.agentscope.agent.HarnessConfig}.
+ * <p>
+ * Event-conversion coverage now lives in {@code AgentEventMapperTest}, since {@link HarnessRuntime}
+ * delegates to the shared {@code AgentEventMapper} (it no longer has its own {@code convertEvent}
+ * — that crude text-flattener was retired when the runtime switched to {@code streamEvents()}).
+ */
 class HarnessRuntimeTest {
-
-    @Test
-    void convertsTextEvent() {
-        Msg msg = Msg.builder()
-                .content(List.of(TextBlock.builder().text("Hello").build()))
-                .build();
-        Event event = new Event(EventType.AGENT_RESULT, msg, false);
-
-        Map<String, Object> result = HarnessRuntime.convertEvent(event);
-        assertEquals("text", result.get("type"));
-        assertEquals("Hello", result.get("content"));
-    }
-
-    @Test
-    void convertsUnknownEventToRaw() {
-        Event event = new Event(EventType.REASONING, null, false);
-
-        Map<String, Object> result = HarnessRuntime.convertEvent(event);
-        // Events without message return empty
-        assertEquals("empty", result.get("type"));
-    }
 
     @Test
     void harnessConfigDefaultsToClawMode() {

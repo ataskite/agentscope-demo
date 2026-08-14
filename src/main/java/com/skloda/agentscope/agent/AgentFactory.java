@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Set;
 
 @Service
+@SuppressWarnings("removal")
 public class AgentFactory {
 
     private static final Logger log = LoggerFactory.getLogger(AgentFactory.class);
