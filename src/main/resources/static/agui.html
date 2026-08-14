@@ -22,7 +22,7 @@
 <body>
     <h1>AgentScope AG-UI Protocol Demo (S15)</h1>
     <div class="info">
-        This page exercises the <code>POST /ag-ui</code> endpoint (AG-UI protocol),
+        This page exercises the <code>POST /ag-ui/run</code> endpoint (AG-UI protocol),
         which is separate from the main <code>/chat/send</code> SSE endpoint.<br>
         Requires <code>--spring.profiles.active=agui</code> to be active.
         Events are rendered as raw AG-UI event types (28 AguiEventType values).
@@ -65,12 +65,15 @@
         statusSpan.textContent = 'Sending...';
         eventsDiv.innerHTML = '';
 
-        // Build RunAgentInput (AG-UI protocol)
+        // Build RunAgentInput (AG-UI protocol).
+        // NOTE: each AguiMessage MUST carry an `id` (non-null) and the endpoint
+        // path is the configured path-prefix + "/run" (default "/ag-ui/run").
+        const ts = Date.now();
         const runAgentInput = {
-            threadId: 'agui-demo-' + Date.now(),
-            runId: 'run-' + Date.now(),
+            threadId: 'agui-demo-' + ts,
+            runId: 'run-' + ts,
             messages: [
-                { role: 'user', content: message, parts: [{ type: 'text', text: message }] }
+                { id: 'msg-' + ts, role: 'user', content: message, parts: [{ type: 'text', text: message }] }
             ],
             tools: [],
             context: [],
@@ -79,7 +82,7 @@
         };
 
         try {
-            const response = await fetch('/ag-ui', {
+            const response = await fetch('/ag-ui/run', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
                 body: JSON.stringify(runAgentInput)

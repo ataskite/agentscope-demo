@@ -20,7 +20,8 @@ import org.springframework.context.annotation.Profile;
  * Activated via {@code --spring.profiles.active=agui}. Registers the {@code chat-basic}
  * agent into the {@code AguiAgentRegistry} (auto-configured by
  * {@code agentscope-agui-spring-boot-starter}) so it is callable via the AG-UI protocol
- * at {@code POST /ag-ui} (path configurable via {@code agentscope.agui.path-prefix}).
+ * at {@code POST /ag-ui/run} (endpoint = path-prefix + "/run"; path-prefix configurable
+ * via {@code agentscope.agui.path-prefix}, default {@code /ag-ui}).
  * <p>
  * The existing {@code /chat/send} SSE endpoint (custom {@code AgentEventMapper} format)
  * is left untouched. AG-UI provides a standardized event protocol (28 AguiEventType values)
@@ -28,7 +29,7 @@ import org.springframework.context.annotation.Profile;
  *
  * <h3>Endpoints (when active)</h3>
  * <ul>
- *   <li>{@code POST /ag-ui} - AG-UI SSE endpoint (RunAgentInput -> Flux&lt;AguiEvent&gt;)</li>
+ *   <li>{@code POST /ag-ui/run} - AG-UI SSE endpoint (RunAgentInput -> Flux&lt;AguiEvent&gt;)</li>
  * </ul>
  *
  * <h3>Frontend</h3>
