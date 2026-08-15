@@ -172,7 +172,7 @@ src/main/java/com/skloda/agentscope/
 | POST | `/chat/upload` | Upload file (multipart) |
 | GET | `/chat/download?fileId=` | Download file |
 | POST | `/channel/feishu/webhook` | Feishu IM webhook (profile: `feishu`, S14) |
-| POST | `/ag-ui` | AG-UI protocol SSE endpoint (profile: `agui`, S15) |
+| POST | `/ag-ui/run` | AG-UI protocol SSE endpoint (profile: `agui`, S15; path-prefix + `/run`) |
 | GET | `/.well-known/agent-card.json` | A2A AgentCard discovery (profile: `a2a`, S12) |
 | POST | `/a2a/jsonrpc` | A2A JSON-RPC task endpoint (profile: `a2a`, S12) |
 

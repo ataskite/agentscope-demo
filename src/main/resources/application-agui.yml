@@ -3,7 +3,7 @@
 # Requires DASHSCOPE_API_KEY (the AG-UI agent uses a DashScope model).
 #
 # This profile registers chat-basic into the AguiAgentRegistry so it is callable
-# via the AG-UI protocol at POST /ag-ui. The existing /chat/send endpoint is unchanged.
+# via the AG-UI protocol at POST /ag-ui/run (path-prefix + "/run"). The existing /chat/send endpoint is unchanged.
 agentscope:
   agui:
     path-prefix: /ag-ui
