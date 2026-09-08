@@ -37,6 +37,9 @@ public class HarnessConfig {
     // S10: Skill self-learning
     private SkillLearningConfig skillLearning;
 
+    // agentscope 2.0.3: deliver_artifact sandbox artifact delivery
+    private ArtifactDeliveryConfig artifactDelivery;
+
     public boolean isBuilderMode() {
         return "BUILDER".equalsIgnoreCase(executionMode);
     }
@@ -129,5 +132,21 @@ public class HarnessConfig {
         private Integer staleAfterDays;
         /** Days before a stale skill is archived; null = 90 */
         private Integer archiveAfterDays;
+    }
+
+    /**
+     * 沙箱产物交付配置（agentscope 2.0.3 deliver_artifact SPI）。
+     * <p>
+     * 开启后 HarnessAgentFactory 会通过
+     * {@code HarnessAgent.Builder.artifactDeliveryTarget(...)} 挂载
+     * {@code UploadsArtifactDeliveryTarget}，harness 随之自动注册 deliver_artifact
+     * 工具并在 workspace 提示词中引用，使 Docker 沙箱内的 agent 能把生成的
+     * 文件交付到宿主机的 {java.io.tmpdir}/agentscope-uploads/ 目录。
+     */
+    @Setter
+    @Getter
+    public static class ArtifactDeliveryConfig {
+        /** 是否开启 deliver_artifact 产物交付工具 */
+        private boolean enabled = false;
     }
 }

@@ -84,3 +84,39 @@ agents:
         expectedBehavior: "追踪证券行业最新风控政策变化"
       - prompt: "基金销售新规对行业的影响"
         expectedBehavior: "分析基金销售新规并评估行业影响"
+
+  # === Harness Demo: Sandbox Artifact Delivery (agentscope 2.0.3 deliver_artifact) ===
+  - agentId: sandbox-artifact-demo
+    category: harness
+    type: HARNESS
+    name: 沙箱产物交付演示
+    description: Docker 沙箱内执行 Python 代码并生成文件，通过 deliver_artifact 工具把产物交付到宿主机 uploads 目录（agentscope 2.0.3 新能力）。
+    systemPrompt: |
+      你是一个沙箱产物交付助手。你在 Docker 沙箱中执行 Python 代码并生成文件。
+      当你生成了对用户有价值的产物（如数据文件、报表、处理后的文件）时，
+      必须调用 deliver_artifact 工具把它交付到宿主机，交付结果会返回宿主机上的绝对路径。
+      重复交付同名文件会返回 conflict，如确需覆盖请携带 force=true 重新交付。
+    modelName: deepseek-v4-flash
+    streaming: true
+    enableThinking: true
+    harnessConfig:
+      workspace: /tmp/agentscope-sandbox-artifact
+      filesystemMode: DOCKER
+      executionMode: BUILDER
+      isolationScope: USER
+      taskListEnabled: true
+      sandbox:
+        image: python:3.11-slim
+        memorySizeBytes: 2000000000
+        cpuCount: 2
+      compaction:
+        triggerMessages: 30
+        keepMessages: 10
+        flushBeforeCompact: true
+      artifactDelivery:
+        enabled: true
+    samplePrompts:
+      - prompt: "用 Python 生成一份 100 行的模拟销售数据 CSV，并交付给我"
+        expectedBehavior: "沙箱内生成 CSV 后调用 deliver_artifact 交付到宿主机，返回宿主机绝对路径"
+      - prompt: "把刚才的 CSV 再交付一次，允许覆盖"
+        expectedBehavior: "同名产物重复交付触发 conflict，携带 force=true 后覆盖成功"

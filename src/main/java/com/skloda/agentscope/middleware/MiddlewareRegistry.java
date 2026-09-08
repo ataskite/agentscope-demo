@@ -1,5 +1,6 @@
 package com.skloda.agentscope.middleware;
 
+import io.agentscope.core.middleware.FinalAnswerFilterMiddleware;
 import io.agentscope.core.middleware.MiddlewareBase;
 import io.agentscope.core.tracing.OtelTracingMiddleware;
 import org.slf4j.Logger;
@@ -36,6 +37,9 @@ public class MiddlewareRegistry {
 
         // GA built-in: OpenTelemetry tracing (S11)
         register("otel-tracing", OtelTracingMiddleware::new);
+
+        // agentscope 2.0.3 新增：最终答案过滤（抑制 ReAct 流式输出中中间推理轮次的文本，仅输出最终答案）
+        register("final-answer-filter", FinalAnswerFilterMiddleware::new);
 
         log.info("Registered {} built-in middlewares: {}", registry.size(), getRegisteredNames());
     }

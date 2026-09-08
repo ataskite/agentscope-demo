@@ -22,7 +22,7 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <agentscope.version>2.0.2</agentscope.version>
+        <agentscope.version>2.0.3</agentscope.version>
     </properties>
 
     <dependencies>
@@ -186,6 +186,23 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <!-- Official Maven Central fallback: the aliyun mirror (mirrorOf=central) lags behind
+         for freshly released agentscope versions; this repo uses a distinct id so it is
+         not intercepted by the mirror. -->
+    <repositories>
+        <repository>
+            <id>central-official</id>
+            <name>Maven Central (official)</name>
+            <url>https://repo.maven.apache.org/maven2</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
 
     <build>
         <plugins>

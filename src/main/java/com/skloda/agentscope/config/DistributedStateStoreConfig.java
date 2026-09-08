@@ -37,8 +37,35 @@ import javax.sql.DataSource;
  *
  * # PostgreSQL
  * --spring.profiles.active=postgresql
- * # application-postgresql.yml: spring.datasource.url/h.username/password
+ * # application-postgresql.yml: spring.datasource.url/username/password
  * </pre>
+ *
+ * <h3>State Versioning (agentscope 2.0.3 — Optimistic Concurrency Control)</h3>
+ * Since agentscope 2.0.3 the {@link AgentStateStore} interface ships opt-in OCC APIs:
+ * {@code supportsVersioning()}, {@code getVersioned(userId, sessionId, key, type)}
+ * (returns {@code VersionedState<T>} = value + monotonically increasing version) and
+ * {@code saveIfVersion(userId, sessionId, key, state, expectedVersion)} where
+ * {@code AgentStateStore.UNVERSIONED} (-1) is the "first write / no version" sentinel.
+ * <p>
+ * All three stores exposed here — {@link RedisAgentStateStore}, {@link MysqlAgentStateStore}
+ * and {@link PostgresAgentStateStore} — implement these methods <b>natively and atomically</b>
+ * in 2.0.3 ({@code supportsVersioning() == true}, confirmed against the extension jars):
+ * <ul>
+ *   <li>Redis: side-car version key ({@code RedisStateVersionSupport.versionKey}) checked and
+ *       bumped by an embedded Lua CAS script executed as a single atomic EVAL;</li>
+ *   <li>MySQL / PostgreSQL: version-conditional DML inside a write transaction
+ *       ({@code executeInWriteTransaction});</li>
+ *   <li>on version mismatch {@code saveIfVersion} returns -1, and the agent runtime
+ *       (see {@code ReActAgent}, configurable via {@code ReActAgent.builder().conflictPolicy(...)}
+ *       with {@code ConflictPolicy.OVERWRITE / FAIL / APPEND_MERGE}) surfaces it as
+ *       {@code io.agentscope.core.state.ConcurrentSessionModificationException} when appropriate.</li>
+ * </ul>
+ * Versioning is therefore available out of the box on the {@code redis}/{@code mysql}/
+ * {@code postgresql} profiles: <b>no extra property switch is required</b> (a decorator-based
+ * opt-in toggle was deliberately not added because the extension stores already provide
+ * first-class support; bean initialization logs the {@code supportsVersioning()} result above).
+ * When no distributed profile is active, the default InMemory/JsonFile fallback stores are used
+ * and default startup behavior is unchanged.
  */
 @Configuration
 @Profile({"redis", "mysql", "postgresql"})
@@ -56,11 +83,13 @@ public class DistributedStateStoreConfig {
             @Value("${agentscope.distributed.redis.url:redis://localhost:6379}") String redisUrl,
             @Value("${agentscope.distributed.redis.key-prefix:agentscope}") String keyPrefix) {
         JedisPooled jedis = new JedisPooled(redisUrl);
-        log.info("S13: RedisAgentStateStore initialized (url={}, keyPrefix={})", redisUrl, keyPrefix);
-        return RedisAgentStateStore.builder()
+        AgentStateStore store = RedisAgentStateStore.builder()
                 .jedisClient(jedis)
                 .keyPrefix(keyPrefix)
                 .build();
+        log.info("S13: RedisAgentStateStore initialized (url={}, keyPrefix={}); state versioning (2.0.3 OCC): supported={}",
+                redisUrl, keyPrefix, store.supportsVersioning());
+        return store;
     }
 
     /**
@@ -86,8 +115,10 @@ public class DistributedStateStoreConfig {
     @Bean
     @Profile("mysql")
     public AgentStateStore mysqlStateStore(DataSource dataSource) {
-        log.info("S13: MysqlAgentStateStore initialized");
-        return new MysqlAgentStateStore(dataSource);
+        AgentStateStore store = new MysqlAgentStateStore(dataSource);
+        log.info("S13: MysqlAgentStateStore initialized; state versioning (2.0.3 OCC): supported={}",
+                store.supportsVersioning());
+        return store;
     }
 
     /**
@@ -112,7 +143,9 @@ public class DistributedStateStoreConfig {
     @Bean
     @Profile("postgresql")
     public AgentStateStore postgresStateStore(DataSource dataSource) {
-        log.info("S13: PostgresAgentStateStore initialized");
-        return new PostgresAgentStateStore(dataSource);
+        AgentStateStore store = new PostgresAgentStateStore(dataSource);
+        log.info("S13: PostgresAgentStateStore initialized; state versioning (2.0.3 OCC): supported={}",
+                store.supportsVersioning());
+        return store;
     }
 }

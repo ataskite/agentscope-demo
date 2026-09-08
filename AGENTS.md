@@ -4,7 +4,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Project Overview
 
-Spring Boot 3.5.14 + Java 17 demo for AgentScope (v2.0.0 GA), a Java agent framework with LLM-backed ReAct agents. Features multiple agent types: basic chat, tool-calling, document analysis, template-based document generation (Bank Invoice), RAG knowledge base, multi-modal (vision/audio), multi-agent collaboration (10 patterns), and Harness capabilities (Docker sandbox, Plan Mode, Task List, layered memory, skill self-learning, context compaction, OTel tracing).
+Spring Boot 3.5.14 + Java 17 demo for AgentScope (v2.0.3), a Java agent framework with LLM-backed ReAct agents. Features multiple agent types: basic chat, tool-calling, document analysis, template-based document generation (Bank Invoice), RAG knowledge base, multi-modal (vision/audio), multi-agent collaboration (10 patterns), and Harness capabilities (Docker sandbox, Plan Mode, Task List, layered memory, skill self-learning, context compaction, OTel tracing).
 
 ## Build & Run
 
@@ -77,6 +77,11 @@ Register directly via `toolkit.registerTool(new SimpleTools())` or bind via Skil
 - permissionContext, skillRepository
 - enableSkillManageTool + enableSkillCurator (skill self-learning)
 - maxContextTokens, additionalContextFile
+- artifactDelivery (2.0.3 `deliver_artifact` SPI: `UploadsArtifactDeliveryTarget` delivers sandbox artifacts to `{java.io.tmpdir}/agentscope-uploads/`; enabled per-agent via `harnessConfig.artifactDelivery.enabled`, demo agent `sandbox-artifact-demo`)
+
+**Middleware (2.0.3 addition):** `MiddlewareRegistry` also registers the GA built-in `final-answer-filter` (`FinalAnswerFilterMiddleware` — suppresses intermediate ReAct reasoning-round text, emits only the final user-facing answer); enabled per-agent via the `middlewares:` list (demo agent `middleware-demo`).
+
+**State versioning (2.0.3, zero-config):** the Redis/MySQL/Postgres `AgentStateStore` extensions natively implement optimistic concurrency (`supportsVersioning()`/`getVersioned`/`saveIfVersion` with atomic Lua CAS / versioned DML). `DistributedStateStoreConfig` logs the support status at startup; see its javadoc for the OCC API (`VersionedState`, `ConflictPolicy`, `ConcurrentSessionModificationException`).
 
 **HarnessRuntime** uses `agent.streamEvents()` (the 2.0 native `Flux<AgentEvent>` stream) and reuses the shared `AgentEventMapper`, so harness agents emit the same typed event stream as single agents. (Previously used the deprecated `agent.stream()` to work around a GA gap where `streamEvents()` dropped sub-agent events; fixed in agentscope 2.0.2 PR #2613.)
 
@@ -178,16 +183,16 @@ src/main/java/com/skloda/agentscope/
 
 ## Dependencies
 
-- `agentscope-spring-boot-starter` 2.0.0
-- `agentscope-core` 2.0.0
-- `agentscope-harness` 2.0.0
-- `agentscope-extensions-model-dashscope` 2.0.0 (DashScope provider, RC5 modularized)
-- `agentscope-extensions-rag-simple` 2.0.0
-- `agentscope-extensions-memory-bailian` 2.0.0
-- `agentscope-extensions-redis` / `-mysql` / `-postgresql` 2.0.0 (S13 distributed state store, profile-gated)
-- `agentscope-extensions-a2a-server` / `-a2a-client` / `agentscope-a2a-spring-boot-starter` 2.0.0 (S12 A2A protocol, profile-gated)
-- `agentscope-extensions-channel-common` / `-channel-feishu` 2.0.0 (S14 IM channel, profile-gated)
-- `agentscope-extensions-agui` / `agentscope-agui-spring-boot-starter` 2.0.0 (S15 AG-UI protocol, profile-gated)
+- `agentscope-spring-boot-starter` 2.0.3
+- `agentscope-core` 2.0.3
+- `agentscope-harness` 2.0.3
+- `agentscope-extensions-model-dashscope` 2.0.3 (DashScope provider, RC5 modularized)
+- `agentscope-extensions-rag-simple` 2.0.3
+- `agentscope-extensions-memory-bailian` 2.0.3
+- `agentscope-extensions-redis` / `-mysql` / `-postgresql` 2.0.3 (S13 distributed state store, profile-gated)
+- `agentscope-extensions-a2a-server` / `-a2a-client` / `agentscope-a2a-spring-boot-starter` 2.0.3 (S12 A2A protocol, profile-gated)
+- `agentscope-extensions-channel-common` / `-channel-feishu` 2.0.3 (S14 IM channel, profile-gated)
+- `agentscope-extensions-agui` / `agentscope-agui-spring-boot-starter` 2.0.3 (S15 AG-UI protocol, profile-gated)
 - Apache POI 5.5.1, Apache PDFBox 3.0.7
 - Spring Boot 3.5.14
 - Project Reactor

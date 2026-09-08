@@ -102,6 +102,17 @@ public class HarnessAgentFactory {
             log.info("Agent '{}' using BUILDER mode with LocalFilesystemSpec", config.getAgentId());
         }
 
+        // 5b. Configure sandbox artifact delivery (agentscope 2.0.3 deliver_artifact SPI):
+        // mounts UploadsArtifactDeliveryTarget so the harness registers the deliver_artifact
+        // tool and references it in the workspace prompt, letting a sandboxed agent hand
+        // generated files back to the host ({java.io.tmpdir}/agentscope-uploads)
+        HarnessConfig.ArtifactDeliveryConfig artifactDelivery = harnessConfig.getArtifactDelivery();
+        if (artifactDelivery != null && artifactDelivery.isEnabled()) {
+            builder.artifactDeliveryTarget(new UploadsArtifactDeliveryTarget());
+            log.info("Agent '{}' enabled artifact delivery (deliver_artifact -> {})",
+                    config.getAgentId(), UploadsArtifactDeliveryTarget.uploadsDir());
+        }
+
         // 6. Configure compaction
         if (harnessConfig.getCompaction() != null) {
             HarnessConfig.CompactionConfig cc = harnessConfig.getCompaction();
