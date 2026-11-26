@@ -78,6 +78,32 @@ public class HarnessAgentFactory {
                 .model(model)
                 .workspace(workspace);
 
+        // 4b. Model failover (agentscope 2.0.4 fallbackModel). The fallback model is built
+        // through the same ModelFactory context on purpose — the framework's string-based
+        // shortcut (builder.fallbackModel(String) → ModelRegistry.resolve(String)) resolves
+        // with an empty context, which means: (1) no apiKey — the DashScope provider only
+        // falls back to the DASHSCOPE_API_KEY env var, so when the key comes from the
+        // Spring property (agentscope.model.dashscope.api-key) the first actual failover
+        // would fail auth; (2) no stream/enableThinking — the fallback would behave
+        // inconsistently with the primary model.
+        String fallbackModelName = harnessConfig.getFallbackModel();
+        if (fallbackModelName != null && !fallbackModelName.isBlank()) {
+            if (isSameEffectiveModel(modelName, fallbackModelName)) {
+                log.warn("Agent '{}' fallbackModel '{}' is the same as the primary model, failover disabled",
+                        config.getAgentId(), fallbackModelName);
+            } else {
+                Model fallbackModel = modelFactory.createModel(fallbackModelName, streaming, config.isEnableThinking());
+                builder.fallbackModel(fallbackModel)
+                        .failoverListener((switchedTo, cause) -> log.warn(
+                                "Agent '{}' primary model failed ({}), failed over to fallback model [{}]",
+                                config.getAgentId(),
+                                cause == null ? "unknown" : cause.toString(),
+                                switchedTo.getModelName()));
+                log.info("Agent '{}' model failover enabled: {} -> {}",
+                        config.getAgentId(), modelName, fallbackModelName);
+            }
+        }
+
         // 5. Configure filesystem (Docker sandbox / Local)
         if (harnessConfig.isDockerMode()) {
             DockerFilesystemSpec dockerSpec = filesystemSpecFactory.createDocker();
@@ -271,5 +297,19 @@ public class HarnessAgentFactory {
             return Paths.get(expanded);
         }
         return Paths.get(System.getProperty("user.home"), ".agentscope", agentId);
+    }
+
+    /**
+     * Compares two model names ignoring the optional provider prefix: ModelFactory
+     * auto-prefixes bare names with "dashscope:", so "qwen-plus" and
+     * "dashscope:qwen-plus" resolve to the same model.
+     */
+    private static boolean isSameEffectiveModel(String a, String b) {
+        return stripProviderPrefix(a).equalsIgnoreCase(stripProviderPrefix(b));
+    }
+
+    private static String stripProviderPrefix(String model) {
+        int idx = model.indexOf(':');
+        return idx >= 0 ? model.substring(idx + 1) : model;
     }
 }

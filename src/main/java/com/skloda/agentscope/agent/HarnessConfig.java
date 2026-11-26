@@ -40,6 +40,9 @@ public class HarnessConfig {
     // agentscope 2.0.3: deliver_artifact sandbox artifact delivery
     private ArtifactDeliveryConfig artifactDelivery;
 
+    // agentscope 2.0.4: model failover — 主模型失败（限流/超时/网络）时自动切换的备用模型名
+    private String fallbackModel;
+
     public boolean isBuilderMode() {
         return "BUILDER".equalsIgnoreCase(executionMode);
     }

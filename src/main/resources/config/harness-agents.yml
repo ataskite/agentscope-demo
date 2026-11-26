@@ -14,6 +14,8 @@ agents:
       executionMode: CLAW
       maxContextTokens: 8000
       metaToolEnabled: true
+      # agentscope 2.0.4 model failover: 主模型失败时自动切换（经 ModelFactory 带 key 构建）
+      fallbackModel: qwen-plus
       permissionConfig:
         # Demo HITL resume path (agentscope_confirm_results metadata) is not wired
         # end-to-end for Harness agents; accept_edits makes unmatched tools (e.g. the
@@ -64,6 +66,7 @@ agents:
       filesystemMode: LOCAL
       executionMode: BUILDER
       isolationScope: USER
+      fallbackModel: qwen-plus
       compaction:
         triggerMessages: 30
         keepMessages: 10

@@ -4,7 +4,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Project Overview
 
-Spring Boot 3.5.14 + Java 17 demo for AgentScope (v2.0.3), a Java agent framework with LLM-backed ReAct agents. Features multiple agent types: basic chat, tool-calling, document analysis, template-based document generation (Bank Invoice), RAG knowledge base, multi-modal (vision/audio), multi-agent collaboration (10 patterns), and Harness capabilities (Docker sandbox, Plan Mode, Task List, layered memory, skill self-learning, context compaction, OTel tracing).
+Spring Boot 3.5.14 + Java 17 demo for AgentScope (v2.0.5), a Java agent framework with LLM-backed ReAct agents. Features multiple agent types: basic chat, tool-calling, document analysis, template-based document generation (Bank Invoice), RAG knowledge base, multi-modal (vision/audio), multi-agent collaboration (10 patterns), and Harness capabilities (Docker sandbox, Plan Mode, Task List, layered memory, skill self-learning, context compaction, OTel tracing).
 
 ## Build & Run
 
@@ -34,7 +34,7 @@ Agents are defined in `src/main/resources/config/agents.yml` and `harness-agents
 
 **Configuration chain:** `agents.yml` → `AgentConfigService` → `AgentFactory` / `HarnessAgentFactory` → `AgentRuntimeFactory` → `AgentService` / `HarnessAgentService` (caches instances)
 
-Each agent config includes: `agentId`, `name`, `description`, `systemPrompt`, `modelName`, `streaming`, `enableThinking`, `skills[]`, `userTools[]`, `systemTools[]`. Harness agents additionally support `harnessConfig` with: `executionMode`, `filesystemMode`, `compaction`, `memory`, `plan`, `taskListEnabled`, `skillLearning`, `permissionConfig`, `sandbox`, etc.
+Each agent config includes: `agentId`, `name`, `description`, `systemPrompt`, `modelName`, `streaming`, `enableThinking`, `skills[]`, `userTools[]`, `systemTools[]`. Harness agents additionally support `harnessConfig` with: `executionMode`, `filesystemMode`, `compaction`, `memory`, `plan`, `taskListEnabled`, `skillLearning`, `permissionConfig`, `sandbox`, `fallbackModel` (2.0.4 model failover), etc.
 
 **Adding a new agent:**
 1. Add entry to `config/agents.yml` (or `harness-agents.yml` for HARNESS type)
@@ -76,6 +76,7 @@ Register directly via `toolkit.registerTool(new SimpleTools())` or bind via Skil
 
 `HarnessAgentFactory` (@Component) builds `HarnessAgent` instances with 17+ builder capabilities wired from `HarnessConfig`:
 - workspace, model (via ModelFactory), compaction, toolResultEviction
+- model failover (2.0.4): `harnessConfig.fallbackModel` → builds the fallback model through the same ModelFactory context (the framework's string shortcut resolves with an empty context: no apiKey for property-based keys, no stream/enableThinking parity) and registers a WARN `failoverListener`; a fallback identical to the primary model is skipped with a WARN
 - filesystem (Docker sandbox / Local), memory (layered MemoryConfig)
 - enablePlanMode, enableTaskList, enableMetaTool
 - permissionContext, skillRepository
@@ -187,16 +188,16 @@ src/main/java/com/skloda/agentscope/
 
 ## Dependencies
 
-- `agentscope-spring-boot-starter` 2.0.3
-- `agentscope-core` 2.0.3
-- `agentscope-harness` 2.0.3
-- `agentscope-extensions-model-dashscope` 2.0.3 (DashScope provider, RC5 modularized)
-- `agentscope-extensions-rag-simple` 2.0.3
-- `agentscope-extensions-memory-bailian` 2.0.3
-- `agentscope-extensions-redis` / `-mysql` / `-postgresql` 2.0.3 (S13 distributed state store, profile-gated)
-- `agentscope-extensions-a2a-server` / `-a2a-client` / `agentscope-a2a-spring-boot-starter` 2.0.3 (S12 A2A protocol, profile-gated)
-- `agentscope-extensions-channel-common` / `-channel-feishu` 2.0.3 (S14 IM channel, profile-gated)
-- `agentscope-extensions-agui` / `agentscope-agui-spring-boot-starter` 2.0.3 (S15 AG-UI protocol, profile-gated)
+- `agentscope-spring-boot-starter` 2.0.5
+- `agentscope-core` 2.0.5
+- `agentscope-harness` 2.0.5
+- `agentscope-extensions-model-dashscope` 2.0.5 (DashScope provider, RC5 modularized)
+- `agentscope-extensions-rag-simple` 2.0.5
+- `agentscope-extensions-memory-bailian` 2.0.5
+- `agentscope-extensions-redis` / `-mysql` / `-postgresql` 2.0.5 (S13 distributed state store, profile-gated)
+- `agentscope-extensions-a2a-server` / `-a2a-client` / `agentscope-a2a-spring-boot-starter` 2.0.5 (S12 A2A protocol, profile-gated)
+- `agentscope-extensions-channel-common` / `-channel-feishu` 2.0.5 (S14 IM channel, profile-gated)
+- `agentscope-extensions-agui` / `agentscope-agui-spring-boot-starter` 2.0.5 (S15 AG-UI protocol, profile-gated)
 - Apache POI 5.5.1, Apache PDFBox 3.0.7
 - Spring Boot 3.5.14
 - Project Reactor
