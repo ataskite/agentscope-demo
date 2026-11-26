@@ -1,0 +1,22 @@
+AGENTS.md
+  h_db6a30ab34bcd6 7,37,79,191-200
+pom.xml
+  h_db6a30ab34bcd6 25
+src/main/java/com/skloda/agentscope/agent/HarnessConfig.java
+  h_db6a30ab34bcd6 43-45
+src/main/java/com/skloda/agentscope/harness/HarnessAgentFactory.java
+  h_db6a30ab34bcd6 81-106,301-314
+src/main/resources/config/harness-agents.yml
+  h_db6a30ab34bcd6 17-18,69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "e5dd81d02521622f480badc1f16dfede00ebd923",
+  "prompts": {},
+  "humans": {
+    "h_db6a30ab34bcd6": {
+      "author": "ataskite <sogo1986@gmail.com>"
+    }
+  }
+}
