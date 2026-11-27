@@ -164,7 +164,7 @@ public class AgentService {
 
         Flux<Map<String, Object>> stream;
         if (sessionId != null && !sessionId.isBlank()) {
-            stream = createSessionStreamFlux(sessionId, agentId, userMsg, permissionMode, sessionType);
+            stream = createSessionStreamFlux(sessionId, agentId, userMsg, permissionMode, sessionType, userId);
         } else {
             StreamingAgentRuntime runtime = (permissionMode != null && !permissionMode.isBlank())
                     ? runtimeFactory.createRuntime(agentId, permissionMode)
@@ -188,11 +188,11 @@ public class AgentService {
                                                                  String sessionId, String userId) {
         String effectiveSessionId = (sessionId == null || sessionId.isBlank())
                 ? sessionManagerService.createNewSession(agentId).getSessionId()
-                : sessionManagerService.getOrCreateSession(sessionId, agentId).getSessionId();
+                : sessionManagerService.getOrCreateSession(sessionId, agentId, null, userId).getSessionId();
 
         // Supervisor's Conversation store — session-scoped, same lifecycle as legacy agents.
         SessionManagerService.SessionContext ctx =
-                sessionManagerService.getOrCreateSession(effectiveSessionId, agentId);
+                sessionManagerService.getOrCreateSession(effectiveSessionId, agentId, null, userId);
 
         long tBuild = System.currentTimeMillis();
         SupervisorRuntime runtime = supervisorRuntimeFactory.create(
@@ -224,9 +224,9 @@ public class AgentService {
 
     private Flux<Map<String, Object>> createSessionStreamFlux(String sessionId, String agentId,
                                                                 Msg userMsg, String permissionMode,
-                                                                String sessionType) {
+                                                                String sessionType, String userId) {
         SessionManagerService.SessionContext ctx =
-                sessionManagerService.getOrCreateSession(sessionId, agentId, sessionType);
+                sessionManagerService.getOrCreateSession(sessionId, agentId, sessionType, userId);
 
         String effectiveSessionId = ctx.getSessionId();
 
@@ -246,6 +246,15 @@ public class AgentService {
      */
     private String preprocessMessage(String filePath, String fileName, String message) {
         if (filePath != null && !filePath.isBlank()) {
+            // P1-2: only whitelist-directory paths are revealed to the LLM; anything else
+            // (arbitrary absolute paths from the request body) is refused here so it can
+            // neither be read nor used to steer the parser tools at server files.
+            try {
+                com.skloda.agentscope.security.UploadPathGuard.validate(filePath);
+            } catch (IllegalArgumentException e) {
+                log.warn("Rejected client-supplied file path outside the upload whitelist: {}", fileName);
+                return String.format("[用户上传的文件不可用: %s（路径不在允许的上传目录内）]\n\n%s", fileName, message);
+            }
             return String.format("[用户上传了文件: %s, 路径: %s]\n\n%s", fileName, filePath, message);
         }
         return message;

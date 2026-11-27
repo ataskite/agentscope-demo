@@ -31,8 +31,12 @@ public class KnowledgeController {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeController.class);
 
-    @Autowired
-    private KnowledgeService knowledgeService;
+    // P2-9: constructor injection (was @Autowired field injection)
+    private final KnowledgeService knowledgeService;
+
+    public KnowledgeController(KnowledgeService knowledgeService) {
+        this.knowledgeService = knowledgeService;
+    }
 
     /**
      * Upload and index a document into the knowledge base.
@@ -72,8 +76,9 @@ public class KnowledgeController {
                     "status", "indexed"
             ));
         } catch (Exception e) {
+            // P3-1: sanitized client message, server-side detail stays in the log
             log.error("Failed to upload knowledge document: {}", originalName, e);
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to index document: " + originalName));
         }
     }
 
@@ -126,6 +131,11 @@ public class KnowledgeController {
     @DeleteMapping("/documents/{fileName}")
     public ResponseEntity<?> removeDocument(@PathVariable String fileName) {
         knowledgeService.removeDocument(fileName);
-        return ResponseEntity.ok(Map.of("removed", true));
+        // P2-5: be honest about what was removed — the in-memory vector store cannot
+        // delete embeddings, so the document leaves the index but its vectors remain
+        // retrievable until the next restart.
+        return ResponseEntity.ok(Map.of(
+                "removed", true,
+                "note", "已从索引清单移除；向量数据将在应用重启后清除，在此之前仍可能被检索命中"));
     }
 }

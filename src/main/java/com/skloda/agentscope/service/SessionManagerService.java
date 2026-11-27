@@ -9,6 +9,7 @@ import io.agentscope.core.state.AgentStateStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
@@ -30,16 +31,45 @@ public class SessionManagerService {
     private final AgentConfigService configService;
     private final Path sessionBasePath;
 
+    // P2-1: idle timeout + capacity cap — SessionContext holds a full ReActAgent and
+    // state store; previously entries lived forever, so long-running processes grew
+    // monotonically.
+    private final long idleTimeoutMs;
+    private final int maxActiveSessions;
+
     private final ConcurrentHashMap<String, SessionContext> activeSessions = new ConcurrentHashMap<>();
 
     public SessionManagerService(AgentFactory agentFactory,
                                  AgentConfigService configService,
-                                 @Value("${agentscope.session.storage-path:${user.home}/.agentscope/demo-sessions}") String storagePath) {
+                                 @Value("${agentscope.session.storage-path:${user.home}/.agentscope/demo-sessions}") String storagePath,
+                                 @Value("${agentscope.session.idle-timeout-minutes:120}") long idleTimeoutMinutes,
+                                 @Value("${agentscope.session.max-active:200}") int maxActiveSessions) {
         this.agentFactory = agentFactory;
         this.configService = configService;
         this.sessionBasePath = Paths.get(storagePath);
-        log.info("Session storage mode: in-memory (configured path ignored: {})",
-                sessionBasePath.toAbsolutePath());
+        this.idleTimeoutMs = idleTimeoutMinutes * 60_000L;
+        this.maxActiveSessions = maxActiveSessions;
+        log.info("Session storage mode: in-memory (configured path ignored: {}, idleTimeout={}min, maxActive={})",
+                sessionBasePath.toAbsolutePath(), idleTimeoutMinutes, maxActiveSessions);
+    }
+
+    /**
+     * P2-1: periodic eviction of sessions idle beyond {@code idle-timeout-minutes}.
+     * Runs with the scheduler enabled by {@code @EnableScheduling} (P1-4).
+     */
+    @Scheduled(fixedRate = 60_000)
+    public void evictIdleSessions() {
+        if (idleTimeoutMs <= 0) {
+            return;
+        }
+        long cutoff = System.currentTimeMillis() - idleTimeoutMs;
+        activeSessions.entrySet().removeIf(entry -> {
+            if (entry.getValue().getLastAccessedAt() < cutoff) {
+                log.info("Evicting idle session: {} (agent: {})", entry.getKey(), entry.getValue().getAgentId());
+                return true;
+            }
+            return false;
+        });
     }
 
     public static class SessionContext {
@@ -50,6 +80,11 @@ public class SessionManagerService {
         private final long createdAt;
         private volatile long lastAccessedAt;
         private final String sessionType;
+        // P1-7: server-recorded owner identity (first identified userId). Client-supplied
+        // userIds that mismatch the recorded owner are rejected; null/blank request
+        // userIds are tolerated as the anonymous demo client (network access is already
+        // gated by the P0-1 API token filter).
+        private volatile String ownerKey;
 
         SessionContext(String sessionId, String agentId, ReActAgent agent,
                        AgentStateStore stateStore, String sessionType) {
@@ -60,6 +95,7 @@ public class SessionManagerService {
             this.createdAt = System.currentTimeMillis();
             this.lastAccessedAt = this.createdAt;
             this.sessionType = sessionType;
+            this.ownerKey = null;
         }
 
         public String getSessionId() { return sessionId; }
@@ -67,15 +103,39 @@ public class SessionManagerService {
         public ReActAgent getAgent() { return agent; }
         public AgentStateStore getStateStore() { return stateStore; }
         public String getSessionType() { return sessionType; }
+        public String getOwnerKey() { return ownerKey; }
+        void bindOwner(String userId) {
+            if (this.ownerKey == null && userId != null && !userId.isBlank()) {
+                this.ownerKey = userId;
+            }
+        }
 
         public long getLastAccessedAt() { return lastAccessedAt; }
         public void touch() { this.lastAccessedAt = System.currentTimeMillis(); }
     }
 
-    public SessionContext getOrCreateSession(String sessionId, String agentId, String sessionType) {
+    public SessionContext getOrCreateSession(String sessionId, String agentId, String sessionType, String userId) {
         if (sessionId != null && !sessionId.isBlank()) {
             SessionContext cached = activeSessions.get(sessionId);
             if (cached != null) {
+                // P3-8: an agentId mismatch must be an explicit error, never a silent
+                // takeover of another agent's state and toolset under the same sessionId.
+                if (!cached.getAgentId().equals(agentId)) {
+                    throw new IllegalArgumentException(
+                            "Session " + sessionId + " belongs to agent '" + cached.getAgentId()
+                                    + "', but the request targeted agent '" + agentId
+                                    + "'. Use a new session or switch back to the original agent.");
+                }
+                // P1-7: reject cross-user session takeover
+                String cachedOwner = cached.getOwnerKey();
+                if (cachedOwner != null && userId != null && !userId.isBlank()
+                        && !cachedOwner.equals(userId)) {
+                    log.warn("Rejected session {} access: request userId '{}' does not match owner '{}'",
+                            sessionId, userId, cachedOwner);
+                    throw new IllegalArgumentException(
+                            "Session " + sessionId + " belongs to another user. Create a new session.");
+                }
+                cached.bindOwner(userId);
                 // Check if session type has changed
                 AgentConfig config = configService.getAgentConfig(agentId);
                 String effectiveType = resolveSessionType(config, sessionType);
@@ -89,7 +149,13 @@ public class SessionManagerService {
                 return cached;
             }
         }
-        return createNewSession(agentId, sessionType);
+        SessionContext created = createNewSession(agentId, sessionType);
+        created.bindOwner(userId);
+        return created;
+    }
+
+    public SessionContext getOrCreateSession(String sessionId, String agentId, String sessionType) {
+        return getOrCreateSession(sessionId, agentId, sessionType, null);
     }
 
     private SessionContext migrateSession(String sessionId, String agentId, SessionContext oldContext,
@@ -101,8 +167,9 @@ public class SessionManagerService {
         AgentStateStore newStateStore = agentFactory.createStateStore(newType, storagePath);
         ReActAgent newAgent = agentFactory.createAgentForSession(agentId, newStateStore);
 
-        // Create new context
+        // Create new context (P1-7: carry the owner binding across the migration)
         SessionContext newContext = new SessionContext(sessionId, agentId, newAgent, newStateStore, newType);
+        newContext.bindOwner(oldContext.getOwnerKey());
         activeSessions.put(sessionId, newContext);
         log.info("Migrated session {} from {} to {}", sessionId, oldContext.getSessionType(), newType);
         return newContext;
@@ -124,6 +191,19 @@ public class SessionManagerService {
     }
 
     public SessionContext createNewSession(String agentId, String sessionType) {
+        // P2-1: capacity cap — evict the least recently accessed session when full
+        while (maxActiveSessions > 0 && activeSessions.size() >= maxActiveSessions) {
+            activeSessions.entrySet().stream()
+                    .min(Comparator.comparingLong(e -> e.getValue().getLastAccessedAt()))
+                    .ifPresent(oldest -> {
+                        log.info("Session capacity reached ({}), evicting LRU session: {}",
+                                maxActiveSessions, oldest.getKey());
+                        activeSessions.remove(oldest.getKey());
+                    });
+            if (activeSessions.isEmpty()) {
+                break; // guard against pathological non-removal loops
+            }
+        }
         String sessionId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         return createSessionContext(sessionId, agentId, sessionType);
     }

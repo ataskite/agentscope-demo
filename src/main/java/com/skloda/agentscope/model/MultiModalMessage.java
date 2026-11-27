@@ -30,7 +30,9 @@ public class MultiModalMessage {
      */
     public static Msg withImage(String text, String imagePath, String originalFileName) {
         try {
-            byte[] imageBytes = Files.readAllBytes(Path.of(imagePath));
+            // P1-2: client-supplied path must resolve inside the upload whitelist directory
+            Path validated = com.skloda.agentscope.security.UploadPathGuard.validate(imagePath);
+            byte[] imageBytes = Files.readAllBytes(validated);
             String base64Image = Base64.getEncoder().encodeToString(imageBytes);
 
             String mediaType = getMediaType(originalFileName);
@@ -66,7 +68,9 @@ public class MultiModalMessage {
      */
     public static Msg withAudio(String audioPath, String originalFileName) {
         try {
-            byte[] audioBytes = Files.readAllBytes(Path.of(audioPath));
+            // P1-2: client-supplied path must resolve inside the upload whitelist directory
+            Path validated = com.skloda.agentscope.security.UploadPathGuard.validate(audioPath);
+            byte[] audioBytes = Files.readAllBytes(validated);
             String base64Audio = Base64.getEncoder().encodeToString(audioBytes);
 
             String mediaType = getMediaType(originalFileName);
@@ -105,7 +109,9 @@ public class MultiModalMessage {
             }
 
             for (ImageFile img : images) {
-                byte[] imageBytes = Files.readAllBytes(Path.of(img.path));
+                // P1-2: client-supplied path must resolve inside the upload whitelist directory
+                byte[] imageBytes = Files.readAllBytes(
+                        com.skloda.agentscope.security.UploadPathGuard.validate(img.path));
                 String base64Image = Base64.getEncoder().encodeToString(imageBytes);
                 String mediaType = getMediaType(img.fileName);
 

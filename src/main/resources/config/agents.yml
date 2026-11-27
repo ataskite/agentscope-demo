@@ -49,8 +49,9 @@ agents:
       - get_weather
     systemTools:
       - view_text_file
-      - write_text_file
-      - execute_shell_command
+    # P0-1 security fix: execute_shell_command / write_text_file removed from
+    # conversational agents. Shell/file-write capabilities are only exposed via
+    # sandboxed harness agents with explicit permissionConfig + approval gates.
     samplePrompts:
       - prompt: "现在几点？请使用工具获取当前时间"
         expectedBehavior: "调用时间工具，并把结果解释给用户"
@@ -159,7 +160,8 @@ agents:
       - generate_bank_invoice
     systemTools:
       - view_text_file
-      - write_text_file
+    # P0-1 security fix: write_text_file removed (file generation goes through the
+    # approval-gated generate_bank_invoice tool only).
     samplePrompts:
       - prompt: "为张三丰生成银行发票：身份证 110101199001011234，手机 13800138000，邮箱 zsf@example.com，合同号 HT20240410001，借据号 JD20240410001，放款日期 2024-04-10，贷款总额 100000，银行放款金额 80000，费用类型 服务费，发票金额 5000，流水号 001"
         expectedBehavior: "收集完整参数后调用 generate_bank_invoice，生成 Excel 和 Word 文件"

@@ -1,5 +1,5 @@
 import './state.js?v=2.4';
-import { createSSEParser, uploadFile, fetchAgents, fetchSessions, createSession as createSessionApi, deleteSession as deleteSessionApi, fetchKnowledgeDocs, uploadKnowledgeDoc, removeKnowledgeDoc as removeKnowledgeDocApi, fetchSkillInfo, fetchToolInfo } from './api.js?v=2.5';
+import { createSSEParser, uploadFile, fetchAgents, fetchSessions, createSession as createSessionApi, deleteSession as deleteSessionApi, fetchKnowledgeDocs, uploadKnowledgeDoc, removeKnowledgeDoc as removeKnowledgeDocApi, fetchSkillInfo, fetchToolInfo, authHeaders, getApiToken } from './api.js?v=2.5';
 import { renderMarkdown, escapeHtml, getTimestamp, formatDuration, scrollToBottom, createFileList } from './modules/utils.js?v=2.4';
 import { chatMessages, messageInput, sendBtn, chatEmpty, chatHeaderName, chatHeaderDesc, debugPanel, debugRounds, debugToggle, appendMessage, createThinkingBox, updateThinkingBox, collapseThinkingBox, completeThinkingBox, addAgentBubble, addAgentBubbleAfter, removeTypingIndicator, updateTypingIndicator, setStreamingState, showTypingIndicator, createAgentMessageWrapper } from './modules/ui.js?v=2.5';
 import { startRound, endRound, completeRoundTrace, addTimelineRow, addTimelineRowForRound, clearDebug, toggleDebug, handlePipelineStart, handlePipelineStepStart, handlePipelineStepEnd, handleRoutingDecision, handleHandoffStart, updateRoundMetrics, updateRoundMetricsForRound, handleLoopStart, handleLoopEnd, handleLoopIterationResult, handleGraphTransition, handleRoundtableStart, handleRoundMessage, handleTaskDelegate, handleTaskEnd, handleSupervisorStart, handleRoutingEvent, handleExpertDispatchStart, handleExpertDispatchEnd, handleBlackboardPatched, handleUnresolvedQuestions } from './modules/debug.js?v=2.9';
@@ -105,14 +105,18 @@ async function sendMessage() {
 
         var response = await fetch('/chat/send', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify(payload),
             signal: currentAbortController.signal
         });
 
         if (!response.ok) {
             removeTypingIndicator();
-            appendMessage('error', '请求失败: ' + response.status);
+            if (response.status === 401 && !getApiToken()) {
+                appendMessage('error', '认证失败(401)：请在浏览器控制台执行 localStorage.setItem("agentscopeApiToken","<token>") 设置 API Token 后重试（token 见服务端启动日志）。');
+            } else {
+                appendMessage('error', '请求失败: ' + response.status);
+            }
             endRound('error');
             setStreamingState(false);
             return;
@@ -817,7 +821,7 @@ window.submitApproval = async function(approvalId, approved) {
     try {
         var response = await fetch('/chat/approve', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ approvalId: approvalId, approved: approved }),
             signal: currentAbortController.signal
         });

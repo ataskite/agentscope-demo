@@ -57,8 +57,11 @@ public class LoopRuntime implements StreamingAgentRuntime {
             hook.emitLoopStart(0);
             String originalRequest = MultiAgentStreamSupport.extractText(userMsg);
 
-            iterate(originalRequest, "", 0, fluxSink)
-                    .subscribe();  // single subscription at the top of the chain
+            // P3-6: single subscription at the top of the chain; dispose on sink cancel
+            // so client disconnects stop further write→critic iterations
+            reactor.core.Disposable disposable =
+                    iterate(originalRequest, "", 0, fluxSink).subscribe();
+            fluxSink.onCancel(disposable::dispose);
         });
 
         // doFinally completes the EventSink so Flux.merge(sinkEvents, loopFlux) can terminate.

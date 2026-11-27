@@ -24,6 +24,10 @@ public class DocxParserTool {
     @Tool(name = "parse_docx", description = "Parse a .docx file and extract its full text content including headings, paragraphs, tables, and lists. Returns the document text with structure preserved.")
     public String parseDocx(
             @ToolParam(name = "filePath", description = "Absolute path to the .docx file") String filePath) {
+        // P1-2: tool entry paths are restricted to the upload whitelist directory
+        if (!com.skloda.agentscope.security.UploadPathGuard.isAllowed(filePath)) {
+            return "Error parsing DOCX file: filePath is required";
+        }
         log.info("Parsing DOCX file: {}", filePath);
         StringBuilder sb = new StringBuilder();
 
@@ -61,6 +65,10 @@ public class DocxParserTool {
             @ToolParam(name = "filePath", description = "Absolute path to the source .docx file") String filePath,
             @ToolParam(name = "replacements", description = "JSON array of replacement objects: [{\"placeholder\":\"{{name}}\",\"value\":\"张三\"}]") String replacementsJson) {
 
+        // P1-2: tool entry paths are restricted to the upload whitelist directory
+        if (!com.skloda.agentscope.security.UploadPathGuard.isAllowed(filePath)) {
+            return "{\"success\":false,\"message\":\"filePath is required\"}";
+        }
         log.info("Editing DOCX file: {}", filePath);
 
         try {

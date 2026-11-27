@@ -109,7 +109,33 @@ public class CompositeAgentFactory {
             }
         }
 
-        return new OrderFulfillmentGraph(states, stateAgents);
+        // P3-7: persist the machine's current state in the session store so it survives
+        // the per-request graph rebuild; stateless mode keeps the previous reset behavior
+        String persistKey = "state_graph_current";
+        String initialStateName = null;
+        OrderFulfillmentGraph graph;
+        if (stateStore != null) {
+            try {
+                initialStateName = stateStore
+                        .get(config.getAgentId(), config.getAgentId(), persistKey, com.skloda.agentscope.composite.graph.GraphCurrentState.class)
+                        .map(com.skloda.agentscope.composite.graph.GraphCurrentState::getStateName)
+                        .orElse(null);
+            } catch (Exception e) {
+                log.warn("Failed to load persisted graph state for {}: {}", config.getAgentId(), e.getMessage());
+            }
+            graph = new OrderFulfillmentGraph(states, stateAgents, initialStateName);
+            graph.addStateChangeListener(stateName -> {
+                try {
+                    stateStore.save(config.getAgentId(), config.getAgentId(), persistKey,
+                            new com.skloda.agentscope.composite.graph.GraphCurrentState(stateName));
+                } catch (Exception e) {
+                    log.warn("Failed to persist graph state {} for {}: {}", stateName, config.getAgentId(), e.getMessage());
+                }
+            });
+        } else {
+            graph = new OrderFulfillmentGraph(states, stateAgents, null);
+        }
+        return graph;
     }
 
     public ReActAgent createRoutingAgent(AgentConfig config, AgentStateStore stateStore) {
@@ -127,8 +153,31 @@ public class CompositeAgentFactory {
                 config.getModelName(), config.isStreaming(), config.isEnableThinking());
 
         Toolkit toolkit = new Toolkit();
-        List<ReActAgent> subAgents = new ArrayList<>();
+        // P2-8: shared no-tool sub-agent registration (was duplicated inline)
+        registerNoToolSubAgents(toolkit, config);
+        log.info("  Registered {} SubAgentTools for routing agent: {} (no-tool mode)",
+                config.getSubAgents().size(), config.getAgentId());
 
+        ReActAgent.Builder builder = ReActAgent.builder()
+                .name(config.getName() != null ? config.getName() : config.getAgentId())
+                .sysPrompt(routingPrompt)
+                .model(model)
+                .stateStore(effectiveStore)
+                .defaultSessionId(config.getAgentId())
+                .toolkit(toolkit);
+
+        // No hooks registration -- ObservabilityHook is no longer a Hook interface impl
+
+        return builder.build();
+    }
+
+    /**
+     * P2-8: shared sub-agent construction for ROUTING and HANDOFFS composites.
+     * Both patterns build the same no-tool sub-agents and SubAgentTool registrations;
+     * only the owner label in the log line differs. The duplicated ~50-line block was
+     * already drifting between the two copies.
+     */
+    private void registerNoToolSubAgents(Toolkit toolkit, AgentConfig config) {
         for (SubAgentConfig subConfig : config.getSubAgents()) {
             AgentConfig subAgentConfig = configService.getAgentConfig(subConfig.getAgentId());
 
@@ -152,8 +201,6 @@ public class CompositeAgentFactory {
                     .enablePendingToolRecovery(true)
                     .build();
 
-            subAgents.add(subAgent);
-
             SubAgentProvider<ReActAgent> provider = () -> subAgent;
 
             io.agentscope.core.tool.subagent.SubAgentConfig frameworkSubConfig =
@@ -173,21 +220,7 @@ public class CompositeAgentFactory {
 
             SubAgentTool subAgentTool = new SubAgentTool(provider, frameworkSubConfig);
             toolkit.registerTool(subAgentTool);
-            log.info("  Registered SubAgentTool: {} for routing agent: {} (no-tool mode)",
-                    subConfig.getAgentId(), config.getAgentId());
         }
-
-        ReActAgent.Builder builder = ReActAgent.builder()
-                .name(config.getName() != null ? config.getName() : config.getAgentId())
-                .sysPrompt(routingPrompt)
-                .model(model)
-                .stateStore(effectiveStore)
-                .defaultSessionId(config.getAgentId())
-                .toolkit(toolkit);
-
-        // No hooks registration -- ObservabilityHook is no longer a Hook interface impl
-
-        return builder.build();
     }
 
     private String buildRoutingSystemPrompt(AgentConfig config) {
@@ -240,52 +273,10 @@ public class CompositeAgentFactory {
                 config.getModelName(), config.isStreaming(), config.isEnableThinking());
 
         Toolkit toolkit = new Toolkit();
-
-        for (SubAgentConfig subConfig : config.getSubAgents()) {
-            AgentConfig subAgentConfig = configService.getAgentConfig(subConfig.getAgentId());
-
-            String originalPrompt = subAgentConfig != null ? subAgentConfig.getSystemPrompt() : "";
-            String modifiedPrompt = "你是一个子代理，正在通过工具调用被主代理调用。\n" +
-                    "请直接回答用户的问题，不要调用任何工具。\n" +
-                    "专注于你作为" + subConfig.getAgentId() + "的专业领域。\n\n" +
-                    "你的原始角色描述:\n" + originalPrompt;
-
-            Model subModel = modelFactory.createModel(
-                    subAgentConfig != null ? subAgentConfig.getModelName() : config.getModelName(),
-                    config.isStreaming(), config.isEnableThinking());
-
-            ReActAgent subAgent = ReActAgent.builder()
-                    .name(subConfig.getAgentId())
-                    .sysPrompt(modifiedPrompt)
-                    .model(subModel)
-                    .stateStore(new InMemoryAgentStateStore())
-                    .defaultSessionId(subConfig.getAgentId())
-                    .toolkit(new Toolkit())
-                    .enablePendingToolRecovery(true)
-                    .build();
-
-            SubAgentProvider<ReActAgent> provider = () -> subAgent;
-
-            io.agentscope.core.tool.subagent.SubAgentConfig frameworkSubConfig =
-                    io.agentscope.core.tool.subagent.SubAgentConfig.builder()
-                            .toolName(subConfig.getAgentId())
-                            .description(subConfig.getDescription() != null
-                                    ? subConfig.getDescription()
-                                    : "Sub-agent: " + subConfig.getAgentId())
-                            .forwardEvents(true)
-                            .streamOptions(StreamOptions.builder()
-                                    .eventTypes(io.agentscope.core.agent.EventType.REASONING,
-                                            io.agentscope.core.agent.EventType.TOOL_RESULT)
-                                    .incremental(true)
-                                    .includeReasoningResult(true)
-                                    .build())
-                            .build();
-
-            SubAgentTool subAgentTool = new SubAgentTool(provider, frameworkSubConfig);
-            toolkit.registerTool(subAgentTool);
-            log.info("  Registered SubAgentTool: {} for handoffs agent: {} (no-tool mode)",
-                    subConfig.getAgentId(), config.getAgentId());
-        }
+        // P2-8: shared no-tool sub-agent registration (was duplicated inline)
+        registerNoToolSubAgents(toolkit, config);
+        log.info("  Registered {} SubAgentTools for handoffs agent: {} (no-tool mode)",
+                config.getSubAgents().size(), config.getAgentId());
 
         ReActAgent.Builder builder = ReActAgent.builder()
                 .name(config.getName() != null ? config.getName() : config.getAgentId())

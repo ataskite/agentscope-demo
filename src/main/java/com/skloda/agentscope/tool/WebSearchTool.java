@@ -5,12 +5,14 @@ import io.agentscope.core.tool.ToolParam;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -22,10 +24,31 @@ public class WebSearchTool {
 
     private static final Logger log = LoggerFactory.getLogger(WebSearchTool.class);
 
-    @Value("${tavily.api-key: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}")
+    // P1-6: bounded connect/read timeouts — this call blocks the LLM tool-calling
+    // chain, an unbounded wait would stall the whole ReAct loop and the SSE stream.
+    private static final Duration CALL_TIMEOUT = Duration.ofSeconds(20);
+
+    // P1-3 security fix: no API key default in source code. The key must come from
+    // configuration (TAVILY_API_KEY env var or tavily.api-key property). When absent,
+    // web_search degrades to a clear "unavailable" message instead of leaking a live
+    // credential. NOTE: the previously hard-coded key was committed to git history —
+    // rotate it in the Tavily console and scrub history (git filter-repo) if the
+    // repository is shared.
+    @Value("${tavily.api-key:}")
     private String apiKey;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    public WebSearchTool() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5_000);
+        factory.setReadTimeout(15_000);
+        this.restTemplate = new RestTemplate(factory);
+    }
+
+    private boolean isApiKeyConfigured() {
+        return apiKey != null && !apiKey.isBlank();
+    }
 
     @Tool(name = "web_search", description = "搜索网络信息。用于获取实时新闻、天气、股票价格、当前事件等最新信息。")
     public String searchWeb(
@@ -34,6 +57,12 @@ public class WebSearchTool {
     ) {
         if (query == null || query.isBlank()) {
             return "搜索关键词不能为空";
+        }
+
+        // P1-3: degrade clearly when no key is configured instead of failing at Tavily
+        if (!isApiKeyConfigured()) {
+            log.warn("web_search called but tavily.api-key is not configured; tool disabled");
+            return "搜索暂不可用：未配置 TAVILY_API_KEY 环境变量（tavily.api-key）";
         }
 
         int searchLimit = (limit != null && limit > 0 && limit <= 10) ? limit : 5;
@@ -55,7 +84,7 @@ public class WebSearchTool {
             Map<String, Object> response = Mono.fromCallable(() ->
                             restTemplate.postForObject(url, requestBody, Map.class))
                     .subscribeOn(Schedulers.boundedElastic())
-                    .block();
+                    .block(CALL_TIMEOUT);
 
             if (response == null) {
                 return "搜索失败：未获取到响应";

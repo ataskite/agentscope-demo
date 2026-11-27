@@ -3,7 +3,9 @@
 # Requires a running MySQL at the configured URL and the agentscope_state DB.
 spring:
   datasource:
-    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/agentscope_state?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC}
+    # P3-3: SSL is enabled by default for non-local deployments; set MYSQL_USE_SSL=false
+    # only for local dev against a plain-HTTP MySQL
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/agentscope_state?createDatabaseIfNotExist=true&useSSL=${MYSQL_USE_SSL:false}&serverTimezone=UTC}
     username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver

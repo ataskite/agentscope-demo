@@ -26,6 +26,7 @@ import io.agentscope.core.skill.repository.ClasspathSkillRepository;
 import io.agentscope.core.tool.Toolkit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -51,16 +52,18 @@ public class AgentFactory {
      * S13: Optional distributed AgentStateStore bean. Present only when a
      * {@code redis}/{@code mysql}/{@code postgresql} Spring profile is active
      * (see {@link com.skloda.agentscope.config.DistributedStateStoreConfig}).
-     * Null by default -> falls back to InMemory/JsonFile (no behavior change).
+     * Absent by default -> falls back to InMemory/JsonFile (no behavior change).
+     * P2-9: injected via ObjectProvider constructor param instead of field injection.
      */
-    @Autowired(required = false)
-    private AgentStateStore distributedStateStore;
+    private final ObjectProvider<AgentStateStore> distributedStateStoreProvider;
 
+    @Autowired
     public AgentFactory(AgentConfigService configService, ToolRegistry toolRegistry,
                         KnowledgeService knowledgeService, McpClientService mcpClientService,
                         MiddlewareRegistry middlewareRegistry,
                         PermissionContextFactory permissionContextFactory,
-                        ModelFactory modelFactory) {
+                        ModelFactory modelFactory,
+                        ObjectProvider<AgentStateStore> distributedStateStoreProvider) {
         this.configService = configService;
         this.toolRegistry = toolRegistry;
         this.knowledgeService = knowledgeService;
@@ -68,6 +71,30 @@ public class AgentFactory {
         this.middlewareRegistry = middlewareRegistry;
         this.permissionContextFactory = permissionContextFactory;
         this.modelFactory = modelFactory;
+        this.distributedStateStoreProvider = distributedStateStoreProvider;
+    }
+
+    /**
+     * P2-9 backward-compatibility constructor for tests that predate the
+     * ObjectProvider parameter: no distributed store is wired.
+     */
+    public AgentFactory(AgentConfigService configService, ToolRegistry toolRegistry,
+                        KnowledgeService knowledgeService, McpClientService mcpClientService,
+                        MiddlewareRegistry middlewareRegistry,
+                        PermissionContextFactory permissionContextFactory,
+                        ModelFactory modelFactory) {
+        this(configService, toolRegistry, knowledgeService, mcpClientService,
+                middlewareRegistry, permissionContextFactory, modelFactory,
+                new ObjectProvider<AgentStateStore>() {
+                    @Override
+                    public AgentStateStore getIfAvailable() {
+                        return null;
+                    }
+                    @Override
+                    public AgentStateStore getObject(Object... args) {
+                        return getIfAvailable();
+                    }
+                });
     }
 
     /**
@@ -79,6 +106,7 @@ public class AgentFactory {
 
     public AgentStateStore createStateStore(String type, String storagePath) {
         // S13: prefer distributed store bean when a redis/mysql/postgresql profile is active
+        AgentStateStore distributedStateStore = distributedStateStoreProvider.getIfAvailable();
         if (distributedStateStore != null) {
             return distributedStateStore;
         }
@@ -95,7 +123,7 @@ public class AgentFactory {
      * Create agent for a persistent session (with shared stateStore, no ApprovalMiddleware).
      */
     public ReActAgent createAgentForSession(String agentId, AgentStateStore stateStore) {
-        return buildAgent(agentId, stateStore, null);
+        return buildAgent(agentId, stateStore, null, null);
     }
 
     /**
@@ -103,34 +131,43 @@ public class AgentFactory {
      * ObservabilityHook is no longer a Hook; lifecycle events come from agent.streamEvents().
      */
     public ReActAgent createAgentForSession(String agentId, AgentStateStore stateStore, ApprovalMiddleware approvalMiddleware) {
-        return buildAgent(agentId, stateStore, approvalMiddleware);
+        return buildAgent(agentId, stateStore, approvalMiddleware, null);
     }
 
     /**
      * Create agent without ApprovalMiddleware (stateless, creates fresh AgentStateStore each time).
      */
     public ReActAgent createAgent(String agentId) {
-        return buildAgent(agentId, new InMemoryAgentStateStore(), null);
+        return buildAgent(agentId, new InMemoryAgentStateStore(), null, null);
     }
 
     /**
      * Create agent with optional ApprovalMiddleware (stateless, creates fresh AgentStateStore each time).
      */
     public ReActAgent createAgent(String agentId, ApprovalMiddleware approvalMiddleware) {
-        return buildAgent(agentId, new InMemoryAgentStateStore(), approvalMiddleware);
+        return buildAgent(agentId, new InMemoryAgentStateStore(), approvalMiddleware, null);
     }
 
     public ReActAgent createAgentForSession(String agentId, AgentStateStore stateStore, String permissionMode, ApprovalMiddleware approvalMiddleware) {
-        return buildAgentWithPermission(agentId, stateStore, permissionMode, approvalMiddleware);
+        return buildAgent(agentId, stateStore, approvalMiddleware, permissionMode);
     }
 
     public ReActAgent createAgent(String agentId, String permissionMode, ApprovalMiddleware approvalMiddleware) {
-        return buildAgentWithPermission(agentId, new InMemoryAgentStateStore(), permissionMode, approvalMiddleware);
+        return buildAgent(agentId, new InMemoryAgentStateStore(), approvalMiddleware, permissionMode);
     }
 
-    private ReActAgent buildAgent(String agentId, AgentStateStore stateStore, ApprovalMiddleware approvalMiddleware) {
+    /**
+     * P2-8: single unified build path (previously buildAgent and
+     * buildAgentWithPermission were ~150-line near-duplicates that had already
+     * drifted — the permission copy lost the v1 RAG deprecation warning).
+     * All public entry points funnel through this method so every agent gets the
+     * same tool/RAG/LTM/middleware wiring and the same P1-1 permission policy.
+     */
+    private ReActAgent buildAgent(String agentId, AgentStateStore stateStore,
+                                  ApprovalMiddleware approvalMiddleware, String requestPermissionMode) {
         AgentConfig config = configService.getAgentConfig(agentId);
-        log.info("Creating agent: {} ({})", config.getName(), agentId);
+        log.info("Creating agent: {} ({}){}", config.getName(), agentId,
+                requestPermissionMode != null ? " [requested permissionMode=" + requestPermissionMode + "]" : "");
 
         Model model = modelFactory.createModel(
                 config.getModelName(), config.isStreaming(), config.isEnableThinking());
@@ -201,89 +238,53 @@ public class AgentFactory {
             }
         }
 
+        // P1-1: apply the permission policy on EVERY build path (previously only the
+        // client-requested permission path set a permission context).
+        applyPermissionContext(builder, config, agentId, requestPermissionMode);
+
         builder.enablePendingToolRecovery(true);
 
         return builder.build();
     }
 
-    private ReActAgent buildAgentWithPermission(String agentId, AgentStateStore stateStore, String permissionMode, ApprovalMiddleware approvalMiddleware) {
-        AgentConfig config = configService.getAgentConfig(agentId);
-        log.info("Creating agent: {} ({}) [permissionMode={}]", config.getName(), agentId, permissionMode);
-
-        Model model = modelFactory.createModel(
-                config.getModelName(), config.isStreaming(), config.isEnableThinking());
-
-        ReActAgent.Builder builder = ReActAgent.builder()
-                .name(config.getName())
-                .sysPrompt(config.getSystemPrompt())
-                .model(model)
-                .stateStore(stateStore)
-                .defaultSessionId(agentId);
-
-        if (config.isPlanEnabled()) {
-            builder.enableTaskList();
-            log.info("  Enabled PlanNotebook for agent: {}", agentId);
-        }
-
-        Toolkit toolkit = new Toolkit();
-        registerToolsAndSkills(builder, toolkit, config, agentId);
-        registerMcpTools(config, toolkit);
-
-        if (config.isRagEnabled()) {
-            RAGMode ragMode = parseRagMode(config.getRagMode());
-            builder.knowledge(knowledgeService.getKnowledge())
-                    .ragMode(ragMode)
-                    .retrieveConfig(RetrieveConfig.builder()
-                            .limit(config.getRagRetrieveLimit())
-                            .scoreThreshold(config.getRagScoreThreshold())
-                            .build());
-            log.info("  Enabled RAG for agent: {} (mode={}, limit={}, threshold={})",
-                    agentId, ragMode, config.getRagRetrieveLimit(), config.getRagScoreThreshold());
-        }
-
-        if (config.getLongTermMemory() != null && !"none".equals(config.getLongTermMemory().getType())) {
-            LongTermMemory ltm = createLongTermMemory(config.getLongTermMemory());
-            if (ltm != null) {
-                LongTermMemoryMode mode = parseLtmMode(config.getLongTermMemory().getMode());
-                builder.longTermMemory(ltm).longTermMemoryMode(mode);
-                log.info("  Enabled long-term memory for agent: {} (type={}, mode={})",
-                        agentId, config.getLongTermMemory().getType(), mode);
-            }
-        }
-
-        if (approvalMiddleware != null) {
-            builder.middlewares(List.of(approvalMiddleware));
-            log.info("  Registered ApprovalMiddleware for agent: {}", agentId);
-        }
-
-        if (config.getMiddlewares() != null && !config.getMiddlewares().isEmpty()) {
-            List<MiddlewareBase> middlewares = config.getMiddlewares().stream()
-                    .map(middlewareRegistry::create)
-                    .filter(java.util.Objects::nonNull)
-                    .toList();
-            if (!middlewares.isEmpty()) {
-                builder.middlewares(middlewares);
-                log.info("  Registered {} middlewares for agent: {}", middlewares.size(), agentId);
-            }
-        }
-
-        // Configure permission context
-        String effectiveMode = resolvePermissionMode(config, permissionMode);
+    /**
+     * P1-1 security fix: the effective permission mode always comes from the
+     * server-side {@code permissionConfig.defaultMode}; a client-supplied mode is
+     * honored only when the agent config explicitly sets
+     * {@code allowClientOverride: true}. Agents without any permissionConfig that
+     * mount system tools get a fail-closed context (P0-1 defense-in-depth).
+     */
+    private void applyPermissionContext(ReActAgent.Builder builder, AgentConfig config,
+                                        String agentId, String requestPermissionMode) {
+        String effectiveMode = resolvePermissionMode(config, requestPermissionMode);
         if (effectiveMode != null) {
             PermissionContextState permContext = permissionContextFactory.build(
                     effectiveMode, config.getPermissionConfig());
             builder.permissionContext(permContext);
             log.info("  Configured permission mode: {} for agent: {}", effectiveMode, agentId);
+        } else if (!config.getSystemTools().isEmpty()) {
+            builder.permissionContext(permissionContextFactory.buildFailClosed());
+            log.warn("  Agent {} mounts system tools without permissionConfig; "
+                    + "fail-closed permission context injected (P0-1)", agentId);
         }
-
-        builder.enablePendingToolRecovery(true);
-        return builder.build();
     }
 
     private String resolvePermissionMode(AgentConfig config, String requestMode) {
-        if (config.getPermissionConfig() == null) return null;
-        if (requestMode != null && !requestMode.isBlank()) return requestMode;
-        return config.getPermissionConfig().getDefaultMode();
+        AgentConfig.PermissionConfig permissionConfig = config.getPermissionConfig();
+        if (permissionConfig == null) {
+            return null;
+        }
+        String serverDefault = (permissionConfig.getDefaultMode() != null && !permissionConfig.getDefaultMode().isBlank())
+                ? permissionConfig.getDefaultMode()
+                : "explore";
+        if (requestMode != null && !requestMode.isBlank()) {
+            if (permissionConfig.isAllowClientOverride()) {
+                return requestMode;
+            }
+            log.info("  Client permissionMode '{}' ignored for agent '{}'; server default '{}' enforced",
+                    requestMode, config.getAgentId(), serverDefault);
+        }
+        return serverDefault;
     }
 
     private void registerToolsAndSkills(ReActAgent.Builder builder, Toolkit toolkit,

@@ -1,13 +1,14 @@
 package com.skloda.agentscope.model;
 
+import com.skloda.agentscope.security.UploadPathGuard;
 import io.agentscope.core.message.AudioBlock;
 import io.agentscope.core.message.Base64Source;
 import io.agentscope.core.message.ImageBlock;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,15 +18,33 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Fixtures live inside the upload whitelist directory (P1-2): client-supplied media
+ * paths are only honored inside {java.io.tmpdir}/agentscope-uploads.
+ */
 class MultiModalMessageTest {
 
-    @TempDir
-    private Path tempDir;
+    private final List<String> fixtures = new java.util.ArrayList<>();
+
+    private Path whitelistFixture(String name, byte[] content) throws java.io.IOException {
+        Path file = UploadPathGuard.uploadDir().resolve(name);
+        Files.createDirectories(UploadPathGuard.uploadDir());
+        Files.write(file, content);
+        fixtures.add(name);
+        return file;
+    }
+
+    @AfterEach
+    void cleanup() throws java.io.IOException {
+        for (String name : fixtures) {
+            Files.deleteIfExists(UploadPathGuard.uploadDir().resolve(name));
+        }
+        fixtures.clear();
+    }
 
     @Test
     void withImageCreatesTextAndImageBlocks() throws Exception {
-        Path image = tempDir.resolve("sample.png");
-        Files.write(image, new byte[] {1, 2, 3});
+        Path image = whitelistFixture("mm-sample.png", new byte[] {1, 2, 3});
 
         Msg msg = MultiModalMessage.withImage("look", image.toString(), "sample.png");
 
@@ -40,7 +59,9 @@ class MultiModalMessageTest {
 
     @Test
     void withImageFallsBackToTextWhenFileCannotBeRead() {
-        Msg msg = MultiModalMessage.withImage("look", tempDir.resolve("missing.jpg").toString(), "missing.jpg");
+        Path missing = UploadPathGuard.uploadDir().resolve("mm-missing-" + System.nanoTime() + ".jpg");
+
+        Msg msg = MultiModalMessage.withImage("look", missing.toString(), "missing.jpg");
 
         assertEquals(MsgRole.USER, msg.getRole());
         assertTrue(msg.getTextContent().contains("[图片加载失败: missing.jpg]"));
@@ -48,8 +69,7 @@ class MultiModalMessageTest {
 
     @Test
     void withAudioCreatesAudioBlock() throws Exception {
-        Path audio = tempDir.resolve("sample.mp3");
-        Files.write(audio, new byte[] {4, 5, 6});
+        Path audio = whitelistFixture("mm-sample.mp3", new byte[] {4, 5, 6});
 
         Msg msg = MultiModalMessage.withAudio(audio.toString(), "sample.mp3");
 
@@ -62,10 +82,8 @@ class MultiModalMessageTest {
 
     @Test
     void withMultipleImagesCreatesAllImageBlocks() throws Exception {
-        Path first = tempDir.resolve("first.jpg");
-        Path second = tempDir.resolve("second.webp");
-        Files.write(first, new byte[] {1});
-        Files.write(second, new byte[] {2});
+        Path first = whitelistFixture("mm-first.jpg", new byte[] {1});
+        Path second = whitelistFixture("mm-second.webp", new byte[] {2});
 
         Msg msg = MultiModalMessage.withMultipleImages("compare", List.of(
                 new MultiModalMessage.ImageFile(first.toString(), "first.jpg"),

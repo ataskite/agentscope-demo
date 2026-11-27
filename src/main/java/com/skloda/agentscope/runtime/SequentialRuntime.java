@@ -68,7 +68,9 @@ public class SequentialRuntime implements StreamingAgentRuntime {
                 });
             }
 
-            chain.subscribe(
+            // P3-6: keep the Disposable and dispose on sink cancel so client disconnects
+            // stop the inner LLM chain instead of letting it run to completion
+            reactor.core.Disposable disposable = chain.subscribe(
                     finalOutput -> {
                         fluxSink.next(Map.of("type", "text", "content", finalOutput));
                         hook.emitPipelineEnd(pipelineId, agents.size(), 0);
@@ -82,6 +84,7 @@ public class SequentialRuntime implements StreamingAgentRuntime {
                         fluxSink.complete();
                     }
             );
+            fluxSink.onCancel(disposable::dispose);
         });
 
         return Flux.merge(sinkEvents, pipelineFlux.doFinally(s -> close()))

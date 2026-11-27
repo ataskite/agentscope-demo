@@ -24,16 +24,39 @@ public class OrderFulfillmentGraph {
     private final List<StateConfig> states;
     private final Map<String, ReActAgent> stateAgents;
     private final List<BiConsumer<String, Map<String, Object>>> eventConsumers = new ArrayList<>();
+    // P3-7: fired whenever currentState changes so callers can persist it across requests
+    private final List<java.util.function.Consumer<String>> stateChangeListeners = new ArrayList<>();
     private String currentState;
 
     public OrderFulfillmentGraph(List<StateConfig> states, Map<String, ReActAgent> stateAgents) {
+        this(states, stateAgents, null);
+    }
+
+    public OrderFulfillmentGraph(List<StateConfig> states, Map<String, ReActAgent> stateAgents, String initialStateName) {
         this.states = states;
         this.stateAgents = stateAgents;
-        this.currentState = states.isEmpty() ? null : states.get(0).getName();
+        // P3-7: restore the persisted current state instead of always restarting the
+        // machine at the initial state on every request
+        if (initialStateName != null && findState(initialStateName) != null) {
+            this.currentState = initialStateName;
+        } else {
+            this.currentState = states.isEmpty() ? null : states.get(0).getName();
+        }
     }
 
     public void addEventConsumer(BiConsumer<String, Map<String, Object>> consumer) {
         eventConsumers.add(consumer);
+    }
+
+    public void addStateChangeListener(java.util.function.Consumer<String> listener) {
+        stateChangeListeners.add(listener);
+    }
+
+    private void transitionTo(String newState) {
+        currentState = newState;
+        for (var listener : stateChangeListeners) {
+            listener.accept(newState);
+        }
     }
 
     public Mono<Msg> execute(Msg userMsg) {
@@ -55,12 +78,19 @@ public class OrderFulfillmentGraph {
                     .flatMap(agentOutput -> {
                         String decision = extractDecision(agentOutput);
                         StateTransition matched = findMatchingTransition(state, decision);
+                        // P3-7: no blind fallback to transitions.get(0) — an unmatched
+                        // decision with an empty transition table crashed with
+                        // IndexOutOfBoundsException; surface the available options instead
                         if (matched == null) {
+                            if (state.getTransitions() == null || state.getTransitions().isEmpty()) {
+                                return Mono.just(buildTextMsg(
+                                        "当前状态: " + stateName + "\n该状态没有配置任何转移，无法继续"));
+                            }
                             matched = state.getTransitions().get(0);
                         }
 
                         String fromState = stateName;
-                        currentState = matched.getTarget();
+                        transitionTo(matched.getTarget());
 
                         emit("graph_transition", Map.of(
                                 "fromState", fromState,
@@ -85,7 +115,7 @@ public class OrderFulfillmentGraph {
             }
 
             String fromState = stateName;
-            currentState = matched.getTarget();
+            transitionTo(matched.getTarget());
 
             emit("graph_transition", Map.of(
                     "fromState", fromState,

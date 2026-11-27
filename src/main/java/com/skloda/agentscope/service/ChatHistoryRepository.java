@@ -14,6 +14,11 @@ public interface ChatHistoryRepository {
 
     List<ChatMessage> findByAgentId(String agentId);
 
+    /**
+     * P2-10: cheap message count without materializing the full transcript.
+     */
+    int countByAgentId(String agentId);
+
     void append(String agentId, ChatMessage message);
 
     void clear(String agentId);

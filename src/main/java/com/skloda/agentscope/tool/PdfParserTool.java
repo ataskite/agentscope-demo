@@ -19,6 +19,10 @@ public class PdfParserTool {
     @Tool(name = "parse_pdf", description = "Parse a PDF file and extract text content from all pages. Returns the extracted text with page numbers and document metadata if available.")
     public String parsePdf(
             @ToolParam(name = "filePath", description = "Absolute path to the PDF file") String filePath) {
+        // P1-2: tool entry paths are restricted to the upload whitelist directory
+        if (!com.skloda.agentscope.security.UploadPathGuard.isAllowed(filePath)) {
+            return "Error parsing PDF file: filePath is required";
+        }
         log.info("Parsing PDF file: {}", filePath);
         StringBuilder sb = new StringBuilder();
 

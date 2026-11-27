@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -73,15 +75,30 @@ public class FeishuChannelController {
             @RequestHeader(value = "X-Lark-Request-Nonce", required = false) String nonce,
             @RequestHeader(value = "X-Lark-Signature", required = false) String signature) {
         try {
+            // P1-5 security fix: verify the request BEFORE parsing/processing.
+            // 1) With encrypt-key configured, require a valid HMAC signature over the
+            //    raw body (Feishu signs timestamp+nonce+encryptedBody with the key).
+            // 2) Without encryption, fall back to the verification token carried in
+            //    the event envelope (header.token for v2, root.token for v1).
+            // 3) With neither credential configured, reject (fail-closed) — running a
+            //    public webhook with no request authentication is not allowed.
+            if (!isRequestAuthenticated(body, timestamp, nonce, signature)) {
+                log.warn("S14: Feishu webhook request failed authentication (signature/token check)");
+                return Mono.just(ResponseEntity.status(401).body("{\"error\":\"invalid signature or token\"}"));
+            }
+
             JsonNode root = MAPPER.readTree(body);
 
             // 1. Handle Feishu URL verification challenge
             Optional<String> challenge = FeishuInboundMapper.extractUrlChallenge(root);
             if (challenge.isPresent()) {
                 log.info("S14: Feishu URL verification challenge received");
+                // P1-5: respond via ObjectMapper (the challenge value is attacker-influenced
+                // and must never be concatenated into a JSON string literal)
+                Map<String, String> challengeResponse = Map.of("challenge", challenge.get());
                 return Mono.just(ResponseEntity.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .body("{\"challenge\":\"" + challenge.get() + "\"}"));
+                        .body(MAPPER.writeValueAsString(challengeResponse)));
             }
 
             // 2. Decrypt if encrypted (encrypt-key configured)
@@ -146,6 +163,50 @@ public class FeishuChannelController {
         if (inbound.messages() == null || inbound.messages().isEmpty()) return null;
         Msg msg = inbound.messages().get(0);
         return msg.getTextContent();
+    }
+
+    /**
+     * P1-5 security fix: authenticate the webhook request before any processing.
+     * <ul>
+     *   <li>encrypt-key configured → mandatory HMAC signature verification over the
+     *       raw body via {@link FeishuCrypto#verifySignature} (missing/invalid → reject)</li>
+     *   <li>no encryption → verification-token comparison against the envelope token
+     *       (v2 events: {@code header.token}; v1 url_verification: {@code token})</li>
+     *   <li>neither credential configured → reject (fail-closed)</li>
+     * </ul>
+     */
+    private boolean isRequestAuthenticated(String body, String timestamp, String nonce, String signature) {
+        boolean hasEncryptKey = properties.isEncrypted();
+        if (hasEncryptKey) {
+            if (timestamp == null || nonce == null || signature == null || signature.isBlank()) {
+                return false;
+            }
+            return new FeishuCrypto(properties.encryptKey())
+                    .verifySignature(timestamp, nonce, body, signature);
+        }
+
+        String verificationToken = properties.verificationToken();
+        if (verificationToken == null || verificationToken.isBlank()) {
+            log.warn("S14: Feishu webhook has neither encrypt-key nor verification-token configured; "
+                    + "rejecting unauthenticated event (P1-5 fail-closed). Configure FEISHU_ENCRYPT_KEY "
+                    + "or FEISHU_VERIFICATION_TOKEN.");
+            return false;
+        }
+
+        try {
+            JsonNode root = MAPPER.readTree(body);
+            String token = root.path("header").path("token").asText("");
+            if (token.isBlank()) {
+                token = root.path("token").asText("");
+            }
+            return !token.isBlank() && constantTimeEquals(token, verificationToken);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static boolean constantTimeEquals(String a, String b) {
+        return MessageDigest.isEqual(a.getBytes(StandardCharsets.UTF_8), b.getBytes(StandardCharsets.UTF_8));
     }
 
     /**

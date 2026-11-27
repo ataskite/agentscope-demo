@@ -23,6 +23,10 @@
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <agentscope.version>2.0.5</agentscope.version>
+        <!-- P2-11: third-party versions centralized here (previously hard-coded inline) -->
+        <poi.version>5.5.1</poi.version>
+        <pdfbox.version>3.0.7</pdfbox.version>
+        <lombok.version>1.18.46</lombok.version>
     </properties>
 
     <dependencies>
@@ -77,14 +81,14 @@
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
-            <version>5.5.1</version>
+            <version>${poi.version}</version>
         </dependency>
 
         <!-- Apache PDFBox for PDF parsing -->
         <dependency>
             <groupId>org.apache.pdfbox</groupId>
             <artifactId>pdfbox</artifactId>
-            <version>3.0.7</version>
+            <version>${pdfbox.version}</version>
         </dependency>
 
         <!-- AgentScope RAG Simple Knowledge -->
@@ -231,7 +235,7 @@
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
-                            <version>1.18.46</version>
+                            <version>${lombok.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>

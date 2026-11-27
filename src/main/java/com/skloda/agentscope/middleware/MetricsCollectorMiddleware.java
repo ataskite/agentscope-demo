@@ -33,7 +33,12 @@ public class MetricsCollectorMiddleware implements MiddlewareBase {
     private static final Logger log = LoggerFactory.getLogger(MetricsCollectorMiddleware.class);
     private static final Logger metricsLog = LoggerFactory.getLogger("METRICS");
 
-    // Thread-local metrics context
+    // P2-4: the metrics context now travels in the Reactor Context (written in onAgent,
+    // read downstream via deferContextual) instead of a static ThreadLocal — phases run
+    // on different threads under Reactor, where a ThreadLocal either reads null or
+    // another request's context. The legacy ThreadLocal is kept only as a fallback for
+    // callers outside a reactive chain and is always cleared in doFinally.
+    private static final String METRICS_CTX_KEY = "agentscope.metricsContext";
     private static final ThreadLocal<MetricsContext> METRICS_CONTEXT = new ThreadLocal<>();
 
     // Global aggregated metrics
@@ -54,7 +59,7 @@ public class MetricsCollectorMiddleware implements MiddlewareBase {
         MetricsContext context = new MetricsContext(agentName);
         METRICS_CONTEXT.set(context);
 
-        System.out.println("[METRICS-COLLECTOR] Agent start: " + agentName);
+        metricsLog.info("Agent start: {}", agentName);
 
         long startNanos = System.nanoTime();
 
@@ -69,96 +74,116 @@ public class MetricsCollectorMiddleware implements MiddlewareBase {
                     updateMin(agentMetrics.minDuration, durationMs);
                     updateMax(agentMetrics.maxDuration, durationMs);
 
-                    // Log metrics summary to console
+                    // Log metrics summary
                     long tokens = context.tokens.get();
                     double cost = estimateCost(tokens);
-                    System.out.println("[METRICS-COLLECTOR] Agent: " + agentName +
-                        " | Duration: " + durationMs + "ms" +
-                        " | Tools: " + context.toolCalls.get() +
-                        " | Tokens: " + tokens +
-                        " | Cost: ¥" + String.format("%.4f", cost));
+                    metricsLog.info("Agent: {} | Duration: {}ms | Tools: {} | Tokens: {} | Cost: ¥{}",
+                        agentName, durationMs, context.toolCalls.get(), tokens, String.format("%.4f", cost));
 
                     // Update global metrics
                     GLOBAL_CALLS.incrementAndGet();
-
-                    METRICS_CONTEXT.remove();
                 })
                 .doOnError(e -> {
                     GLOBAL_ERRORS.incrementAndGet();
-                    System.err.println("[METRICS-COLLECTOR] Agent: " + agentName + " | ERROR: " + e.getMessage());
-                    METRICS_CONTEXT.remove();
-                });
+                    metricsLog.error("Agent: {} | ERROR: {}", agentName, e.getMessage());
+                })
+                // P2-4: cleanup must also run on cancel (client disconnects), not just
+                // complete/error
+                .doFinally(signal -> METRICS_CONTEXT.remove())
+                // P2-4: publish the context for the reactive phases (onReasoning/onActing/
+                // onModelCall) — context flows downstream→source, so every inner operator
+                // sees it regardless of which thread executes them.
+                .contextWrite(reactor.util.context.Context.of(METRICS_CTX_KEY, context));
     }
 
     @Override
     public Flux<AgentEvent> onReasoning(Agent agent, RuntimeContext ctx, ReasoningInput input,
                                          Function<ReasoningInput, Flux<AgentEvent>> next) {
-        MetricsContext context = METRICS_CONTEXT.get();
         long startNanos = System.nanoTime();
 
-        return next.apply(input)
-                .doOnComplete(() -> {
-                    long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
-                    if (context != null) {
-                        context.reasoningDuration.addAndGet(durationMs);
-                    }
-                });
+        return reactor.core.publisher.Flux.<AgentEvent>deferContextual(ctxView -> {
+            MetricsContext context = resolveContext(ctxView);
+            return next.apply(input)
+                    .doOnComplete(() -> {
+                        long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+                        if (context != null) {
+                            context.reasoningDuration.addAndGet(durationMs);
+                        }
+                    });
+        });
     }
 
     @Override
     public Flux<AgentEvent> onActing(Agent agent, RuntimeContext ctx, ActingInput input,
                                       Function<ActingInput, Flux<AgentEvent>> next) {
-        MetricsContext context = METRICS_CONTEXT.get();
         List<ToolUseBlock> toolCalls = input.toolCalls();
 
-        for (ToolUseBlock tool : toolCalls) {
-            String toolName = tool.getName();
-            context.currentTool = toolName;
-            context.toolCallStart = System.nanoTime();
-        }
+        return reactor.core.publisher.Flux.<AgentEvent>deferContextual(ctxView -> {
+            MetricsContext context = resolveContext(ctxView);
 
-        return next.apply(input)
-                .doOnComplete(() -> {
-                    if (context != null && context.currentTool != null) {
-                        long durationMs = (System.nanoTime() - context.toolCallStart) / 1_000_000;
+            // P2-4: null guard before dereferencing (previously a direct field write on a
+            // possibly-null context → NPE interrupted tool execution statistics)
+            if (context != null) {
+                for (ToolUseBlock tool : toolCalls) {
+                    context.currentTool = tool.getName();
+                    context.toolCallStart = System.nanoTime();
+                }
+            }
 
-                        // Update tool metrics
-                        ToolMetrics toolMetrics = TOOL_METRICS.computeIfAbsent(context.currentTool, k -> new ToolMetrics());
-                        toolMetrics.callCount.incrementAndGet();
-                        toolMetrics.totalDuration.addAndGet(durationMs);
-                        updateMin(toolMetrics.minDuration, durationMs);
-                        updateMax(toolMetrics.maxDuration, durationMs);
+            return next.apply(input)
+                    .doOnComplete(() -> {
+                        if (context != null && context.currentTool != null) {
+                            long durationMs = (System.nanoTime() - context.toolCallStart) / 1_000_000;
 
-                        context.toolCalls.incrementAndGet();
-                        context.currentTool = null;
-                    }
-                })
-                .doOnError(e -> {
-                    if (context != null && context.currentTool != null) {
-                        ToolMetrics toolMetrics = TOOL_METRICS.computeIfAbsent(context.currentTool, k -> new ToolMetrics());
-                        toolMetrics.errorCount.incrementAndGet();
-                    }
-                });
+                            // Update tool metrics
+                            ToolMetrics toolMetrics = TOOL_METRICS.computeIfAbsent(context.currentTool, k -> new ToolMetrics());
+                            toolMetrics.callCount.incrementAndGet();
+                            toolMetrics.totalDuration.addAndGet(durationMs);
+                            updateMin(toolMetrics.minDuration, durationMs);
+                            updateMax(toolMetrics.maxDuration, durationMs);
+
+                            context.toolCalls.incrementAndGet();
+                            context.currentTool = null;
+                        }
+                    })
+                    .doOnError(e -> {
+                        if (context != null && context.currentTool != null) {
+                            ToolMetrics toolMetrics = TOOL_METRICS.computeIfAbsent(context.currentTool, k -> new ToolMetrics());
+                            toolMetrics.errorCount.incrementAndGet();
+                        }
+                    });
+        });
     }
 
     @Override
     public Flux<AgentEvent> onModelCall(Agent agent, RuntimeContext ctx, ModelCallInput input,
-                                        Function<ModelCallInput, Flux<AgentEvent>> next) {
-        MetricsContext context = METRICS_CONTEXT.get();
+                                         Function<ModelCallInput, Flux<AgentEvent>> next) {
+        return reactor.core.publisher.Flux.<AgentEvent>deferContextual(ctxView -> {
+            MetricsContext context = resolveContext(ctxView);
 
-        return next.apply(input)
-                .doOnNext(event -> {
-                    if (context != null && event.getType() == AgentEventType.MODEL_CALL_END && event instanceof ModelCallEndEvent) {
-                        ModelCallEndEvent modelEvent = (ModelCallEndEvent) event;
-                        if (modelEvent.getUsage() != null) {
-                            int tokens = modelEvent.getUsage().getTotalTokens();
-                            if (tokens > 0) {
-                                context.tokens.addAndGet(tokens);
-                                GLOBAL_TOKENS.addAndGet(tokens);
+            return next.apply(input)
+                    .doOnNext(event -> {
+                        if (context != null && event.getType() == AgentEventType.MODEL_CALL_END && event instanceof ModelCallEndEvent) {
+                            ModelCallEndEvent modelEvent = (ModelCallEndEvent) event;
+                            if (modelEvent.getUsage() != null) {
+                                int tokens = modelEvent.getUsage().getTotalTokens();
+                                if (tokens > 0) {
+                                    context.tokens.addAndGet(tokens);
+                                    GLOBAL_TOKENS.addAndGet(tokens);
+                                }
                             }
                         }
-                    }
-                });
+                    });
+        });
+    }
+
+    /**
+     * P2-4: prefer the Reactor Context (thread-safe across phase switches); fall back
+     * to the ThreadLocal only for non-reactive invocation paths.
+     */
+    private static MetricsContext resolveContext(reactor.util.context.ContextView ctxView) {
+        MetricsContext fromContext = ctxView.getOrDefault(METRICS_CTX_KEY, null);
+        return fromContext != null ? fromContext : METRICS_CONTEXT.get();
     }
 
     /**

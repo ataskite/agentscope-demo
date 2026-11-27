@@ -24,6 +24,15 @@ spring:
 
 # AgentScope Configuration
 agentscope:
+  # P0-1 security fix: shared-token authentication for /chat/**, /api/**,
+  # /channel/**, /a2a/**, /ag-ui/**. Enabled by default; when api-token is blank
+  # a random token is generated and logged at startup. Set AGENTSCOPE_SECURITY_API_TOKEN
+  # for a stable token, or AGENTSCOPE_SECURITY_ENABLED=false for local-only dev.
+  security:
+    enabled: ${AGENTSCOPE_SECURITY_ENABLED:true}
+    api-token: ${AGENTSCOPE_SECURITY_API_TOKEN:}
+    header-name: X-API-Token
+
   # Model Configuration
   model:
     # Default model provider
@@ -53,6 +62,11 @@ agentscope:
     # Enable built-in tools
     enabled: true
 
+# P1-3 security fix: Tavily API key must be injected via environment variable.
+# Never commit a real key; web_search degrades to "unavailable" when absent.
+tavily:
+  api-key: ${TAVILY_API_KEY:}
+
   # Session Configuration
   session:
     enabled: true
@@ -61,7 +75,10 @@ agentscope:
   # Knowledge Configuration
   knowledge:
     enabled: true
-    path: src/main/resources/knowledge
+    # P3-3: runtime directory instead of a source-tree relative path — with a packaged
+    # jar the old value resolved against the process CWD and wrote into (nonexistent)
+    # source directories. Override with AGENTSCOPE_KNOWLEDGE_PATH if needed.
+    path: ${AGENTSCOPE_KNOWLEDGE_PATH:${user.home}/.agentscope/knowledge}
     embedding-model: text-embedding-v3
     dimensions: 1024
     chunk-size: 512
@@ -86,4 +103,6 @@ logging:
     com.msxf.agentscope: INFO
     METRICS: INFO
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    # P3-2: include correlation id fields; springApplicationName/traceId populate when
+    # tracing (OTel/MDC) is active, empty otherwise
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [${spring.application.name:-},%X{traceId:-},%X{spanId:-}] %logger{36} - %msg%n"

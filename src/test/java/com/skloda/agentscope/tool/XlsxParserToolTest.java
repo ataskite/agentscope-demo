@@ -1,8 +1,9 @@
 package com.skloda.agentscope.tool;
 
+import com.skloda.agentscope.security.UploadPathGuard;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 import java.io.OutputStream;
 import java.nio.file.Files;
@@ -10,16 +11,30 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Fixtures live inside the upload whitelist directory (P1-2).
+ */
 class XlsxParserToolTest {
 
-    @TempDir
-    private Path tempDir;
-
     private final XlsxParserTool tool = new XlsxParserTool();
+    private final java.util.List<String> fixtures = new java.util.ArrayList<>();
+
+    private Path whitelistPath(String name) {
+        fixtures.add(name);
+        return UploadPathGuard.uploadDir().resolve(name);
+    }
+
+    @AfterEach
+    void cleanup() throws Exception {
+        for (String name : fixtures) {
+            Files.deleteIfExists(UploadPathGuard.uploadDir().resolve(name));
+        }
+        fixtures.clear();
+    }
 
     @Test
     void parseXlsxExtractsSheetsRowsAndCellTypes() throws Exception {
-        Path file = tempDir.resolve("sample.xlsx");
+        Path file = whitelistPath("sample-" + System.nanoTime() + ".xlsx");
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
             var sheet = workbook.createSheet("Data");
             var header = sheet.createRow(0);
@@ -46,7 +61,7 @@ class XlsxParserToolTest {
 
     @Test
     void parseXlsxReturnsErrorForMissingFile() {
-        String result = tool.parseXlsx(tempDir.resolve("missing.xlsx").toString());
+        String result = tool.parseXlsx(whitelistPath("missing-" + System.nanoTime() + ".xlsx").toString());
 
         assertTrue(result.startsWith("Error parsing XLSX file: "));
     }

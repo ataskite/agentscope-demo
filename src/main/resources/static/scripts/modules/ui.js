@@ -1,4 +1,5 @@
 import { renderMarkdown, escapeHtml, getTimestamp, scrollToBottom, createFileList } from './utils.js';
+import { downloadUrl } from '../api.js?v=2.5';
 
 /* ===== DOM REFERENCES ===== */
 export const chatMessages = document.getElementById('chatMessages');
@@ -51,7 +52,7 @@ export function appendMessage(role, text, fileInfo, thinkingContent) {
                     var imgWrapper = document.createElement('div');
                     imgWrapper.className = 'message-image-wrapper';
                     var imgEl = document.createElement('img');
-                    imgEl.src = '/chat/download?fileId=' + img.fileId;
+                    imgEl.src = downloadUrl(img.fileId);
                     imgEl.alt = escapeHtml(img.fileName);
                     imgEl.onclick = function() {
                         showImageModal(img); // Use image from array
@@ -67,7 +68,7 @@ export function appendMessage(role, text, fileInfo, thinkingContent) {
                 audioContainer.className = 'message-audio';
                 var audioEl = document.createElement('audio');
                 audioEl.controls = true;
-                audioEl.src = '/chat/download?fileId=' + fileInfo.audio.fileId;
+                audioEl.src = downloadUrl(fileInfo.audio.fileId);
                 var audioLabel = document.createElement('div');
                 audioLabel.className = 'message-audio-label';
                 audioLabel.textContent = escapeHtml(fileInfo.audio.fileName);
@@ -307,7 +308,7 @@ export function showImageModal(img) {
     overlay.innerHTML =
         '<div class="image-modal-content">' +
             '<button class="image-modal-close" onclick="closeImageModal()">×</button>' +
-            '<img src="/chat/download?fileId=' + img.fileId + '" alt="' + escapeHtml(img.fileName) + '">' +
+            '<img src="' + downloadUrl(img.fileId) + '" alt="' + escapeHtml(img.fileName) + '">' +
             '<div class="image-modal-filename">' + escapeHtml(img.fileName) + '</div>' +
         '</div>';
 

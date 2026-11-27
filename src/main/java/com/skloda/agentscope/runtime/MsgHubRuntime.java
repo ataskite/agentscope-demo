@@ -87,7 +87,9 @@ public class MsgHubRuntime implements StreamingAgentRuntime {
             }
 
             // Moderator synthesis after all rounds complete
-            chain.then(Mono.defer(() -> {
+            // P3-6: keep the Disposable and dispose on sink cancel so client disconnects
+            // stop the remaining LLM rounds instead of letting them run on
+            reactor.core.Disposable disposable = chain.then(Mono.defer(() -> {
                 String moderatorPrompt = buildModeratorPrompt(topic, discussionLog);
                 Msg moderatorMsg = Msg.builder()
                         .name("user").role(MsgRole.USER)
@@ -112,6 +114,7 @@ public class MsgHubRuntime implements StreamingAgentRuntime {
                         fluxSink.complete();
                     }
             );
+            fluxSink.onCancel(disposable::dispose);
         });
 
         return Flux.merge(sinkEvents, roundtableFlux.doFinally(s -> close()))

@@ -22,7 +22,7 @@ public class AuditLoggingMiddleware implements MiddlewareBase {
         String agentName = agent != null ? agent.getName() : "unknown";
         int msgCount = input.msgs() != null ? input.msgs().size() : 0;
 
-        System.out.println("[AUDIT-LOGGING] Agent '" + agentName + "' starting with " + msgCount + " input messages");
+        // P3-2: use the logger instead of stdout (no level control, no MDC context)
         log.info("[audit] Agent '{}' starting with {} input messages", agentName, msgCount);
         long startNanos = System.nanoTime();
 
@@ -53,9 +53,15 @@ public class AuditLoggingMiddleware implements MiddlewareBase {
                                       Function<ActingInput, Flux<AgentEvent>> next) {
         List<ToolUseBlock> toolCalls = input.toolCalls();
         for (ToolUseBlock tool : toolCalls) {
-            String params = tool.getInput() != null ? tool.getInput().toString() : "{}";
-            String preview = params.length() > 80 ? params.substring(0, 80) + "..." : params;
-            log.info("[audit] Tool '{}' called with params: {}", tool.getName(), preview);
+            // P2-7: INFO records only the parameter KEY SET (bank-invoice params carry
+            // idCard/phone/email); masked values are DEBUG-only
+            log.info("[audit] Tool '{}' called with param keys: {}",
+                    tool.getName(), tool.getInput() != null ? tool.getInput().keySet() : "{}");
+            if (log.isDebugEnabled() && tool.getInput() != null) {
+                String params = LogMasking.mask(tool.getInput().toString());
+                String preview = params.length() > 80 ? params.substring(0, 80) + "..." : params;
+                log.debug("[audit] Tool '{}' called with params: {}", tool.getName(), preview);
+            }
         }
         long startNanos = System.nanoTime();
 

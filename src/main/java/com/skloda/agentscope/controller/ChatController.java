@@ -215,9 +215,10 @@ public class ChatController {
     @GetMapping("/api/sessions")
     @ResponseBody
     public List<SessionInfo> listSessions() {
+        // P2-10: count instead of materializing each agent's full transcript
         return sessionManagerService.listSessions().stream()
                 .peek(info -> info.setMessageCount(
-                        chatHistoryRepository.findByAgentId(info.getAgentId()).size()))
+                        chatHistoryRepository.countByAgentId(info.getAgentId())))
                 .toList();
     }
 
@@ -235,11 +236,15 @@ public class ChatController {
             info.setAgentId(ctx.getAgentId());
             AgentConfig cfg = agentConfigService.findAgentConfig(ctx.getAgentId()).orElse(null);
             info.setAgentName(cfg != null ? cfg.getName() : ctx.getAgentId());
-            info.setMessageCount(chatHistoryRepository.findByAgentId(ctx.getAgentId()).size());
+            info.setMessageCount(chatHistoryRepository.countByAgentId(ctx.getAgentId()));
             return ResponseEntity.ok(info);
         } catch (Exception e) {
+            // P3-1: sanitized client message, server-side detail stays in the log
             log.error("Failed to create session for agent: {}", agentId, e);
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+            String clientMessage = e instanceof IllegalArgumentException
+                    ? e.getMessage() : "Internal server error";
+            return ResponseEntity.status(e instanceof IllegalArgumentException ? 400 : 500)
+                    .body(Map.of("error", clientMessage));
         }
     }
 
@@ -455,6 +460,9 @@ public class ChatController {
             Files.createDirectories(uploadDir);
             Path filePath = uploadDir.resolve(savedName);
             file.transferTo(filePath.toFile());
+
+            // P1-2: record the file in the upload registry (audit + future ID-only access)
+            com.skloda.agentscope.security.UploadPathGuard.register(filePath);
 
             log.info("File uploaded: {} -> {}", originalName, filePath);
 

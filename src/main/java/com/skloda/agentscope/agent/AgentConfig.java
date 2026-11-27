@@ -100,7 +100,17 @@ public class AgentConfig {
     @Setter
     @Getter
     public static class PermissionConfig {
-        private String defaultMode = "bypass";
+        // P1-1 security fix: default hardened from "bypass" (allow-all) to "explore"
+        // (read-only). Agents needing mutations must set an explicit defaultMode.
+        private String defaultMode = "explore";
+
+        /**
+         * P1-1 security fix: client-supplied permissionMode is IGNORED unless the
+         * server-side agent config explicitly opts in via this flag. Authorization
+         * decisions must never be controlled by the request body.
+         */
+        private boolean allowClientOverride = false;
+
         private List<String> denyTools = new ArrayList<>();
         private List<String> askTools = new ArrayList<>();
     }

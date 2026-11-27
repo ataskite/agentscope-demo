@@ -175,9 +175,25 @@ public class BlackboardService {
                 loaded.getUpdatedAt());
     }
 
+    // P2-3: lock-table cap — keys derive from client-controlled (userId, sessionId);
+    // beyond the cap, callers share one fallback lock instead of growing the table.
+    private static final int MAX_LOCKS = 10_000;
+    private final ReentrantLock fallbackLock = new ReentrantLock();
+
+    private ReentrantLock lockFor(String slotKey) {
+        ReentrantLock existing = locks.get(slotKey);
+        if (existing != null) {
+            return existing;
+        }
+        if (locks.size() >= MAX_LOCKS) {
+            return fallbackLock;
+        }
+        return locks.computeIfAbsent(slotKey, k -> new ReentrantLock());
+    }
+
     private <T> T withLock(String userId, String sessionId, java.util.function.Supplier<T> body) {
         String slotKey = slotKey(userId, sessionId);
-        ReentrantLock lock = locks.computeIfAbsent(slotKey, k -> new ReentrantLock());
+        ReentrantLock lock = lockFor(slotKey);
         lock.lock();
         try {
             return body.get();

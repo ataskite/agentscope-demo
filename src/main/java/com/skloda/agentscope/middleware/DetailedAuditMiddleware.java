@@ -60,14 +60,16 @@ public class DetailedAuditMiddleware implements MiddlewareBase {
         log.info("[DETAILED-AUDIT] Time: {}", java.time.LocalDateTime.now());
 
         // Log input messages preview
-        if (input.msgs() != null && !input.msgs().isEmpty()) {
+        // P2-7: full message text (name/idCard/phone/email in real flows) is PII —
+        // it moves to DEBUG with masking; INFO keeps only the message count.
+        if (log.isDebugEnabled() && input.msgs() != null && !input.msgs().isEmpty()) {
             for (int i = 0; i < input.msgs().size(); i++) {
                 Msg msg = input.msgs().get(i);
-                String preview = msg.toString();
+                String preview = LogMasking.mask(msg.toString());
                 if (preview.length() > 100) {
                     preview = preview.substring(0, 100) + "...";
                 }
-                log.info("[audit]   Message[{}]: {}", i + 1, preview);
+                log.debug("[audit]   Message[{}]: {}", i + 1, preview);
             }
         }
 
@@ -103,8 +105,9 @@ public class DetailedAuditMiddleware implements MiddlewareBase {
                     log.error("[audit] Total duration: {}ms", durationMs);
                     log.error("[audit] Error: {}", e.getMessage(), e);
                     log.error("[audit] Success: false");
-                    TRACE_CONTEXT.remove();
-                });
+                })
+                // P2-4: cleanup must also run on cancel (client disconnects)
+                .doFinally(signal -> TRACE_CONTEXT.remove());
     }
 
     @Override
@@ -146,7 +149,7 @@ public class DetailedAuditMiddleware implements MiddlewareBase {
                             }
                         } else if (event.getType() == AgentEventType.THINKING_BLOCK_END) {
                             if (context.thinkingContent.length() > 0) {
-                                String thinking = context.thinkingContent.toString();
+                                String thinking = LogMasking.mask(context.thinkingContent.toString());
                                 String preview = thinking.length() > 200 ? thinking.substring(0, 200) + "..." : thinking;
                                 log.info("[audit] Thinking: {}", preview);
                                 context.thinkingContent.setLength(0);
@@ -162,7 +165,7 @@ public class DetailedAuditMiddleware implements MiddlewareBase {
                             }
                         } else if (event.getType() == AgentEventType.TEXT_BLOCK_END) {
                             if (context.textContent.length() > 0) {
-                                String text = context.textContent.toString();
+                                String text = LogMasking.mask(context.textContent.toString());
                                 String preview = text.length() > 100 ? text.substring(0, 100) + "..." : text;
                                 log.info("[audit] Output: {}", preview);
                                 context.textContent.setLength(0);
@@ -193,11 +196,16 @@ public class DetailedAuditMiddleware implements MiddlewareBase {
             log.info("[audit] Tool: {}", toolName);
             log.info("[audit] Call ID: {}", tool.getId());
 
-            // Log parameters with proper formatting
+            // P2-7: INFO records only the parameter KEY SET; masked values are DEBUG-only
+            // (bank-invoice params carry idCard/phone/email and the 150-char preview
+            // previously captured them verbatim)
             if (params != null && !params.isEmpty()) {
-                String paramsStr = formatMap(params);
-                String preview = paramsStr.length() > 150 ? paramsStr.substring(0, 150) + "..." : paramsStr;
-                log.info("[audit] Params: {}", preview);
+                log.info("[audit] Params keys: {}", params.keySet());
+                if (log.isDebugEnabled()) {
+                    String paramsStr = LogMasking.mask(formatMap(params));
+                    String preview = paramsStr.length() > 150 ? paramsStr.substring(0, 150) + "..." : paramsStr;
+                    log.debug("[audit] Params: {}", preview);
+                }
             } else {
                 log.info("[audit] Params: {{}}");
             }
@@ -221,7 +229,7 @@ public class DetailedAuditMiddleware implements MiddlewareBase {
                         }
                     } else if (context != null && event.getType() == AgentEventType.TOOL_RESULT_END) {
                         if (context.toolResultContent.length() > 0) {
-                            String result = context.toolResultContent.toString();
+                            String result = LogMasking.mask(context.toolResultContent.toString());
                             String preview = result.length() > 100 ? result.substring(0, 100) + "..." : result;
                             log.info("[audit] Result: {}", preview);
                             context.toolResultContent.setLength(0);

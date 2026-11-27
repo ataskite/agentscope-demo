@@ -19,6 +19,10 @@ public class WorkflowRunService {
 
     private static final int DEFAULT_MAX_RUNS = 100;
     private static final int INPUT_PREVIEW_LIMIT = 500;
+    // P2-2: per-run event caps — tool_result events can embed whole parsed documents,
+    // so unbounded retention multiplied by maxRuns reached hundreds of MB in heap.
+    private static final int MAX_EVENTS_PER_RUN = 200;
+    private static final int MAX_EVENT_PREVIEW_CHARS = 2_000;
 
     private final int maxRuns;
     private final Map<String, MutableWorkflowRun> runs = new ConcurrentHashMap<>();
@@ -66,9 +70,11 @@ public class WorkflowRunService {
     }
 
     public List<WorkflowRunSnapshot> listRuns() {
+        // P2-2: list view exposes metadata only — full event payloads stay out of the
+        // bulk endpoint to avoid serializing every retained run's event history.
         return runs.values().stream()
                 .sorted(Comparator.comparingLong(MutableWorkflowRun::sequence).reversed())
-                .map(MutableWorkflowRun::snapshot)
+                .map(MutableWorkflowRun::summarySnapshot)
                 .toList();
     }
 
@@ -121,7 +127,20 @@ public class WorkflowRunService {
         }
 
         private synchronized void addEvent(Map<String, Object> event) {
-            events.add(new LinkedHashMap<>(event));
+            // P2-2: cap the event count and truncate oversized event values
+            if (events.size() >= MAX_EVENTS_PER_RUN) {
+                return;
+            }
+            Map<String, Object> copy = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> entry : event.entrySet()) {
+                Object value = entry.getValue();
+                if (value instanceof String s && s.length() > MAX_EVENT_PREVIEW_CHARS) {
+                    copy.put(entry.getKey(), s.substring(0, MAX_EVENT_PREVIEW_CHARS) + "...[truncated]");
+                } else {
+                    copy.put(entry.getKey(), value);
+                }
+            }
+            events.add(copy);
         }
 
         private synchronized void complete() {
@@ -146,6 +165,21 @@ public class WorkflowRunService {
                     .startedAt(startedAt)
                     .finishedAt(finishedAt)
                     .events(List.copyOf(events))
+                    .build();
+        }
+
+        /** P2-2: metadata-only snapshot without the retained event payloads. */
+        private synchronized WorkflowRunSnapshot summarySnapshot() {
+            return WorkflowRunSnapshot.builder()
+                    .runId(runId)
+                    .agentId(agentId)
+                    .sessionId(sessionId)
+                    .inputPreview(inputPreview)
+                    .status(status)
+                    .error(error)
+                    .startedAt(startedAt)
+                    .finishedAt(finishedAt)
+                    .events(List.of())
                     .build();
         }
     }

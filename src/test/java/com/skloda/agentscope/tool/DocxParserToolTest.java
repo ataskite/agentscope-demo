@@ -2,11 +2,12 @@ package com.skloda.agentscope.tool;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.skloda.agentscope.security.UploadPathGuard;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 import java.io.OutputStream;
 import java.nio.file.Files;
@@ -15,14 +16,30 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Fixtures live inside the upload whitelist directory (P1-2): tool filePath params
+ * are only honored inside {java.io.tmpdir}/agentscope-uploads.
+ */
 class DocxParserToolTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    @TempDir
-    private Path tempDir;
-
     private final DocxParserTool tool = new DocxParserTool();
+    private final java.util.List<String> fixtures = new java.util.ArrayList<>();
+
+    private Path whitelistPath(String name) {
+        fixtures.add(name);
+        return UploadPathGuard.uploadDir().resolve(name);
+    }
+
+    @AfterEach
+    void cleanup() throws Exception {
+        for (String name : fixtures) {
+            Files.deleteIfExists(UploadPathGuard.uploadDir().resolve(name.replace(".docx", "_edited.docx")));
+            Files.deleteIfExists(UploadPathGuard.uploadDir().resolve(name));
+        }
+        fixtures.clear();
+    }
 
     @Test
     void parseDocxExtractsParagraphAndTableText() throws Exception {
@@ -36,7 +53,9 @@ class DocxParserToolTest {
 
     @Test
     void parseDocxReturnsErrorForMissingFile() {
-        String result = tool.parseDocx(tempDir.resolve("missing.docx").toString());
+        // Missing but INSIDE the whitelist: exercises the file-not-found branch,
+        // not the whitelist rejection
+        String result = tool.parseDocx(whitelistPath("missing-" + System.nanoTime() + ".docx").toString());
 
         assertTrue(result.startsWith("Error parsing DOCX file: "));
     }
@@ -64,7 +83,7 @@ class DocxParserToolTest {
 
     @Test
     void editDocxReportsMissingSourceFile() {
-        String result = tool.editDocx(tempDir.resolve("missing.docx").toString(),
+        String result = tool.editDocx(whitelistPath("missing-" + System.nanoTime() + ".docx").toString(),
                 "[{\"placeholder\":\"{{name}}\",\"value\":\"张三\"}]");
 
         assertTrue(result.contains("\"success\":false"));
@@ -72,7 +91,7 @@ class DocxParserToolTest {
     }
 
     private Path createDocx(String paragraphText, String tableValue) throws Exception {
-        Path file = tempDir.resolve("sample.docx");
+        Path file = whitelistPath("sample-" + System.nanoTime() + ".docx");
         try (XWPFDocument document = new XWPFDocument()) {
             XWPFParagraph paragraph = document.createParagraph();
             paragraph.createRun().setText(paragraphText);

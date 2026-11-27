@@ -1,15 +1,18 @@
 package com.skloda.agentscope;
 
+import com.skloda.agentscope.security.SecurityProperties;
 import com.skloda.agentscope.service.KnowledgeProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.context.WebServerInitializedEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.stereotype.Component;
 
 @SpringBootApplication
-@EnableConfigurationProperties(KnowledgeProperties.class)
+@EnableScheduling // P1-4: ApprovalService.cleanupExpired (@Scheduled) never ran without this
+@EnableConfigurationProperties({KnowledgeProperties.class, SecurityProperties.class})
 public class AgentScopeDemoApplication {
 
     public static void main(String[] args) {

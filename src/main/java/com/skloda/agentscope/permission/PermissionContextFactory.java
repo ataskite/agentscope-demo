@@ -9,6 +9,14 @@ import java.util.List;
 @Component
 public class PermissionContextFactory {
 
+    /**
+     * Framework tools that must never run without an explicit, configured permission
+     * policy. Used by {@link #buildFailClosed()} as defense-in-depth for agents that
+     * mount system tools without any {@code permissionConfig}.
+     */
+    private static final List<String> FAIL_CLOSED_DENY_TOOLS =
+            List.of("execute_shell_command", "write_text_file", "edit_docx");
+
     public PermissionContextState build(String mode, AgentConfig.PermissionConfig config) {
         PermissionContextState.Builder builder = PermissionContextState.builder()
                 .mode(PermissionMode.fromString(mode != null ? mode : "bypass"));
@@ -20,6 +28,20 @@ public class PermissionContextFactory {
             }
         }
 
+        return builder.build();
+    }
+
+    /**
+     * P0-1/P1-1 security fix: fail-closed permission context injected when an agent
+     * mounts system tools without any {@code permissionConfig}. EXPLORE mode blocks
+     * mutations; the high-risk framework tools are additionally denied explicitly.
+     */
+    public PermissionContextState buildFailClosed() {
+        PermissionContextState.Builder builder = PermissionContextState.builder()
+                .mode(PermissionMode.EXPLORE);
+        for (String tool : FAIL_CLOSED_DENY_TOOLS) {
+            builder.addDenyRule(tool, new PermissionRule(tool, null, PermissionBehavior.DENY, "fail-closed-default"));
+        }
         return builder.build();
     }
 

@@ -120,10 +120,16 @@ public class McpDemoServer {
         return false;
     }
 
+    // P2-11: pin exact npm versions — `npx -y pkg` resolved latest at every startup,
+    // making dependency resolution unreproducible and exposing the process to supply
+    // chain events (malicious version publication). Upgrade deliberately, not implicitly.
+    private static final String SUPERGATEWAY_VERSION = "4.3.0";
+    private static final String MCP_SERVER_EVERYTHING_VERSION = "2.3.1";
+
     private void startSseServer() throws IOException {
         ProcessBuilder pb = new ProcessBuilder(
-                "npx", "-y", "supergateway",
-                "--stdio", "npx -y @modelcontextprotocol/server-everything",
+                "npx", "-y", "supergateway@" + SUPERGATEWAY_VERSION,
+                "--stdio", "npx -y @modelcontextprotocol/server-everything@" + MCP_SERVER_EVERYTHING_VERSION,
                 "--port", String.valueOf(ssePort),
                 "--transport", "sse"
         );
@@ -136,8 +142,8 @@ public class McpDemoServer {
 
     private void startHttpServer() throws IOException {
         ProcessBuilder pb = new ProcessBuilder(
-                "npx", "-y", "supergateway",
-                "--stdio", "npx -y @modelcontextprotocol/server-everything",
+                "npx", "-y", "supergateway@" + SUPERGATEWAY_VERSION,
+                "--stdio", "npx -y @modelcontextprotocol/server-everything@" + MCP_SERVER_EVERYTHING_VERSION,
                 "--port", String.valueOf(httpPort),
                 "--transport", "streamable-http"
         );

@@ -102,6 +102,10 @@ public class SupervisorRuntime implements StreamingAgentRuntime {
 
     /** Cache of per-slot locks (shared across all SupervisorRuntimes in the JVM). */
     private static final Map<String, ReentrantLock> SLOT_LOCKS = new ConcurrentHashMap<>();
+    // P2-3: slot keys derive from client-controlled (userId, sessionId); beyond the cap
+    // a shared fallback lock prevents unbounded growth of the static lock table.
+    private static final int MAX_SLOT_LOCKS = 10_000;
+    private static final ReentrantLock FALLBACK_SLOT_LOCK = new ReentrantLock();
 
     public SupervisorRuntime(AgentConfig supervisorConfig,
                              ReActAgent supervisorAgent,
@@ -121,8 +125,15 @@ public class SupervisorRuntime implements StreamingAgentRuntime {
         this.sessionId = sessionId == null || sessionId.isBlank()
                 ? ("supervisor-" + System.identityHashCode(this))
                 : sessionId;
-        this.sessionLock = SLOT_LOCKS.computeIfAbsent(slotKey(this.userId, this.sessionId),
-                k -> new ReentrantLock());
+        String slotKey = slotKey(this.userId, this.sessionId);
+        ReentrantLock existing = SLOT_LOCKS.get(slotKey);
+        if (existing != null) {
+            this.sessionLock = existing;
+        } else if (SLOT_LOCKS.size() >= MAX_SLOT_LOCKS) {
+            this.sessionLock = FALLBACK_SLOT_LOCK;
+        } else {
+            this.sessionLock = SLOT_LOCKS.computeIfAbsent(slotKey, k -> new ReentrantLock());
+        }
         this.supervisorStateAccessor = new AgentStateAccessor(supervisorAgent);
     }
 
@@ -547,7 +558,11 @@ public class SupervisorRuntime implements StreamingAgentRuntime {
                     withSource.put("source", expertId);
                     sink.next(withSource);
                 })
-                .blockLast();
+                // 待确认-2 fix: bounded wait — a hung LLM stream must not hold the session
+                // slot lock and the boundedElastic worker forever. Verified that neither the
+                // framework streamEvents() nor the DashScope SDK guarantees a request-level
+                // timeout visible in this repo, so the guard is enforced here.
+                .blockLast(java.time.Duration.ofMinutes(5));
 
         return replyHolder[0];
     }

@@ -15,12 +15,18 @@ import java.util.Map;
 public class FilesystemSpecFactory {
 
     public LocalFilesystemSpec createLocal() {
+        // P0-1 security fix: inheritEnv(false) stops sandbox commands from seeing the
+        // full server environment (previously DASHSCOPE_API_KEY etc. were exposed to
+        // any sandboxed shell). Only the explicitly whitelisted variables below are
+        // injected.
+        String dashscopeKey = System.getenv("DASHSCOPE_API_KEY");
         return new LocalFilesystemSpec()
                 .mode(LocalFsMode.SANDBOXED)
                 .project(Paths.get(System.getProperty("java.io.tmpdir"), "agentscope-sandbox"))
                 .executeTimeoutSeconds(120)
                 .maxOutputBytes(10000000)
-                .inheritEnv(true);
+                .inheritEnv(false)
+                .env("DASHSCOPE_API_KEY", dashscopeKey != null ? dashscopeKey : "");
     }
 
     public LocalFilesystemSpec createLocalUnrestricted() {

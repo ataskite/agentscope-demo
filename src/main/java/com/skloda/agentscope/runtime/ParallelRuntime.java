@@ -62,7 +62,9 @@ public class ParallelRuntime implements StreamingAgentRuntime {
                 agentMonos.add(agentMono);
             }
 
-            Flux.merge(agentMonos)
+            // P3-6: keep the Disposable and dispose on sink cancel so client disconnects
+            // stop the inner LLM chain instead of letting it run to completion
+            reactor.core.Disposable disposable = Flux.merge(agentMonos)
                     .collectList()
                     .subscribe(
                             results -> {
@@ -88,6 +90,7 @@ public class ParallelRuntime implements StreamingAgentRuntime {
                                 fluxSink.complete();
                             }
                     );
+            fluxSink.onCancel(disposable::dispose);
         });
 
         return Flux.merge(sinkEvents, pipelineFlux.doFinally(s -> close()))

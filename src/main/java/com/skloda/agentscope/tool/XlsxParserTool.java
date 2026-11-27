@@ -17,6 +17,10 @@ public class XlsxParserTool {
     @Tool(name = "parse_xlsx", description = "Parse an .xlsx file and extract its content including sheet names, headers, and row data. Returns the spreadsheet content in a readable format.")
     public String parseXlsx(
             @ToolParam(name = "filePath", description = "Absolute path to the .xlsx file") String filePath) {
+        // P1-2: tool entry paths are restricted to the upload whitelist directory
+        if (!com.skloda.agentscope.security.UploadPathGuard.isAllowed(filePath)) {
+            return "Error parsing XLSX file: filePath is required";
+        }
         log.info("Parsing XLSX file: {}", filePath);
         StringBuilder sb = new StringBuilder();
 

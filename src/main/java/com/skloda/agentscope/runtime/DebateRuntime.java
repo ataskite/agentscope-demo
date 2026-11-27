@@ -76,7 +76,9 @@ public class DebateRuntime implements StreamingAgentRuntime {
                 }
             }
 
-            chain.then(Mono.defer(() -> {
+            // P3-6: keep the Disposable and dispose on sink cancel so client disconnects
+            // stop the remaining LLM debate rounds instead of letting them run on
+            reactor.core.Disposable disposable = chain.then(Mono.defer(() -> {
                 String judgeInput = buildJudgePrompt(topic, allArguments);
                 Msg judgeMsg = Msg.builder()
                         .name("user").role(MsgRole.USER)
@@ -100,6 +102,7 @@ public class DebateRuntime implements StreamingAgentRuntime {
                         fluxSink.complete();
                     }
             );
+            fluxSink.onCancel(disposable::dispose);
         });
 
         return Flux.merge(sinkEvents, debateFlux.doFinally(s -> close()))

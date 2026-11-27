@@ -1,4 +1,4 @@
-import { uploadFile } from '../api.js?v=2.5';
+import { uploadFile, downloadUrl } from '../api.js?v=2.5';
 import { escapeHtml } from './utils.js';
 
 /* ===== INIT: bind upload events programmatically ===== */
@@ -239,7 +239,7 @@ window.showImageModal = function(index) {
     overlay.innerHTML =
         '<div class="image-modal-content">' +
             '<button class="image-modal-close" onclick="window.closeImageModal()">×</button>' +
-            '<img src="/chat/download?fileId=' + img.fileId + '" alt="' + escapeHtml(img.fileName) + '">' +
+            '<img src="' + downloadUrl(img.fileId) + '" alt="' + escapeHtml(img.fileName) + '">' +
             '<div class="image-modal-filename">' + escapeHtml(img.fileName) + '</div>' +
         '</div>';
 
